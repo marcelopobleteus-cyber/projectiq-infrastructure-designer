@@ -6,7 +6,8 @@ import { Database } from '@/types/supabase'
 import {
   createCameraLocation,
   updateCameraCoordinates,
-  updateCameraDetails
+  updateCameraDetails,
+  deleteCameraLocation
 } from '../actions-sprint2'
 
 type CameraLocation = Database['public']['Tables']['camera_locations']['Row']
@@ -313,6 +314,26 @@ export default function ProjectMapCanvas({
     })
   }
 
+  const handleDeleteCamera = async () => {
+    if (!selectedCamera) return
+    if (!confirm(`Are you sure you want to delete ${selectedCamera.camera_id_tag}?`)) return
+
+    startTransition(async () => {
+      const result = await deleteCameraLocation({
+        id: selectedCamera.id,
+        projectId
+      })
+
+      if (result.error) {
+        setPanelMessage({ type: 'error', text: result.error })
+      } else {
+        // Remove from local state
+        setCameras(prev => prev.filter(c => c.id !== selectedCamera.id))
+        setSelectedCamera(null)
+      }
+    })
+  }
+
   // Return warning banner if Google Maps API Key is missing
   if (!googleMapsApiKey) {
     return (
@@ -574,13 +595,21 @@ export default function ProjectMapCanvas({
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-slate-850 mt-4">
+              <div className="pt-4 border-t border-slate-850 mt-4 flex gap-3">
+                <button
+                  type="button"
+                  onClick={handleDeleteCamera}
+                  disabled={isPending}
+                  className="flex-1 py-2.5 px-4 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-900/50 text-rose-300 font-medium rounded-xl transition-all active:scale-[0.98] text-xs focus:outline-none disabled:opacity-50"
+                >
+                  Delete
+                </button>
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-700 text-white font-medium rounded-xl transition-all shadow-md shadow-indigo-600/10 active:scale-[0.98] text-xs focus:outline-none"
+                  className="flex-[2] py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-700 text-white font-medium rounded-xl transition-all shadow-md shadow-indigo-600/10 active:scale-[0.98] text-xs focus:outline-none"
                 >
-                  {isPending ? 'Saving details...' : 'Save Configuration'}
+                  {isPending ? 'Saving...' : 'Save Configuration'}
                 </button>
               </div>
             </form>

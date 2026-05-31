@@ -192,3 +192,23 @@ export async function updateCameraDetails(params: {
   revalidatePath(`/projects/${params.projectId}`)
   return { success: true, data }
 }
+
+export async function deleteCameraLocation(params: {
+  id: string
+  projectId: string
+}) {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('camera_locations')
+    .delete()
+    .eq('id', params.id)
+
+  if (error) {
+    return { error: `Failed to delete camera: ${error.message}` }
+  }
+
+  revalidatePath(`/projects/${params.projectId}`)
+  return { success: true }
+}
+
