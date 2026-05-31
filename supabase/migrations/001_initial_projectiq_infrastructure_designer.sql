@@ -1,7 +1,39 @@
+-- Drop existing objects if they exist to allow clean rebuild
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+DROP FUNCTION IF EXISTS public.handle_new_user_provisioning();
+DROP TABLE IF EXISTS public.bom_items CASCADE;
+DROP TABLE IF EXISTS public.field_tasks CASCADE;
+DROP TABLE IF EXISTS public.switch_ports CASCADE;
+DROP TABLE IF EXISTS public.camera_locations CASCADE;
+DROP TABLE IF EXISTS public.network_devices CASCADE;
+DROP TABLE IF EXISTS public.camera_models CASCADE;
+DROP TABLE IF EXISTS public.projects CASCADE;
+DROP TABLE IF EXISTS public.organization_members CASCADE;
+DROP TABLE IF EXISTS public.organizations CASCADE;
+DROP TABLE IF EXISTS public.profiles CASCADE;
+
+DROP TYPE IF EXISTS public.user_role CASCADE;
+DROP TYPE IF EXISTS public.device_type CASCADE;
+DROP TYPE IF EXISTS public.port_media_type CASCADE;
+DROP TYPE IF EXISTS public.port_assignment_type CASCADE;
+DROP TYPE IF EXISTS public.camera_status CASCADE;
+DROP TYPE IF EXISTS public.comm_type CASCADE;
+DROP TYPE IF EXISTS public.power_type CASCADE;
+DROP TYPE IF EXISTS public.task_status CASCADE;
+DROP TYPE IF EXISTS public.bom_source_type CASCADE;
+
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- Enums
-CREATE TYPE task_status AS ENUM ('pending', 'in_progress', 'completed', 'blocked');
+CREATE TYPE public.user_role AS ENUM ('owner', 'admin', 'member');
+CREATE TYPE public.device_type AS ENUM ('switch', 'nvr', 'router', 'patch_panel', 'other');
+CREATE TYPE public.port_media_type AS ENUM ('copper', 'fiber');
+CREATE TYPE public.port_assignment_type AS ENUM ('camera', 'device', 'uplink', 'unused');
+CREATE TYPE public.camera_status AS ENUM ('planned', 'in_progress', 'complete', 'issue');
+CREATE TYPE public.comm_type AS ENUM ('copper', 'fiber', 'wireless');
+CREATE TYPE public.power_type AS ENUM ('poe', 'poe+', 'local', 'solar');
+CREATE TYPE public.task_status AS ENUM ('pending', 'in_progress', 'completed', 'blocked');
+CREATE TYPE public.bom_source_type AS ENUM ('catalog', 'custom');
 
 -- Common update trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -33,7 +65,7 @@ CREATE TABLE public.organization_members (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id uuid REFERENCES public.organizations(id) ON DELETE CASCADE NOT NULL,
     profile_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
-    role text NOT NULL CHECK (role IN ('owner', 'admin', 'member')),
+    role public.user_role NOT NULL DEFAULT 'member'::public.user_role,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     UNIQUE (organization_id, profile_id)
 );
@@ -70,7 +102,7 @@ CREATE TABLE public.network_devices (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id uuid REFERENCES public.projects(id) ON DELETE CASCADE NOT NULL,
     name text NOT NULL,
-    device_type text NOT NULL CHECK (device_type IN ('switch', 'nvr', 'router', 'patch_panel', 'other')),
+    device_type public.device_type NOT NULL DEFAULT 'switch'::public.device_type,
     model_number text,
     manufacturer text,
     total_ports integer,
@@ -84,13 +116,20 @@ CREATE TABLE public.network_devices (
 CREATE TABLE public.camera_locations (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id uuid REFERENCES public.projects(id) ON DELETE CASCADE NOT NULL,
-    camera_model_id uuid REFERENCES public.camera_models(id) ON DELETE SET NULL,
-    name text NOT NULL,
-    latitude numeric(9,6) NOT NULL,
-    longitude numeric(9,6) NOT NULL,
+    camera_id_tag text NOT NULL,
+    latitude double precision NOT NULL CHECK (latitude >= -90.0 AND latitude <= 90.0),
+    longitude double precision NOT NULL CHECK (longitude >= -180.0 AND longitude <= 180.0),
+    address_reference text,
+    structure_reference text,
+    camera_model_id uuid NOT NULL REFERENCES public.camera_models(id) ON DELETE CASCADE,
+    communication_type public.comm_type NOT NULL DEFAULT 'copper'::public.comm_type,
+    power_type public.power_type NOT NULL DEFAULT 'poe'::public.power_type,
+    assigned_network_device_id uuid REFERENCES public.network_devices(id) ON DELETE SET NULL,
+    status public.camera_status NOT NULL DEFAULT 'planned'::public.camera_status,
     notes text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now()
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    UNIQUE (project_id, camera_id_tag)
 );
 
 -- Switch Ports Table (assigned_camera_location_id is unique -> 1-to-1 camera-to-port assignment MVP rule)
@@ -113,7 +152,7 @@ CREATE TABLE public.field_tasks (
     project_id uuid REFERENCES public.projects(id) ON DELETE CASCADE NOT NULL,
     title text NOT NULL,
     description text,
-    status task_status DEFAULT 'pending'::task_status NOT NULL,
+    status public.task_status DEFAULT 'pending'::public.task_status NOT NULL,
     assigned_to uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
     due_date timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
@@ -130,6 +169,7 @@ CREATE TABLE public.bom_items (
     quantity numeric(12,2) DEFAULT 1.00 NOT NULL,
     unit text DEFAULT 'pcs' NOT NULL,
     unit_cost numeric(12,2) DEFAULT 0.00 NOT NULL,
+    source public.bom_source_type NOT NULL DEFAULT 'catalog'::public.bom_source_type,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now()
 );
@@ -185,7 +225,7 @@ USING (
 CREATE POLICY update_organizations ON public.organizations FOR UPDATE TO authenticated
 USING (
   EXISTS (
-    SELECT 1 FROM public.organization_members WHERE organization_id = public.organizations.id AND profile_id = auth.uid() AND role IN ('owner', 'admin')
+    SELECT 1 FROM public.organization_members WHERE organization_id = public.organizations.id AND profile_id = auth.uid() AND role IN ('owner'::public.user_role, 'admin'::public.user_role)
   )
 );
 
@@ -200,7 +240,7 @@ USING (
 CREATE POLICY modify_organization_members ON public.organization_members FOR ALL TO authenticated
 USING (
   EXISTS (
-    SELECT 1 FROM public.organization_members WHERE organization_id = public.organization_members.organization_id AND profile_id = auth.uid() AND role IN ('owner', 'admin')
+    SELECT 1 FROM public.organization_members WHERE organization_id = public.organization_members.organization_id AND profile_id = auth.uid() AND role IN ('owner'::public.user_role, 'admin'::public.user_role)
   )
 );
 
@@ -291,9 +331,9 @@ BEGIN
     VALUES (org_name)
     RETURNING id INTO new_org_id;
 
-    -- Add user as owner (Correction 1: owner role)
+    -- Add user as owner
     INSERT INTO public.organization_members (organization_id, profile_id, role)
-    VALUES (new_org_id, new.id, 'owner');
+    VALUES (new_org_id, new.id, 'owner'::public.user_role);
 
     RETURN NEW;
 END;

@@ -23,6 +23,7 @@ export type Database = {
           part_number: string | null
           project_id: string
           quantity: number
+          source: Database["public"]["Enums"]["bom_source_type"]
           unit: string
           unit_cost: number
           updated_at: string | null
@@ -35,6 +36,7 @@ export type Database = {
           part_number?: string | null
           project_id: string
           quantity?: number
+          source?: Database["public"]["Enums"]["bom_source_type"]
           unit?: string
           unit_cost?: number
           updated_at?: string | null
@@ -47,6 +49,7 @@ export type Database = {
           part_number?: string | null
           project_id?: string
           quantity?: number
+          source?: Database["public"]["Enums"]["bom_source_type"]
           unit?: string
           unit_cost?: number
           updated_at?: string | null
@@ -63,39 +66,64 @@ export type Database = {
       }
       camera_locations: {
         Row: {
-          camera_model_id: string | null
+          address_reference: string | null
+          assigned_network_device_id: string | null
+          camera_id_tag: string
+          camera_model_id: string
+          communication_type: Database["public"]["Enums"]["comm_type"]
           created_at: string
           id: string
           latitude: number
           longitude: number
-          name: string
           notes: string | null
+          power_type: Database["public"]["Enums"]["power_type"]
           project_id: string
-          updated_at: string | null
+          status: Database["public"]["Enums"]["camera_status"]
+          structure_reference: string | null
+          updated_at: string
         }
         Insert: {
-          camera_model_id?: string | null
+          address_reference?: string | null
+          assigned_network_device_id?: string | null
+          camera_id_tag: string
+          camera_model_id: string
+          communication_type?: Database["public"]["Enums"]["comm_type"]
           created_at?: string
           id?: string
           latitude: number
           longitude: number
-          name: string
           notes?: string | null
+          power_type?: Database["public"]["Enums"]["power_type"]
           project_id: string
-          updated_at?: string | null
+          status?: Database["public"]["Enums"]["camera_status"]
+          structure_reference?: string | null
+          updated_at?: string
         }
         Update: {
-          camera_model_id?: string | null
+          address_reference?: string | null
+          assigned_network_device_id?: string | null
+          camera_id_tag?: string
+          camera_model_id?: string
+          communication_type?: Database["public"]["Enums"]["comm_type"]
           created_at?: string
           id?: string
           latitude?: number
           longitude?: number
-          name?: string
           notes?: string | null
+          power_type?: Database["public"]["Enums"]["power_type"]
           project_id?: string
-          updated_at?: string | null
+          status?: Database["public"]["Enums"]["camera_status"]
+          structure_reference?: string | null
+          updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "camera_locations_assigned_network_device_id_fkey"
+            columns: ["assigned_network_device_id"]
+            isOneToOne: false
+            referencedRelation: "network_devices"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "camera_locations_camera_model_id_fkey"
             columns: ["camera_model_id"]
@@ -205,7 +233,7 @@ export type Database = {
       network_devices: {
         Row: {
           created_at: string
-          device_type: string
+          device_type: Database["public"]["Enums"]["device_type"]
           id: string
           ip_address: string | null
           manufacturer: string | null
@@ -218,7 +246,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          device_type: string
+          device_type?: Database["public"]["Enums"]["device_type"]
           id?: string
           ip_address?: string | null
           manufacturer?: string | null
@@ -231,7 +259,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          device_type?: string
+          device_type?: Database["public"]["Enums"]["device_type"]
           id?: string
           ip_address?: string | null
           manufacturer?: string | null
@@ -258,21 +286,21 @@ export type Database = {
           id: string
           organization_id: string
           profile_id: string
-          role: string
+          role: Database["public"]["Enums"]["user_role"]
         }
         Insert: {
           created_at?: string
           id?: string
           organization_id: string
           profile_id: string
-          role: string
+          role?: Database["public"]["Enums"]["user_role"]
         }
         Update: {
           created_at?: string
           id?: string
           organization_id?: string
           profile_id?: string
-          role?: string
+          role?: Database["public"]["Enums"]["user_role"]
         }
         Relationships: [
           {
@@ -436,7 +464,15 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      bom_source_type: "catalog" | "custom"
+      camera_status: "planned" | "in_progress" | "complete" | "issue"
+      comm_type: "copper" | "fiber" | "wireless"
+      device_type: "switch" | "nvr" | "router" | "patch_panel" | "other"
+      port_assignment_type: "camera" | "device" | "uplink" | "unused"
+      port_media_type: "copper" | "fiber"
+      power_type: "poe" | "poe+" | "local" | "solar"
       task_status: "pending" | "in_progress" | "completed" | "blocked"
+      user_role: "owner" | "admin" | "member"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -564,7 +600,15 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      bom_source_type: ["catalog", "custom"],
+      camera_status: ["planned", "in_progress", "complete", "issue"],
+      comm_type: ["copper", "fiber", "wireless"],
+      device_type: ["switch", "nvr", "router", "patch_panel", "other"],
+      port_assignment_type: ["camera", "device", "uplink", "unused"],
+      port_media_type: ["copper", "fiber"],
+      power_type: ["poe", "poe+", "local", "solar"],
       task_status: ["pending", "in_progress", "completed", "blocked"],
+      user_role: ["owner", "admin", "member"],
     },
   },
 } as const
