@@ -4,10 +4,10 @@ ProjectIQ Infrastructure Designer is a high-performance spatial planner for ente
 
 ## Tech Stack
 
-- **Framework:** Next.js (App Router, Server Actions, TypeScript)
-- **Styling:** Tailwind CSS (v4)
-- **Database & Auth:** Supabase (Postgres, RLS, Auth SSR)
-- **Deployment:** Vercel
+* **Framework:** Next.js App Router, Server Actions, TypeScript
+* **Styling:** Tailwind CSS v4
+* **Database & Auth:** Supabase Postgres, RLS, Auth SSR
+* **Deployment:** Vercel
 
 ## Deployment & Reference IDs
 
@@ -75,5 +75,3 @@ npm run dev
 - Camera marker placement and drag-and-drop coordinate adjustment.
 - Camera coverage and angle visualizations on map.
 - Network device linkage and port allocations panel.
-
-<!-- Last updated: 2026-05-31T12:00:00Z -->
