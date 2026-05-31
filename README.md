@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ProjectIQ Infrastructure Designer
 
-## Getting Started
+ProjectIQ Infrastructure Designer is a high-performance spatial planner for enterprise infrastructure deployments. This tool allows engineers and coordinators to map networks, place CCTV cameras, calculate power requirements, configure switch port allocations, and generate bills of materials (BOM).
 
-First, run the development server:
+## Tech Stack
+- **Framework:** Next.js (App Router, Server Actions, TypeScript)
+- **Styling:** Tailwind CSS (v4)
+- **Database & Auth:** Supabase (Postgres, RLS, Auth SSR)
+- **Deployment:** Vercel
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Deployment & Reference IDs
+- **Vercel Production URL:** [https://projectiq-infrastructure-designer.vercel.app](https://projectiq-infrastructure-designer.vercel.app)
+- **Supabase Project ID:** `fkokqccxhljbuqyutkxi`
+- **GitHub Repository:** [https://github.com/marcelopobleteus-cyber/projectiq-infrastructure-designer](https://github.com/marcelopobleteus-cyber/projectiq-infrastructure-designer)
+
+## Sprint 1 Scope
+- **Database Architecture:** Created complete schema containing enums, profiles, organizations, memberships, camera models, network devices, switch ports, and tasks.
+- **Auth Provisioning:** Automatically provisions user profiles, initial organization workspaces, and assigns the creator as the workspace `owner` upon signup.
+- **Client/Server Utilities:** Safe browser and server Supabase integrations using `@supabase/ssr` cookies.
+- **Project Catalog & Creation:** Page lists projects and features an automated project creator which resolves the user's organization from database memberships (Correction 4).
+- **Project Detail Page:** Detail route showing basic info and coordinate properties.
+
+## Database Tables & Modules
+- `profiles`: User information (e.g. name, avatar).
+- `organizations`: Enterprise organization workspaces.
+- `organization_members`: User assignments to organizations with roles (`owner`, `admin`, `member`).
+- `projects`: Infrastructure projects under an organization.
+- `camera_models`: Reusable catalog of cameras (pre-seeded).
+- `network_devices`: Switches, Routers, NVRs, and Patch Panels.
+- `camera_locations`: CCTV placement coordinates.
+- `switch_ports`: Switchport configurations referencing the single source of truth camera-to-port assignment.
+- `field_tasks`: Team task management (`status` using `task_status` enum).
+- `bom_items`: Bill of Materials items tracking costs (`quantity` configured as `NUMERIC(12,2)`).
+
+## Current Routes
+- **Public Routes:**
+  - `/` (Landing page)
+  - `/login` (Sign in page)
+  - `/register` (Sign up page)
+  - `/auth/callback` (OAuth / Session exchange endpoint)
+- **Protected Routes:**
+  - `/projects` (Project listing dashboard)
+  - `/projects/create` (Project configuration flow)
+  - `/projects/[projectId]` (Project specification view)
+
+## Local Development Setup
+
+### Prerequisite Environment Variables
+Create a `.env.local` file in the root directory:
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://fkokqccxhljbuqyutkxi.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Installation
+```bash
+# Install dependencies
+npm install
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+# Run the local development server
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Planned for Sprint 2
+- Google Maps JavaScript API integration.
+- Camera marker placement and drag-and-drop coordinate adjustment.
+- Camera coverage and angle visualizations on map.
+- Network device linkage and port allocations panel.
