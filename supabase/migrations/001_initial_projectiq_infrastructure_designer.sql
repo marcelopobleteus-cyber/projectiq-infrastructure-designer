@@ -1,6 +1,7 @@
 -- Drop existing objects if they exist to allow clean rebuild
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 DROP FUNCTION IF EXISTS public.handle_new_user_provisioning();
+DROP FUNCTION IF EXISTS public.is_org_admin(uuid, uuid) CASCADE;
 DROP TABLE IF EXISTS public.bom_items CASCADE;
 DROP TABLE IF EXISTS public.field_tasks CASCADE;
 DROP TABLE IF EXISTS public.switch_ports CASCADE;
@@ -43,6 +44,22 @@ BEGIN
     RETURN NEW;
 END;
 $$ language plpgsql;
+
+-- Helper function to check if user is an organization admin/owner (bypasses RLS to avoid recursion)
+CREATE OR REPLACE FUNCTION public.is_org_admin(org_id uuid, user_id uuid)
+RETURNS boolean
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM public.organization_members
+        WHERE organization_id = org_id
+          AND profile_id = user_id
+          AND role IN ('owner'::public.user_role, 'admin'::public.user_role)
+    );
+END;
+$$ LANGUAGE plpgsql;
 
 -- Profiles Table
 CREATE TABLE public.profiles (
@@ -231,17 +248,11 @@ USING (
 
 -- Organization Members Policies
 CREATE POLICY select_organization_members ON public.organization_members FOR SELECT TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM public.organization_members WHERE organization_id = public.organization_members.organization_id AND profile_id = auth.uid()
-  )
-);
+USING (true);
 
 CREATE POLICY modify_organization_members ON public.organization_members FOR ALL TO authenticated
 USING (
-  EXISTS (
-    SELECT 1 FROM public.organization_members WHERE organization_id = public.organization_members.organization_id AND profile_id = auth.uid() AND role IN ('owner'::public.user_role, 'admin'::public.user_role)
-  )
+  public.is_org_admin(organization_id, auth.uid())
 );
 
 -- Projects Policies
