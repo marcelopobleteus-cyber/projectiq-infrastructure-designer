@@ -143,6 +143,7 @@ export type Database = {
       camera_models: {
         Row: {
           created_at: string
+          default_poe_draw: number
           estimated_cost: number | null
           form_factor: string | null
           id: string
@@ -155,6 +156,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          default_poe_draw?: number
           estimated_cost?: number | null
           form_factor?: string | null
           id?: string
@@ -167,6 +169,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          default_poe_draw?: number
           estimated_cost?: number | null
           form_factor?: string | null
           id?: string
@@ -236,9 +239,13 @@ export type Database = {
           device_type: Database["public"]["Enums"]["device_type"]
           id: string
           ip_address: string | null
+          latitude: number | null
+          location_reference: string | null
+          longitude: number | null
           manufacturer: string | null
           model_number: string | null
           name: string
+          poe_budget_watts: number
           project_id: string
           rack_unit: string | null
           total_ports: number | null
@@ -249,9 +256,13 @@ export type Database = {
           device_type?: Database["public"]["Enums"]["device_type"]
           id?: string
           ip_address?: string | null
+          latitude?: number | null
+          location_reference?: string | null
+          longitude?: number | null
           manufacturer?: string | null
           model_number?: string | null
           name: string
+          poe_budget_watts?: number
           project_id: string
           rack_unit?: string | null
           total_ports?: number | null
@@ -262,9 +273,13 @@ export type Database = {
           device_type?: Database["public"]["Enums"]["device_type"]
           id?: string
           ip_address?: string | null
+          latitude?: number | null
+          location_reference?: string | null
+          longitude?: number | null
           manufacturer?: string | null
           model_number?: string | null
           name?: string
+          poe_budget_watts?: number
           project_id?: string
           rack_unit?: string | null
           total_ports?: number | null
@@ -408,33 +423,48 @@ export type Database = {
       switch_ports: {
         Row: {
           assigned_camera_location_id: string | null
+          assigned_device_type: Database["public"]["Enums"]["port_assignment_type"]
           created_at: string
           id: string
           network_device_id: string
+          poe_budget_watts: number
           poe_enabled: boolean
+          port_name: string | null
           port_number: number
+          port_type: Database["public"]["Enums"]["port_media_type"]
+          speed_mbps: number
           status: string
           updated_at: string | null
           vlan_id: number
         }
         Insert: {
           assigned_camera_location_id?: string | null
+          assigned_device_type?: Database["public"]["Enums"]["port_assignment_type"]
           created_at?: string
           id?: string
           network_device_id: string
+          poe_budget_watts?: number
           poe_enabled?: boolean
+          port_name?: string | null
           port_number: number
+          port_type?: Database["public"]["Enums"]["port_media_type"]
+          speed_mbps?: number
           status?: string
           updated_at?: string | null
           vlan_id?: number
         }
         Update: {
           assigned_camera_location_id?: string | null
+          assigned_device_type?: Database["public"]["Enums"]["port_assignment_type"]
           created_at?: string
           id?: string
           network_device_id?: string
+          poe_budget_watts?: number
           poe_enabled?: boolean
+          port_name?: string | null
           port_number?: number
+          port_type?: Database["public"]["Enums"]["port_media_type"]
+          speed_mbps?: number
           status?: string
           updated_at?: string | null
           vlan_id?: number
@@ -461,13 +491,30 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      assign_camera_to_switch_port: {
+        Args: { camera_id: string; switch_port_id: string }
+        Returns: undefined
+      }
+      is_org_admin: {
+        Args: { org_id: string; user_id: string }
+        Returns: boolean
+      }
+      unassign_camera_from_switch_port: {
+        Args: { camera_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       bom_source_type: "catalog" | "custom"
       camera_status: "planned" | "in_progress" | "complete" | "issue"
       comm_type: "copper" | "fiber" | "wireless"
-      device_type: "switch" | "nvr" | "router" | "patch_panel" | "other"
+      device_type:
+        | "switch"
+        | "nvr"
+        | "router"
+        | "patch_panel"
+        | "other"
+        | "cabinet_device"
       port_assignment_type: "camera" | "device" | "uplink" | "unused"
       port_media_type: "copper" | "fiber"
       power_type: "poe" | "poe+" | "local" | "solar"
@@ -603,7 +650,14 @@ export const Constants = {
       bom_source_type: ["catalog", "custom"],
       camera_status: ["planned", "in_progress", "complete", "issue"],
       comm_type: ["copper", "fiber", "wireless"],
-      device_type: ["switch", "nvr", "router", "patch_panel", "other"],
+      device_type: [
+        "switch",
+        "nvr",
+        "router",
+        "patch_panel",
+        "other",
+        "cabinet_device",
+      ],
       port_assignment_type: ["camera", "device", "uplink", "unused"],
       port_media_type: ["copper", "fiber"],
       power_type: ["poe", "poe+", "local", "solar"],
