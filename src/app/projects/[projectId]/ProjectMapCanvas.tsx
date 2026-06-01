@@ -220,7 +220,7 @@ export default function ProjectMapCanvas({
       strokeColor: isSelected ? '#ffffff' : '#0f172a',
       strokeWeight: isSelected ? 3 : 1.5,
       scale: isSelected ? 1.5 : 1.3,
-      anchor: new google.maps.Point(12, 22),
+      anchor: typeof google !== 'undefined' && google.maps ? new google.maps.Point(12, 22) : undefined,
     }
   }
 
@@ -240,7 +240,7 @@ export default function ProjectMapCanvas({
       strokeColor: isSelected ? '#ffffff' : '#0f172a',
       strokeWeight: isSelected ? 3 : 1.5,
       scale: isSelected ? 1.3 : 1.1,
-      anchor: new google.maps.Point(12, 12),
+      anchor: typeof google !== 'undefined' && google.maps ? new google.maps.Point(12, 12) : undefined,
     }
   }
 
