@@ -1,0 +1,47 @@
+import { redirect } from 'next/navigation'
+import { createClient } from '@/utils/supabase/server'
+import { logout } from '../auth/actions'
+import AppShell from '@/components/layout/AppShell'
+import MainSidebar from '@/components/layout/MainSidebar'
+
+export default async function DesignReviewLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect('/login')
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .single()
+
+  const handleSignOut = async () => {
+    'use server'
+    await logout()
+  }
+
+  return (
+    <AppShell>
+      {/* Narrow Primary Left Sidebar */}
+      <MainSidebar
+        userEmail={user.email}
+        userName={profile?.full_name || 'User'}
+        onSignOut={handleSignOut}
+      />
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col overflow-hidden bg-slate-950">
+        {children}
+      </div>
+    </AppShell>
+  )
+}

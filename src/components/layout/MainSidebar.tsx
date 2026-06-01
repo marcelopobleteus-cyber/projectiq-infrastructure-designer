@@ -26,7 +26,7 @@ export default function MainSidebar({ userEmail, userName, onSignOut }: MainSide
       ),
       href: '/projects',
       enabled: true,
-      active: pathname === '/projects' || pathname === '/projects/create',
+      active: pathname === '/projects' || pathname === '/projects/create' || pathname.startsWith('/design-review/projects'),
     },
     {
       id: 'map',
