@@ -323,6 +323,7 @@ export type Database = {
       }
       fiber_catalog: {
         Row: {
+          cost_per_foot: number
           cost_per_meter: number
           created_at: string
           diameter_mm: number
@@ -336,6 +337,7 @@ export type Database = {
           weight_kg_km: number
         }
         Insert: {
+          cost_per_foot: number
           cost_per_meter: number
           created_at?: string
           diameter_mm: number
@@ -349,6 +351,7 @@ export type Database = {
           weight_kg_km: number
         }
         Update: {
+          cost_per_foot?: number
           cost_per_meter?: number
           created_at?: string
           diameter_mm?: number
@@ -362,6 +365,51 @@ export type Database = {
           weight_kg_km?: number
         }
         Relationships: []
+      }
+      fiber_enclosure_attachments: {
+        Row: {
+          cable_id: string
+          created_at: string
+          enclosure_id: string
+          id: string
+          label: string | null
+          port_number: number
+          updated_at: string | null
+        }
+        Insert: {
+          cable_id: string
+          created_at?: string
+          enclosure_id: string
+          id?: string
+          label?: string | null
+          port_number?: number
+          updated_at?: string | null
+        }
+        Update: {
+          cable_id?: string
+          created_at?: string
+          enclosure_id?: string
+          id?: string
+          label?: string | null
+          port_number?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fiber_enclosure_attachments_cable_id_fkey"
+            columns: ["cable_id"]
+            isOneToOne: false
+            referencedRelation: "fiber_cables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fiber_enclosure_attachments_enclosure_id_fkey"
+            columns: ["enclosure_id"]
+            isOneToOne: false
+            referencedRelation: "fiber_enclosures"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       fiber_enclosures: {
         Row: {
@@ -409,7 +457,7 @@ export type Database = {
           latitude: number
           longitude: number
           node_id_tag: string
-          node_type: string
+          node_type: Database["public"]["Enums"]["fiber_node_type"]
           notes: string | null
           project_id: string
           size_dims: string
@@ -423,7 +471,7 @@ export type Database = {
           latitude: number
           longitude: number
           node_id_tag: string
-          node_type: string
+          node_type: Database["public"]["Enums"]["fiber_node_type"]
           notes?: string | null
           project_id: string
           size_dims?: string
@@ -437,7 +485,7 @@ export type Database = {
           latitude?: number
           longitude?: number
           node_id_tag?: string
-          node_type?: string
+          node_type?: Database["public"]["Enums"]["fiber_node_type"]
           notes?: string | null
           project_id?: string
           size_dims?: string
@@ -515,6 +563,7 @@ export type Database = {
           measured_length_feet: number
           project_id: string
           route_id_tag: string
+          route_purpose: Database["public"]["Enums"]["route_purpose"]
           slack_percentage: number
           spare_capacity: number
           updated_at: string | null
@@ -529,6 +578,7 @@ export type Database = {
           measured_length_feet?: number
           project_id: string
           route_id_tag: string
+          route_purpose?: Database["public"]["Enums"]["route_purpose"]
           slack_percentage?: number
           spare_capacity?: number
           updated_at?: string | null
@@ -543,6 +593,7 @@ export type Database = {
           measured_length_feet?: number
           project_id?: string
           route_id_tag?: string
+          route_purpose?: Database["public"]["Enums"]["route_purpose"]
           slack_percentage?: number
           spare_capacity?: number
           updated_at?: string | null
@@ -567,7 +618,7 @@ export type Database = {
           fiber_number_b: number
           id: string
           node_id: string
-          status: string
+          status: Database["public"]["Enums"]["splice_status"]
           updated_at: string | null
         }
         Insert: {
@@ -579,7 +630,7 @@ export type Database = {
           fiber_number_b: number
           id?: string
           node_id: string
-          status?: string
+          status?: Database["public"]["Enums"]["splice_status"]
           updated_at?: string | null
         }
         Update: {
@@ -591,7 +642,7 @@ export type Database = {
           fiber_number_b?: number
           id?: string
           node_id?: string
-          status?: string
+          status?: Database["public"]["Enums"]["splice_status"]
           updated_at?: string | null
         }
         Relationships: [
@@ -955,9 +1006,22 @@ export type Database = {
         | "patch_panel"
         | "other"
         | "cabinet_device"
+      fiber_node_type:
+        | "handhole"
+        | "pull_box"
+        | "splice_enclosure"
+        | "cabinet"
+        | "building_entry"
       port_assignment_type: "camera" | "device" | "uplink" | "unused"
       port_media_type: "copper" | "fiber"
       power_type: "poe" | "poe+" | "local" | "solar"
+      route_purpose:
+        | "camera_backbone"
+        | "camera_drop"
+        | "network_backbone"
+        | "power_monitoring"
+        | "spare"
+      splice_status: "planned" | "installed" | "tested" | "abandoned"
       task_status: "pending" | "in_progress" | "completed" | "blocked"
       user_role: "owner" | "admin" | "member"
     }
@@ -1098,9 +1162,24 @@ export const Constants = {
         "other",
         "cabinet_device",
       ],
+      fiber_node_type: [
+        "handhole",
+        "pull_box",
+        "splice_enclosure",
+        "cabinet",
+        "building_entry",
+      ],
       port_assignment_type: ["camera", "device", "uplink", "unused"],
       port_media_type: ["copper", "fiber"],
       power_type: ["poe", "poe+", "local", "solar"],
+      route_purpose: [
+        "camera_backbone",
+        "camera_drop",
+        "network_backbone",
+        "power_monitoring",
+        "spare",
+      ],
+      splice_status: ["planned", "installed", "tested", "abandoned"],
       task_status: ["pending", "in_progress", "completed", "blocked"],
       user_role: ["owner", "admin", "member"],
     },

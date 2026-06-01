@@ -67,7 +67,7 @@ export async function getFiberDesignData(projectId: string) {
 export async function createFiberNode(params: {
   projectId: string
   nodeIdTag: string
-  nodeType: 'handhole' | 'pull_box' | 'splice_enclosure'
+  nodeType: 'handhole' | 'pull_box' | 'splice_enclosure' | 'cabinet' | 'building_entry'
   latitude: number
   longitude: number
   elevationM?: number
@@ -80,8 +80,22 @@ export async function createFiberNode(params: {
   const supabase = await createClient()
 
   // Set default slack values
-  const defaultSlack = params.nodeType === 'handhole' ? 20.0 : 0.0
+  const defaultSlack = (params.nodeType === 'handhole' || params.nodeType === 'cabinet') 
+    ? 20.0 
+    : params.nodeType === 'building_entry' 
+      ? 10.0 
+      : 0.0
   const slackVal = params.slackFeet !== undefined ? params.slackFeet : defaultSlack
+
+  const defaultSize = params.nodeType === 'handhole' 
+    ? '24x36x36' 
+    : params.nodeType === 'pull_box' 
+      ? '12x12x6' 
+      : params.nodeType === 'cabinet' 
+        ? 'Outdoor Cabinet' 
+        : params.nodeType === 'building_entry' 
+          ? 'Wall Transition Box' 
+          : 'Dome Closure'
 
   const { data: newNode, error: nodeErr } = await supabase
     .from('fiber_nodes')
@@ -92,7 +106,7 @@ export async function createFiberNode(params: {
       latitude: params.latitude,
       longitude: params.longitude,
       elevation_m: params.elevationM || 0.0,
-      size_dims: params.sizeDims || '24x36x36',
+      size_dims: params.sizeDims || defaultSize,
       slack_feet: slackVal,
       notes: params.notes || ''
     })
@@ -166,6 +180,36 @@ export async function createFiberNode(params: {
       fiber_node_id: newNode.id,
       status: 'Planned'
     })
+  } else if (params.nodeType === 'cabinet') {
+    // Auto BOM for Cabinet
+    await supabase.from('bom_items').insert({
+      project_id: params.projectId,
+      category: 'Miscellaneous',
+      part_number: 'CAB-OUTDOOR',
+      description: `Outdoor Equipment Cabinet (${params.sizeDims || 'Outdoor Cabinet'})`,
+      quantity: 1.00,
+      unit: 'pcs',
+      unit_cost: 1200.00,
+      source: 'catalog',
+      manufacturer: 'Generic',
+      fiber_node_id: newNode.id,
+      status: 'Planned'
+    })
+  } else if (params.nodeType === 'building_entry') {
+    // Auto BOM for Building Entry transition
+    await supabase.from('bom_items').insert({
+      project_id: params.projectId,
+      category: 'Miscellaneous',
+      part_number: 'BLDG-ENTRY-KIT',
+      description: `Building Entrance Transition Box (${params.sizeDims || 'Wall Transition Box'})`,
+      quantity: 1.00,
+      unit: 'pcs',
+      unit_cost: 250.00,
+      source: 'catalog',
+      manufacturer: 'Generic',
+      fiber_node_id: newNode.id,
+      status: 'Planned'
+    })
   }
 
   revalidatePath(`/projects/${params.projectId}/fiber`)
@@ -207,7 +251,6 @@ function getHaversineDistanceFeet(lat1: number, lon1: number, lat2: number, lon2
   return dMeters * 3.28084 // Convert to feet
 }
 
-// 5. Create fiber route pathway, install cables, and auto BOM items
 export async function createFiberRoute(params: {
   projectId: string
   routeIdTag: string
@@ -223,6 +266,7 @@ export async function createFiberRoute(params: {
   }[]
   cableCatalogId?: string
   fiberCount?: number
+  routePurpose?: 'camera_backbone' | 'camera_drop' | 'network_backbone' | 'power_monitoring' | 'spare'
 }) {
   const supabase = await createClient()
 
@@ -263,7 +307,8 @@ export async function createFiberRoute(params: {
       conduit_diameter_inches: params.conduitDiameterInches || 2.0,
       fill_percentage: 0.0, // Calculated on cable installation
       spare_capacity: 100.0,
-      installation_type: params.installationType
+      installation_type: params.installationType,
+      route_purpose: params.routePurpose || 'camera_backbone'
     })
     .select()
     .single()
@@ -461,7 +506,6 @@ export async function deleteFiberRoute(params: {
   return { success: true }
 }
 
-// 7. Save Splices in an enclosure node
 export async function saveFiberSplices(params: {
   projectId: string
   nodeId: string
@@ -471,7 +515,7 @@ export async function saveFiberSplices(params: {
     fiberNumA: number
     fiberNumB: number
     color?: string
-    status?: 'active' | 'spare' | 'broken'
+    status?: 'planned' | 'installed' | 'tested' | 'abandoned'
   }[]
 }) {
   const supabase = await createClient()
@@ -491,7 +535,7 @@ export async function saveFiberSplices(params: {
       fiber_number_a: s.fiberNumA,
       fiber_number_b: s.fiberNumB,
       color: s.color || 'blue',
-      status: s.status || 'active'
+      status: s.status || 'planned'
     }))
 
     const { error: spliceErr } = await supabase
@@ -504,7 +548,7 @@ export async function saveFiberSplices(params: {
   }
 
   // Update enclosure ports counts
-  const used = params.splices.filter(s => s.status === 'active').length
+  const used = params.splices.filter(s => s.status === 'installed' || s.status === 'tested').length
   const { data: enclosure } = await supabase
     .from('fiber_enclosures')
     .select('capacity')

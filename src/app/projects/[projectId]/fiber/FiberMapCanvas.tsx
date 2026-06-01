@@ -524,7 +524,7 @@ export default function FiberMapCanvas({
         fiberNumA: numA,
         fiberNumB: numB,
         color: getFiberColor(numA).name.toLowerCase(),
-        status: 'active' as const
+        status: 'installed' as const
       }
     })
 
