@@ -253,7 +253,10 @@ export default function ProjectMapCanvas({
       v: 'weekly',
     })
 
-    importLibrary('maps').then((mapsLib) => {
+    Promise.all([
+      importLibrary('maps'),
+      importLibrary('marker')
+    ]).then(([mapsLib]) => {
       if (!mapRef.current) return
       
       const newMap = new mapsLib.Map(mapRef.current, {
