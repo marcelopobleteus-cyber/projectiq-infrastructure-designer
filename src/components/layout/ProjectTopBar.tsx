@@ -25,7 +25,7 @@ export default function ProjectTopBar({
     <header className="h-14 border-b border-slate-800 flex items-center justify-between px-6 bg-slate-900/30 backdrop-blur-md shrink-0 w-full relative z-10">
       {/* Breadcrumbs */}
       <div className="flex items-center gap-2.5 text-xs">
-        <Link href="/projects" className="text-slate-400 hover:text-white transition-colors">
+        <Link href="/design-review/projects" className="text-slate-400 hover:text-white transition-colors">
           Projects
         </Link>
         <span className="text-slate-600">/</span>
