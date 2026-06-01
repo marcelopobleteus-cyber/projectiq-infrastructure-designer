@@ -60,9 +60,14 @@ export default async function DesignReviewProjectsPage() {
     deviceCount: deviceCountMap[p.id] || 0,
   }))
 
+  const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
+
   return (
     <div className="flex-1 flex overflow-hidden h-full w-full">
-      <ProjectReviewListClient initialProjects={projects} />
+      <ProjectReviewListClient 
+        initialProjects={projects} 
+        googleMapsApiKey={googleMapsApiKey}
+      />
     </div>
   )
 }

@@ -1,7 +1,8 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
+import ProjectCreateReviewClient from './new/ProjectCreateReviewClient'
 
 interface ProjectData {
   id: string
@@ -15,11 +16,23 @@ interface ProjectData {
 
 interface ProjectReviewListClientProps {
   initialProjects: ProjectData[]
+  googleMapsApiKey?: string
 }
 
-export default function ProjectReviewListClient({ initialProjects }: ProjectReviewListClientProps) {
+export default function ProjectReviewListClient({ initialProjects, googleMapsApiKey }: ProjectReviewListClientProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [showArchived, setShowArchived] = useState(false)
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+
+  // Check URL query parameters for 'create' or 'new'
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      if (params.get('create') === 'true' || params.get('new') === 'true') {
+        setIsCreateModalOpen(true)
+      }
+    }
+  }, [])
 
   // Filter projects by query
   const filteredProjects = initialProjects.filter(project =>
@@ -40,6 +53,12 @@ export default function ProjectReviewListClient({ initialProjects }: ProjectRevi
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden">
+      {isCreateModalOpen && (
+        <ProjectCreateReviewClient 
+          onClose={() => setIsCreateModalOpen(false)} 
+          googleMapsApiKey={googleMapsApiKey}
+        />
+      )}
       {/* Top Application Bar */}
       <header className="h-14 border-b border-slate-900 bg-slate-950/80 backdrop-blur-md px-6 flex items-center justify-between shrink-0 relative z-10">
         <div className="flex items-center gap-3">
@@ -57,44 +76,67 @@ export default function ProjectReviewListClient({ initialProjects }: ProjectRevi
 
       {/* Main Workspace Area */}
       <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 scrollbar-thin">
-        {/* Page Header & Actions */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        {/* 1. Page Header (Top Header) with Actions */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-900 pb-5">
           <div>
             <h2 className="text-2xl font-black text-white tracking-tight">My Projects</h2>
             <p className="text-xs text-slate-400 mt-1">Manage and configure your site infrastructure networks</p>
           </div>
-
-          <div className="flex flex-wrap items-center gap-2.5">
+          
+          {/* Project Actions */}
+          <div className="flex items-center gap-3 shrink-0">
             <button
-              disabled
-              title="Coming soon"
-              className="px-3.5 py-2 bg-slate-900/60 hover:bg-slate-900 border border-slate-850 text-slate-500 text-xs font-semibold rounded-xl transition-all cursor-not-allowed flex items-center gap-1.5"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              Import Project
-              <span className="text-[9px] bg-slate-950 border border-slate-850 px-1 py-0.2 rounded text-slate-600 uppercase font-mono font-bold shrink-0">Soon</span>
-            </button>
-            <button
-              disabled
-              title="Coming soon"
-              className="px-3.5 py-2 bg-slate-900/60 hover:bg-slate-900 border border-slate-850 text-slate-500 text-xs font-semibold rounded-xl transition-all cursor-not-allowed flex items-center gap-1.5"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-              Add Folder
-              <span className="text-[9px] bg-slate-950 border border-slate-850 px-1 py-0.2 rounded text-slate-600 uppercase font-mono font-bold shrink-0">Soon</span>
-            </button>
-            <Link
-              href="/design-review/projects/new"
-              className="px-4 py-2 bg-indigo-650 hover:bg-indigo-600 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-indigo-950/20 active:scale-[0.98] flex items-center gap-1.5"
+              onClick={() => setIsCreateModalOpen(true)}
+              className="px-4 py-2.5 bg-indigo-650 hover:bg-indigo-600 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-indigo-950/20 active:scale-[0.98] flex items-center gap-1.5 cursor-pointer"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Add Project
-            </Link>
+            </button>
+            <button
+              disabled
+              title="Coming soon"
+              className="px-4 py-2.5 bg-slate-900 border border-slate-800 text-slate-500 text-xs font-semibold rounded-xl transition-all cursor-not-allowed flex items-center gap-1.5 hover:bg-slate-900"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Import Project
+              <span className="text-[8px] bg-slate-950 border border-slate-850 px-1 py-0.2 rounded text-slate-600 font-mono font-bold">Soon</span>
+            </button>
+            <button
+              disabled
+              title="Coming soon"
+              className="px-4 py-2.5 bg-slate-900 border border-slate-800 text-slate-500 text-xs font-semibold rounded-xl transition-all cursor-not-allowed flex items-center gap-1.5 hover:bg-slate-900"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              Add Folder
+              <span className="text-[8px] bg-slate-950 border border-slate-850 px-1 py-0.2 rounded text-slate-600 font-mono font-bold">Soon</span>
+            </button>
           </div>
         </div>
 
-        {/* Filters and Search Bar */}
+        {/* 2. Filters and Search Bar Row */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-slate-900/40 backdrop-blur-md border border-slate-850 p-4 rounded-2xl">
+          {/* Search Box */}
+          <div className="w-full sm:w-72 relative">
+            <input
+              type="text"
+              placeholder="Search projects..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-8.5 pr-4 py-2.5 bg-slate-950/50 border border-slate-850 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 transition-all font-mono"
+            />
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-550 pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </span>
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-555 hover:text-slate-300"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            )}
+          </div>
+
           {/* Toggle */}
           <div className="flex items-center gap-3">
             <button
@@ -107,34 +149,12 @@ export default function ProjectReviewListClient({ initialProjects }: ProjectRevi
               <span className="text-xs text-slate-400 group-hover:text-slate-200 transition-colors">Show archived projects</span>
             </button>
           </div>
-
-          {/* Search Box */}
-          <div className="w-full sm:w-72 relative">
-            <input
-              type="text"
-              placeholder="Search projects..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8.5 pr-4 py-2 bg-slate-950/50 border border-slate-850 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 transition-all font-mono"
-            />
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-550 pointer-events-none">
-              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            </span>
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-550 hover:text-slate-300"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
-            )}
-          </div>
         </div>
 
         {/* Project List Table */}
         {filteredProjects.length === 0 ? (
           <div className="border border-dashed border-slate-850 rounded-2xl p-16 text-center bg-slate-900/10 backdrop-blur-sm max-w-xl mx-auto mt-6 space-y-4">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-slate-950 border border-slate-850 text-slate-550">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-slate-950 border border-slate-850 text-slate-555">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
             </div>
             <div>
@@ -145,13 +165,13 @@ export default function ProjectReviewListClient({ initialProjects }: ProjectRevi
             </div>
             {!searchQuery && (
               <div className="pt-2">
-                <Link
-                  href="/design-review/projects/new"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-650 hover:bg-indigo-600 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-indigo-950/25"
+                <button
+                  onClick={() => setIsCreateModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-650 hover:bg-indigo-600 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-indigo-950/25 cursor-pointer"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                   Create Your First Project
-                </Link>
+                </button>
               </div>
             )}
           </div>
