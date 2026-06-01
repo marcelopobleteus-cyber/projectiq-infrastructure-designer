@@ -19,11 +19,15 @@ export type Database = {
           category: string
           created_at: string
           description: string
+          fiber_node_id: string | null
+          fiber_route_id: string | null
           id: string
+          manufacturer: string | null
           part_number: string | null
           project_id: string
           quantity: number
           source: Database["public"]["Enums"]["bom_source_type"]
+          status: string | null
           unit: string
           unit_cost: number
           updated_at: string | null
@@ -32,11 +36,15 @@ export type Database = {
           category: string
           created_at?: string
           description: string
+          fiber_node_id?: string | null
+          fiber_route_id?: string | null
           id?: string
+          manufacturer?: string | null
           part_number?: string | null
           project_id: string
           quantity?: number
           source?: Database["public"]["Enums"]["bom_source_type"]
+          status?: string | null
           unit?: string
           unit_cost?: number
           updated_at?: string | null
@@ -45,21 +53,97 @@ export type Database = {
           category?: string
           created_at?: string
           description?: string
+          fiber_node_id?: string | null
+          fiber_route_id?: string | null
           id?: string
+          manufacturer?: string | null
           part_number?: string | null
           project_id?: string
           quantity?: number
           source?: Database["public"]["Enums"]["bom_source_type"]
+          status?: string | null
           unit?: string
           unit_cost?: number
           updated_at?: string | null
         }
         Relationships: [
           {
+            foreignKeyName: "bom_items_fiber_node_id_fkey"
+            columns: ["fiber_node_id"]
+            isOneToOne: false
+            referencedRelation: "fiber_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bom_items_fiber_route_id_fkey"
+            columns: ["fiber_route_id"]
+            isOneToOne: false
+            referencedRelation: "fiber_routes"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "bom_items_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      camera_fiber_assignments: {
+        Row: {
+          cable_id: string
+          camera_id: string
+          created_at: string
+          enclosure_id: string
+          id: string
+          link_role: string
+          rx_core: number
+          tx_core: number
+          updated_at: string | null
+        }
+        Insert: {
+          cable_id: string
+          camera_id: string
+          created_at?: string
+          enclosure_id: string
+          id?: string
+          link_role?: string
+          rx_core: number
+          tx_core: number
+          updated_at?: string | null
+        }
+        Update: {
+          cable_id?: string
+          camera_id?: string
+          created_at?: string
+          enclosure_id?: string
+          id?: string
+          link_role?: string
+          rx_core?: number
+          tx_core?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "camera_fiber_assignments_cable_id_fkey"
+            columns: ["cable_id"]
+            isOneToOne: false
+            referencedRelation: "fiber_cables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camera_fiber_assignments_camera_id_fkey"
+            columns: ["camera_id"]
+            isOneToOne: false
+            referencedRelation: "camera_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camera_fiber_assignments_enclosure_id_fkey"
+            columns: ["enclosure_id"]
+            isOneToOne: false
+            referencedRelation: "fiber_nodes"
             referencedColumns: ["id"]
           },
         ]
@@ -181,6 +265,358 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      fiber_cables: {
+        Row: {
+          cable_id_tag: string
+          catalog_id: string | null
+          created_at: string
+          fiber_count: number
+          id: string
+          project_id: string
+          route_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          cable_id_tag: string
+          catalog_id?: string | null
+          created_at?: string
+          fiber_count?: number
+          id?: string
+          project_id: string
+          route_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          cable_id_tag?: string
+          catalog_id?: string | null
+          created_at?: string
+          fiber_count?: number
+          id?: string
+          project_id?: string
+          route_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fiber_cables_catalog_id_fkey"
+            columns: ["catalog_id"]
+            isOneToOne: false
+            referencedRelation: "fiber_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fiber_cables_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fiber_cables_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "fiber_routes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fiber_catalog: {
+        Row: {
+          cost_per_meter: number
+          created_at: string
+          diameter_mm: number
+          fiber_count: number
+          grade: string
+          id: string
+          manufacturer: string
+          mode: string
+          part_number: string
+          updated_at: string | null
+          weight_kg_km: number
+        }
+        Insert: {
+          cost_per_meter: number
+          created_at?: string
+          diameter_mm: number
+          fiber_count: number
+          grade: string
+          id?: string
+          manufacturer: string
+          mode: string
+          part_number: string
+          updated_at?: string | null
+          weight_kg_km: number
+        }
+        Update: {
+          cost_per_meter?: number
+          created_at?: string
+          diameter_mm?: number
+          fiber_count?: number
+          grade?: string
+          id?: string
+          manufacturer?: string
+          mode?: string
+          part_number?: string
+          updated_at?: string | null
+          weight_kg_km?: number
+        }
+        Relationships: []
+      }
+      fiber_enclosures: {
+        Row: {
+          capacity: number
+          closure_type: string
+          created_at: string
+          id: string
+          spare_fibers: number
+          updated_at: string | null
+          used_fibers: number
+        }
+        Insert: {
+          capacity?: number
+          closure_type: string
+          created_at?: string
+          id: string
+          spare_fibers?: number
+          updated_at?: string | null
+          used_fibers?: number
+        }
+        Update: {
+          capacity?: number
+          closure_type?: string
+          created_at?: string
+          id?: string
+          spare_fibers?: number
+          updated_at?: string | null
+          used_fibers?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fiber_enclosures_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "fiber_nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fiber_nodes: {
+        Row: {
+          created_at: string
+          elevation_m: number
+          id: string
+          latitude: number
+          longitude: number
+          node_id_tag: string
+          node_type: string
+          notes: string | null
+          project_id: string
+          size_dims: string
+          slack_feet: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          elevation_m?: number
+          id?: string
+          latitude: number
+          longitude: number
+          node_id_tag: string
+          node_type: string
+          notes?: string | null
+          project_id: string
+          size_dims?: string
+          slack_feet?: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          elevation_m?: number
+          id?: string
+          latitude?: number
+          longitude?: number
+          node_id_tag?: string
+          node_type?: string
+          notes?: string | null
+          project_id?: string
+          size_dims?: string
+          slack_feet?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fiber_nodes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fiber_route_segments: {
+        Row: {
+          created_at: string
+          end_latitude: number
+          end_longitude: number
+          id: string
+          length_feet: number
+          route_id: string
+          segment_index: number
+          slack_feet: number
+          start_latitude: number
+          start_longitude: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          end_latitude: number
+          end_longitude: number
+          id?: string
+          length_feet?: number
+          route_id: string
+          segment_index: number
+          slack_feet?: number
+          start_latitude: number
+          start_longitude: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          end_latitude?: number
+          end_longitude?: number
+          id?: string
+          length_feet?: number
+          route_id?: string
+          segment_index?: number
+          slack_feet?: number
+          start_latitude?: number
+          start_longitude?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fiber_route_segments_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "fiber_routes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fiber_routes: {
+        Row: {
+          conduit_diameter_inches: number
+          created_at: string
+          fill_percentage: number
+          id: string
+          installation_type: string
+          installed_length_feet: number
+          measured_length_feet: number
+          project_id: string
+          route_id_tag: string
+          slack_percentage: number
+          spare_capacity: number
+          updated_at: string | null
+        }
+        Insert: {
+          conduit_diameter_inches?: number
+          created_at?: string
+          fill_percentage?: number
+          id?: string
+          installation_type?: string
+          installed_length_feet?: number
+          measured_length_feet?: number
+          project_id: string
+          route_id_tag: string
+          slack_percentage?: number
+          spare_capacity?: number
+          updated_at?: string | null
+        }
+        Update: {
+          conduit_diameter_inches?: number
+          created_at?: string
+          fill_percentage?: number
+          id?: string
+          installation_type?: string
+          installed_length_feet?: number
+          measured_length_feet?: number
+          project_id?: string
+          route_id_tag?: string
+          slack_percentage?: number
+          spare_capacity?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fiber_routes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fiber_splices: {
+        Row: {
+          cable_a_id: string
+          cable_b_id: string
+          color: string | null
+          created_at: string
+          fiber_number_a: number
+          fiber_number_b: number
+          id: string
+          node_id: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          cable_a_id: string
+          cable_b_id: string
+          color?: string | null
+          created_at?: string
+          fiber_number_a: number
+          fiber_number_b: number
+          id?: string
+          node_id: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          cable_a_id?: string
+          cable_b_id?: string
+          color?: string | null
+          created_at?: string
+          fiber_number_a?: number
+          fiber_number_b?: number
+          id?: string
+          node_id?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fiber_splices_cable_a_id_fkey"
+            columns: ["cable_a_id"]
+            isOneToOne: false
+            referencedRelation: "fiber_cables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fiber_splices_cable_b_id_fkey"
+            columns: ["cable_b_id"]
+            isOneToOne: false
+            referencedRelation: "fiber_cables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fiber_splices_node_id_fkey"
+            columns: ["node_id"]
+            isOneToOne: false
+            referencedRelation: "fiber_nodes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       field_tasks: {
         Row: {
@@ -496,6 +932,10 @@ export type Database = {
         Returns: undefined
       }
       is_org_admin: {
+        Args: { org_id: string; user_id: string }
+        Returns: boolean
+      }
+      is_org_member: {
         Args: { org_id: string; user_id: string }
         Returns: boolean
       }
