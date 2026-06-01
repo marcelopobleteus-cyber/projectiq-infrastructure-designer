@@ -105,3 +105,24 @@ BEGIN
     WHERE id = camera_id;
 END;
 $$;
+
+-- Helper function to check if user is a member of an organization (bypasses RLS to avoid recursion)
+CREATE OR REPLACE FUNCTION public.is_org_member(org_id uuid, user_id uuid)
+RETURNS boolean
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM public.organization_members
+        WHERE organization_id = org_id
+          AND profile_id = user_id
+    );
+END;
+$$ LANGUAGE plpgsql;
+
+-- Secure select_organization_members policy to prevent global exposure
+DROP POLICY IF EXISTS select_organization_members ON public.organization_members;
+CREATE POLICY select_organization_members ON public.organization_members
+FOR SELECT
+USING (public.is_org_member(organization_id, auth.uid()));
