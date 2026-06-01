@@ -97,7 +97,11 @@ export default function ProjectMapCanvas({
   const [assignedPortId, setAssignedPortId] = useState('')
   const [cameraPanelMessage, setCameraPanelMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
-  // Network device side panel form states
+  // Hover info card state
+  const [hoveredCamera, setHoveredCamera] = useState<CameraLocation | null>(null)
+  const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number } | null>(null)
+
+
   const [deviceName, setDeviceName] = useState('')
   const [deviceType, setDeviceType] = useState<Database['public']['Enums']['device_type']>('switch')
   const [deviceBrand, setDeviceBrand] = useState('')
@@ -113,6 +117,9 @@ export default function ProjectMapCanvas({
   const cameraMarkersRef = useRef<{ [id: string]: google.maps.Marker }>({})
   const deviceMarkersRef = useRef<{ [id: string]: google.maps.Marker }>({})
   const clickListenerRef = useRef<google.maps.MapsEventListener | null>(null)
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isHoveringCardRef = useRef(false)
+
 
   // Sync props to state
   useEffect(() => {
@@ -206,33 +213,68 @@ export default function ProjectMapCanvas({
     }
   }
 
-  // Colored SVG pins generator for Cameras
-  const getCameraMarkerIcon = (status: Database['public']['Enums']['camera_status'], isSelected = false) => {
-    let color = '#64748b' // Gray for planned
-    if (status === 'in_progress') color = '#eab308' // Yellow
-    if (status === 'complete') color = '#22c55e' // Green
-    if (status === 'issue') color = '#ef4444' // Red
+  // ── Color helpers (no google.maps dependency – safe to call in JSX render) ──
+
+  const getCameraStatusColor = (status: Database['public']['Enums']['camera_status']): string => {
+    if (status === 'in_progress') return '#3b82f6' // Blue
+    if (status === 'complete') return '#22c55e'     // Green
+    if (status === 'issue') return '#ef4444'         // Red
+    return '#eab308'                                 // Yellow – planned (default)
+  }
+
+  const getNetworkDeviceColor = (type: Database['public']['Enums']['device_type']): string => {
+    if (type === 'nvr') return '#8b5cf6'
+    if (type === 'cabinet_device') return '#f97316'
+    if (type === 'router') return '#06b6d4'
+    if (type === 'other') return '#64748b'
+    return '#2563eb' // switch
+  }
+
+  // ── Camera marker: custom SVG with CCTV body, lens, video module, and label ──
+  // Only call inside useEffect — requires google.maps.Size / Point to be available
+  const createCameraMarkerIcon = (
+    status: Database['public']['Enums']['camera_status'],
+    tag: string,
+    isSelected = false
+  ) => {
+    const color = getCameraStatusColor(status)
+    const ringAttr = isSelected ? `stroke="white" stroke-width="3"` : ''
+    const shortTag = tag.length > 9 ? tag.substring(0, 9) : tag
+
+    const svg = [
+      `<svg xmlns="http://www.w3.org/2000/svg" width="46" height="60" viewBox="0 0 46 60">`,
+      `<defs><filter id="ds" x="-40%" y="-40%" width="180%" height="180%">`,
+      `<feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#000" flood-opacity="0.5"/></filter></defs>`,
+      // Outer circle (status color)
+      `<circle cx="23" cy="23" r="22" fill="${color}" filter="url(#ds)" ${ringAttr}/>`,
+      // Dark inner circle
+      `<circle cx="23" cy="23" r="16" fill="#0f172a"/>`,
+      // Camera body rectangle
+      `<rect x="10" y="17" width="14" height="11" rx="2.5" fill="${color}"/>`,
+      // Lens outer ring
+      `<circle cx="17" cy="22.5" r="4" fill="#0f172a"/>`,
+      // Lens inner (glint effect)
+      `<circle cx="17" cy="22.5" r="2" fill="${color}" opacity="0.32"/>`,
+      // Video feed module (right arrow)
+      `<path d="M25 18.5L34 15v15L25 26.5V18.5z" fill="${color}"/>`,
+      // Label pill
+      `<rect x="1" y="47" width="44" height="12" rx="6" fill="#0f172a" opacity="0.93"/>`,
+      // Label text
+      `<text x="23" y="57" text-anchor="middle" font-family="Courier New,monospace" `,
+      `font-size="8" font-weight="bold" fill="white" letter-spacing="0.4">${shortTag}</text>`,
+      `</svg>`,
+    ].join('')
 
     return {
-      path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z',
-      fillColor: color,
-      fillOpacity: 1,
-      strokeColor: isSelected ? '#ffffff' : '#0f172a',
-      strokeWeight: isSelected ? 3 : 1.5,
-      scale: isSelected ? 1.5 : 1.3,
-      anchor: typeof google !== 'undefined' && google.maps ? new google.maps.Point(12, 22) : undefined,
+      url: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
+      scaledSize: new google.maps.Size(46, 60),
+      anchor: new google.maps.Point(23, 23), // Anchor at circle center
     }
   }
 
-  // Styled SVG pins generator for Network Devices
+  // ── Network device marker: kept as SVG path for visual distinction from cameras ──
   const getNetworkMarkerIcon = (type: Database['public']['Enums']['device_type'], isSelected = false) => {
-    let color = '#2563eb' // Blue for switch
-    if (type === 'nvr') color = '#8b5cf6' // Purple
-    if (type === 'cabinet_device') color = '#f97316' // Orange
-    if (type === 'router') color = '#06b6d4' // Cyan
-    if (type === 'other') color = '#64748b' // Slate
-
-    // Server-rack visual SVG path
+    const color = getNetworkDeviceColor(type)
     return {
       path: 'M2 5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5zm3 2h14v2H5V7zm0 4h14v2H5v-2zm0 4h14v2H5v-2z',
       fillColor: color,
@@ -243,6 +285,8 @@ export default function ProjectMapCanvas({
       anchor: typeof google !== 'undefined' && google.maps ? new google.maps.Point(12, 12) : undefined,
     }
   }
+
+
 
   // Initialize Map
   useEffect(() => {
@@ -294,7 +338,7 @@ export default function ProjectMapCanvas({
     cameras.forEach(cam => {
       const isSelected = selectedCamera?.id === cam.id
       const position = { lat: cam.latitude, lng: cam.longitude }
-      const icon = getCameraMarkerIcon(cam.status, isSelected)
+      const icon = createCameraMarkerIcon(cam.status, cam.camera_id_tag, isSelected)
 
       if (cameraMarkersRef.current[cam.id]) {
         const marker = cameraMarkersRef.current[cam.id]
@@ -312,6 +356,28 @@ export default function ProjectMapCanvas({
 
         marker.addListener('click', () => {
           setSelectedCamera(cam)
+        })
+
+        // Hover card – show on mouseover
+        marker.addListener('mouseover', (e: google.maps.MapMouseEvent) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const domEvent = (e as any).domEvent as MouseEvent
+          const rect = mapRef.current?.getBoundingClientRect()
+          if (rect) {
+            setHoverPosition({ x: domEvent.clientX - rect.left, y: domEvent.clientY - rect.top })
+          }
+          setHoveredCamera(cam)
+          if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+        })
+
+        // Hover card – delayed hide on mouseout (allows mouse to enter card)
+        marker.addListener('mouseout', () => {
+          hoverTimerRef.current = setTimeout(() => {
+            if (!isHoveringCardRef.current) {
+              setHoveredCamera(null)
+              setHoverPosition(null)
+            }
+          }, 350)
         })
 
         marker.addListener('dragend', async () => {
@@ -334,6 +400,7 @@ export default function ProjectMapCanvas({
           })
 
           if (result.error) {
+
             alert(result.error)
             setCameras(cameras) // Rollback
           }
@@ -741,7 +808,7 @@ export default function ProjectMapCanvas({
               }`}
             >
               <span className="flex items-center gap-1.5 truncate">
-                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getCameraMarkerIcon(cam.status).fillColor }} />
+                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getCameraStatusColor(cam.status) }} />
                 {cam.camera_id_tag}
               </span>
               {cam.assigned_network_device_id && (
@@ -770,7 +837,7 @@ export default function ProjectMapCanvas({
               }`}
             >
               <span className="flex items-center gap-1.5 truncate">
-                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getNetworkMarkerIcon(dev.device_type).fillColor }} />
+                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getNetworkDeviceColor(dev.device_type) }} />
                 {dev.name}
               </span>
               <span className="text-[9px] text-slate-500 capitalize">{dev.device_type}</span>
@@ -841,7 +908,133 @@ export default function ProjectMapCanvas({
         {/* Map Canvas Viewport */}
         <div className="flex-1 relative bg-slate-950 flex items-center justify-center overflow-hidden">
           <div ref={mapRef} className="absolute inset-0 w-full h-full" />
-          
+
+          {/* ── Camera Hover Info Card ── */}
+          {hoveredCamera && hoverPosition && (() => {
+            const displayCam = cameras.find(c => c.id === hoveredCamera.id) ?? hoveredCamera
+            const camModel = cameraModels.find(m => m.id === displayCam.camera_model_id)
+            const connSwitch = displayCam.assigned_network_device_id
+              ? networkDevices.find(d => d.id === displayCam.assigned_network_device_id)
+              : null
+            const statusMap: Record<string, { label: string; cls: string }> = {
+              planned:     { label: 'Planned',       cls: 'text-amber-400 bg-amber-400/10 border-amber-400/20' },
+              in_progress: { label: 'In Progress',   cls: 'text-blue-400 bg-blue-400/10 border-blue-400/20' },
+              complete:    { label: 'Complete',       cls: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' },
+              issue:       { label: 'Issue / Alert', cls: 'text-red-400 bg-red-400/10 border-red-400/20' },
+            }
+            const statusInfo = statusMap[displayCam.status] ?? statusMap.planned
+            const mapW = mapRef.current?.offsetWidth ?? 600
+            const cardW = 276
+            const rawX = hoverPosition.x + 24
+            const cardX = rawX + cardW > mapW ? hoverPosition.x - cardW - 12 : rawX
+            const cardY = Math.max(hoverPosition.y - 110, 8)
+            const accentColor = getCameraStatusColor(displayCam.status)
+
+            return (
+              <div
+                key={displayCam.id}
+                id="camera-hover-card"
+                className="absolute z-30 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden pointer-events-auto"
+                style={{ left: cardX, top: cardY, width: `${cardW}px` }}
+                onMouseEnter={() => {
+                  isHoveringCardRef.current = true
+                  if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+                }}
+                onMouseLeave={() => {
+                  isHoveringCardRef.current = false
+                  setHoveredCamera(null)
+                  setHoverPosition(null)
+                }}
+              >
+                {/* Status accent bar */}
+                <div className="h-[3px] w-full" style={{ backgroundColor: accentColor }} />
+
+                {/* Header */}
+                <div className="px-4 pt-3 pb-2.5 border-b border-slate-800 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: `${accentColor}20` }}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: accentColor }}>
+                        <path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                      </svg>
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="text-sm font-black text-white tracking-tight truncate">{displayCam.camera_id_tag}</h4>
+                      <p className="text-[9px] text-slate-500 font-mono">{displayCam.latitude.toFixed(5)}, {displayCam.longitude.toFixed(5)}</p>
+                    </div>
+                  </div>
+                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${statusInfo.cls}`}>
+                    {statusInfo.label}
+                  </span>
+                </div>
+
+                {/* Info fields */}
+                <div className="px-4 py-3">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+                    <div>
+                      <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">Model</span>
+                      <span className="block text-[10px] text-slate-200 mt-0.5 truncate">
+                        {camModel ? `${camModel.manufacturer} ${camModel.model_number}` : <span className="italic text-slate-600">Not Assigned</span>}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">IP Address</span>
+                      <span className="block text-[10px] italic text-slate-600 mt-0.5">Not Assigned</span>
+                    </div>
+                    <div>
+                      <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">Comm Type</span>
+                      <span className="block text-[10px] text-slate-200 mt-0.5 capitalize">{displayCam.communication_type}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">Power</span>
+                      <span className="block text-[10px] text-slate-200 mt-0.5 uppercase">{displayCam.power_type}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">Connected Switch</span>
+                      <span className="block text-[10px] mt-0.5">
+                        {connSwitch
+                          ? <span className="text-indigo-400">{connSwitch.name}</span>
+                          : <span className="italic text-slate-600">Not Assigned</span>}
+                      </span>
+                    </div>
+                    {(displayCam.structure_reference || displayCam.address_reference) && (
+                      <div className="col-span-2">
+                        <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">Location Ref</span>
+                        <span className="block text-[10px] text-slate-200 mt-0.5">
+                          {displayCam.structure_reference || displayCam.address_reference}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="px-4 pb-3 pt-1 flex gap-2 border-t border-slate-800/60">
+                  <button
+                    id="hover-card-edit-btn"
+                    onClick={() => {
+                      setSelectedCamera(displayCam)
+                      setHoveredCamera(null)
+                      setHoverPosition(null)
+                    }}
+                    className="flex-1 py-1.5 text-[10px] font-bold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors"
+                  >
+                    Edit Camera
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (map) map.panTo({ lat: displayCam.latitude, lng: displayCam.longitude })
+                      setHoveredCamera(null)
+                      setHoverPosition(null)
+                    }}
+                    className="py-1.5 px-3 text-[10px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors"
+                  >
+                    Center
+                  </button>
+                </div>
+              </div>
+            )
+          })()}
+
           {(addCameraMode || addDeviceMode) && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-indigo-500/90 backdrop-blur-md text-slate-950 text-xs px-4 py-2 rounded-full font-bold shadow-lg z-10 flex items-center gap-2 pointer-events-none">
               <span className="w-2 h-2 rounded-full bg-slate-950 animate-ping" />
@@ -868,7 +1061,7 @@ export default function ProjectMapCanvas({
               <div className="flex justify-between items-start border-b border-slate-850 pb-4">
                 <div>
                   <h3 className="font-bold text-white tracking-tight flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getCameraMarkerIcon(selectedCamera.status).fillColor }} />
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getCameraStatusColor(selectedCamera.status) }} />
                     {selectedCamera.camera_id_tag} Specs
                   </h3>
                   <p className="text-[10px] text-slate-400 mt-0.5">Edit camera properties and switch connection</p>
@@ -1044,7 +1237,7 @@ export default function ProjectMapCanvas({
               <div className="flex justify-between items-start border-b border-slate-850 pb-4">
                 <div>
                   <h3 className="font-bold text-white tracking-tight flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getNetworkMarkerIcon(selectedDevice.device_type).fillColor }} />
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getNetworkDeviceColor(selectedDevice.device_type) }} />
                     {selectedDevice.name} Settings
                   </h3>
                   <p className="text-[10px] text-slate-400 mt-0.5">Edit network node specs and ports matrix</p>

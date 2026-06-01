@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
 import { getCameraLocations } from '../../actions-sprint2'
 import { getNetworkDevices } from '../../actions-sprint3'
+import OverviewEditPanel from './OverviewEditPanel'
 
 interface PageProps {
   params: Promise<{
@@ -69,13 +70,29 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
   return (
     <div className="space-y-6 relative z-10 w-full max-w-7xl mx-auto px-6 py-4 font-sans text-slate-300">
       {/* Page Header */}
-      <div className="border-b border-slate-900 pb-4">
-        <h2 className="text-xl font-black text-white tracking-tight">Project Overview</h2>
-        <p className="text-xs text-slate-400 mt-1">Status dashboard and general project metadata</p>
+      <div className="border-b border-slate-900 pb-4 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-black text-white tracking-tight">{project.name}</h2>
+          <p className="text-xs text-slate-400 mt-1">Status dashboard and general project metadata</p>
+        </div>
       </div>
+
+      {/* Edit Panel */}
+      <OverviewEditPanel
+        project={{
+          id: project.id,
+          name: project.name,
+          description: project.description ?? null,
+          default_latitude: Number(project.default_latitude),
+          default_longitude: Number(project.default_longitude),
+          default_zoom: project.default_zoom,
+        }}
+        googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+      />
 
       {/* Main Grid: Info Sheet & Stats */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
         
         {/* Info Column (2/3 width) */}
         <div className="lg:col-span-2 space-y-6">

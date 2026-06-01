@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
+
 export async function createProject(formData: FormData) {
   const supabase = await createClient()
   const {
@@ -59,4 +60,61 @@ export async function createProject(formData: FormData) {
 
   revalidatePath('/projects')
   redirect(`/projects/${project.id}`)
+}
+
+export async function updateProjectMetadata(
+  projectId: string,
+  data: {
+    name: string
+    description?: string
+    default_latitude: number
+    default_longitude: number
+    default_zoom: number
+  }
+): Promise<{ success?: boolean; error?: string }> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Not authenticated' }
+
+  // Verify the project belongs to an org the user is a member of
+  const { data: project } = await supabase
+    .from('projects')
+    .select('organization_id')
+    .eq('id', projectId)
+    .single()
+
+  if (!project) return { error: 'Project not found' }
+
+  const { data: membership } = await supabase
+    .from('organization_members')
+    .select('id')
+    .eq('organization_id', project.organization_id)
+    .eq('profile_id', user.id)
+    .single()
+
+  if (!membership) return { error: 'Access denied' }
+
+  const { error: updateError } = await supabase
+    .from('projects')
+    .update({
+      name: data.name,
+      description: data.description || null,
+      default_latitude: data.default_latitude,
+      default_longitude: data.default_longitude,
+      default_zoom: data.default_zoom,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', projectId)
+
+  if (updateError) return { error: updateError.message }
+
+  revalidatePath(`/projects/${projectId}/overview`)
+  revalidatePath(`/projects/${projectId}/maps`)
+  revalidatePath(`/projects/${projectId}`)
+  revalidatePath('/projects')
+
+  return { success: true }
 }
