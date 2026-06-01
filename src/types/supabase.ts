@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -997,7 +997,12 @@ export type Database = {
     }
     Enums: {
       bom_source_type: "catalog" | "custom"
-      camera_status: "planned" | "in_progress" | "complete" | "issue"
+      camera_status:
+        | "planned"
+        | "in_progress"
+        | "complete"
+        | "issue"
+        | "unknown"
       comm_type: "copper" | "fiber" | "wireless"
       device_type:
         | "switch"
@@ -1152,7 +1157,7 @@ export const Constants = {
   public: {
     Enums: {
       bom_source_type: ["catalog", "custom"],
-      camera_status: ["planned", "in_progress", "complete", "issue"],
+      camera_status: ["planned", "in_progress", "complete", "issue", "unknown"],
       comm_type: ["copper", "fiber", "wireless"],
       device_type: [
         "switch",
@@ -1185,3 +1190,4 @@ export const Constants = {
     },
   },
 } as const
+

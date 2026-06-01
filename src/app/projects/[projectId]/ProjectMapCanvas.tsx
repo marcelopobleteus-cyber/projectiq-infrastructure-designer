@@ -219,7 +219,8 @@ export default function ProjectMapCanvas({
     if (status === 'in_progress') return '#3b82f6' // Blue
     if (status === 'complete') return '#22c55e'     // Green
     if (status === 'issue') return '#ef4444'         // Red
-    return '#eab308'                                 // Yellow – planned (default)
+    if (status === 'unknown') return '#64748b'       // Gray
+    return '#eab308'                                 // Yellow - planned (default)
   }
 
   const getNetworkDeviceColor = (type: Database['public']['Enums']['device_type']): string => {
@@ -921,8 +922,9 @@ export default function ProjectMapCanvas({
               in_progress: { label: 'In Progress',   cls: 'text-blue-400 bg-blue-400/10 border-blue-400/20' },
               complete:    { label: 'Complete',       cls: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' },
               issue:       { label: 'Issue / Alert', cls: 'text-red-400 bg-red-400/10 border-red-400/20' },
+              unknown:     { label: 'Unknown / TBD',  cls: 'text-slate-400 bg-slate-400/10 border-slate-400/20' },
             }
-            const statusInfo = statusMap[displayCam.status] ?? statusMap.planned
+            const statusInfo = statusMap[displayCam.status] ?? statusMap.unknown
             const mapW = mapRef.current?.offsetWidth ?? 600
             const cardW = 276
             const rawX = hoverPosition.x + 24
@@ -1187,10 +1189,11 @@ export default function ProjectMapCanvas({
                     value={cameraStatus} onChange={e => setCameraStatus(e.target.value as any)}
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none"
                   >
-                    <option value="planned">Planned (Gray)</option>
-                    <option value="in_progress">In Progress (Yellow)</option>
-                    <option value="complete">Complete (Green)</option>
-                    <option value="issue">Issue (Red)</option>
+                    <option value="planned">Planned</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="complete">Complete</option>
+                    <option value="issue">Issue</option>
+                    <option value="unknown">Unknown / TBD</option>
                   </select>
                 </div>
 

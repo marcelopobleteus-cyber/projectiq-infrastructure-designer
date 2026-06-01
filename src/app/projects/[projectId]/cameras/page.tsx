@@ -42,14 +42,18 @@ export default async function ProjectCamerasPage({ params }: PageProps) {
   }
 
   const getStatusBadge = (status: string) => {
-    let colorClass = 'bg-slate-500/10 text-slate-450 border-slate-500/20'
-    let text = 'Planned'
+    let colorClass = 'bg-slate-500/10 text-slate-400 border-slate-500/20'
+    let text = 'Unknown / TBD'
     let dotColor = 'bg-slate-500'
 
-    if (status === 'in_progress') {
-      colorClass = 'bg-amber-500/10 text-amber-450 border-amber-500/20'
-      text = 'In Progress'
+    if (status === 'planned') {
+      colorClass = 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+      text = 'Planned'
       dotColor = 'bg-amber-500'
+    } else if (status === 'in_progress') {
+      colorClass = 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+      text = 'In Progress'
+      dotColor = 'bg-blue-500'
     } else if (status === 'complete') {
       colorClass = 'bg-emerald-500/10 text-emerald-450 border-emerald-500/20'
       text = 'Complete'
