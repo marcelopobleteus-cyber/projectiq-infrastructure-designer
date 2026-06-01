@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import ProjectTopBar from '@/components/layout/ProjectTopBar'
 import WorkspaceContent from '@/components/layout/WorkspaceContent'
+import ProjectSidebar from '@/components/layout/ProjectSidebar'
 
 interface ProjectLayoutProps {
   children: React.ReactNode
@@ -34,17 +35,26 @@ export default async function ProjectLayout({ children, params }: ProjectLayoutP
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden h-full">
-      {/* Shared breadcrumbs header bar */}
-      <ProjectTopBar
+    <div className="flex-1 flex overflow-hidden h-full w-full">
+      {/* Secondary Project Navigation Sidebar */}
+      <ProjectSidebar
         projectId={projectId}
         projectName={project.name}
       />
 
-      {/* Main Workspace Workspace */}
-      <WorkspaceContent>
-        {children}
-      </WorkspaceContent>
+      {/* Main Content Pane */}
+      <div className="flex-1 flex flex-col overflow-hidden h-full">
+        {/* Shared breadcrumbs header bar */}
+        <ProjectTopBar
+          projectId={projectId}
+          projectName={project.name}
+        />
+
+        {/* Main Workspace Content */}
+        <WorkspaceContent>
+          {children}
+        </WorkspaceContent>
+      </div>
     </div>
   )
 }
