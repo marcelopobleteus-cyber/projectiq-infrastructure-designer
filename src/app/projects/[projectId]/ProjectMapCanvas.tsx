@@ -27,6 +27,13 @@ import {
   assignCameraToPort,
   unassignCameraFromPort
 } from '../actions-sprint3'
+import {
+  getFiberDesignData,
+  updateCameraFiberAssignment,
+  assignStrandToCamera,
+  generateFiberTasksForCamera,
+  clearStrandAssignmentsForCamera
+} from '../actions-fiber'
 import ContextSidebar from '@/components/layout/ContextSidebar'
 
 type CameraLocation = Database['public']['Tables']['camera_locations']['Row']
@@ -81,6 +88,23 @@ export default function ProjectMapCanvas({
   const [showCameras, setShowCameras] = useState(true)
   const [showDevices, setShowDevices] = useState(true)
   
+  // Fiber Overlay & States
+  const [showFiberNodes, setShowFiberNodes] = useState(true)
+  const [showFiberRoutes, setShowFiberRoutes] = useState(true)
+  const [fiberNodes, setFiberNodes] = useState<any[]>([])
+  const [fiberRoutes, setFiberRoutes] = useState<any[]>([])
+  const [fiberRouteSegments, setFiberRouteSegments] = useState<any[]>([])
+  const [fiberCables, setFiberCables] = useState<any[]>([])
+  const [fiberStrands, setFiberStrands] = useState<any[]>([])
+  const [fiberEnclosures, setFiberEnclosures] = useState<any[]>([])
+  const [fiberAssignments, setFiberAssignments] = useState<any[]>([])
+  const [fiberAssignmentStrands, setFiberAssignmentStrands] = useState<any[]>([])
+  const [cabinets, setCabinets] = useState<any[]>([])
+  const [fdus, setFdus] = useState<any[]>([])
+  const [fpps, setFpps] = useState<any[]>([])
+  const [patchCords, setPatchCords] = useState<any[]>([])
+  const [allSwitchPorts, setAllSwitchPorts] = useState<any[]>([])
+  
   // Selected drawers
   const [selectedCamera, setSelectedCamera] = useState<CameraLocation | null>(null)
   const [selectedDevice, setSelectedDevice] = useState<NetworkDevice | null>(null)
@@ -102,9 +126,26 @@ export default function ProjectMapCanvas({
   const [cameraPowerType, setCameraPowerType] = useState<Database['public']['Enums']['power_type']>('poe')
   const [cameraAddressRef, setCameraAddressRef] = useState('')
   const [cameraStructureRef, setCameraStructureRef] = useState('')
+  
+  // Fiber form states
+  const [cameraSourceNodeId, setCameraSourceNodeId] = useState('')
+  const [cameraEnclosureId, setCameraEnclosureId] = useState('')
+  const [cameraDropCableId, setCameraDropCableId] = useState('')
+  const [cameraBackboneCableId, setCameraBackboneCableId] = useState('')
+  const [cameraFiberPathStatus, setCameraFiberPathStatus] = useState('Planned')
+  const [cameraSpliceStatus, setCameraSpliceStatus] = useState('Not Spliced')
+  const [cameraTestStatus, setCameraTestStatus] = useState('Not Tested')
+  const [assignedStrandTxId, setAssignedStrandTxId] = useState('')
+  const [assignedStrandRxId, setAssignedStrandRxId] = useState('')
   const [cameraNotes, setCameraNotes] = useState('')
   const [assignedSwitchId, setAssignedSwitchId] = useState('')
   const [assignedPortId, setAssignedPortId] = useState('')
+  const [connectivityPathType, setConnectivityPathType] = useState('Fiber -> Camera')
+  const [assignedCabinetId, setAssignedCabinetId] = useState('')
+  const [assignedSwitchPortId, setAssignedSwitchPortId] = useState('')
+  const [assignedSfpPortId, setAssignedSfpPortId] = useState('')
+  const [assignedFppId, setAssignedFppId] = useState('')
+  const [assignedFduId, setAssignedFduId] = useState('')
   const [cameraPanelMessage, setCameraPanelMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   // Camera Tasks & History states
@@ -150,6 +191,8 @@ export default function ProjectMapCanvas({
   const deviceMarkersRef = useRef<{ [id: string]: google.maps.Marker }>({})
   const cameraMarkerStateRef = useRef<{ [id: string]: { isSelected: boolean; status: string; tag: string } }>({})
   const deviceMarkerStateRef = useRef<{ [id: string]: { isSelected: boolean; deviceType: string; name: string } }>({})
+  const fiberNodeMarkersRef = useRef<{ [id: string]: google.maps.Marker }>({})
+  const fiberRoutePolylinesRef = useRef<google.maps.Polyline[]>([])
   const clickListenerRef = useRef<google.maps.MapsEventListener | null>(null)
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isHoveringCardRef = useRef(false)
@@ -171,6 +214,32 @@ export default function ProjectMapCanvas({
       console.error('Failed to load profiles:', err)
     })
   }, [])
+
+  const loadFiberData = async () => {
+    try {
+      const data = await getFiberDesignData(projectId)
+      setFiberNodes(data.nodes)
+      setFiberRoutes(data.routes)
+      setFiberRouteSegments(data.segments)
+      setFiberCables(data.cables)
+      setFiberStrands(data.strands)
+      setFiberEnclosures(data.enclosures)
+      setFiberAssignments(data.assignments)
+      setFiberAssignmentStrands(data.assignmentStrands ?? [])
+      setCabinets(data.cabinets ?? [])
+      setFdus(data.fdus ?? [])
+      setFpps(data.fpps ?? [])
+      setPatchCords(data.patchCords ?? [])
+      setAllSwitchPorts(data.switchPorts ?? [])
+      if (data.networkDevices) setNetworkDevices(data.networkDevices)
+    } catch (err) {
+      console.error('Failed to load fiber data:', err)
+    }
+  }
+
+  useEffect(() => {
+    loadFiberData()
+  }, [projectId, cameras])
 
   // Load all camera tasks for the project to display stats in hover cards
   useEffect(() => {
@@ -236,7 +305,7 @@ export default function ProjectMapCanvas({
     }
   }
 
-  // Load ports when selected camera changes
+  // Load ports and fiber assignment when selected camera changes
   useEffect(() => {
     if (selectedCamera) {
       setSelectedDevice(null)
@@ -254,9 +323,52 @@ export default function ProjectMapCanvas({
       // Load tasks and history
       loadCameraTasksAndHistory(selectedCamera.id)
 
-      // Find if this camera is assigned to a switch port
-      if (selectedCamera.assigned_network_device_id) {
-        loadSwitchPorts(selectedCamera.assigned_network_device_id).then(() => {
+      // Populate fiber details
+      const assignment = fiberAssignments.find(a => a.camera_id === selectedCamera.id)
+      if (assignment) {
+        setCameraSourceNodeId(assignment.source_node_id || '')
+        setCameraEnclosureId(assignment.enclosure_id || '')
+        setCameraDropCableId(assignment.drop_cable_id || '')
+        setCameraBackboneCableId(assignment.backbone_cable_id || '')
+        setCameraFiberPathStatus(assignment.fiber_path_status || 'Planned')
+        setCameraSpliceStatus(assignment.splice_status || 'Not Spliced')
+        setCameraTestStatus(assignment.test_status || 'Not Tested')
+        setConnectivityPathType(assignment.connectivity_path_type || 'Fiber -> Camera')
+        setAssignedCabinetId(assignment.assigned_cabinet_id || '')
+        setAssignedSwitchId(assignment.assigned_switch_id || '')
+        setAssignedSwitchPortId(assignment.assigned_switch_port_id || '')
+        setAssignedSfpPortId(assignment.assigned_sfp_port_id || '')
+        setAssignedFppId(assignment.assigned_fpp_id || '')
+        setAssignedFduId(assignment.assigned_fdu_id || '')
+
+        // Find assigned strands
+        const txJoin = fiberAssignmentStrands.find(j => j.camera_fiber_assignment_id === assignment.id && j.strand_role === 'TX')
+        const rxJoin = fiberAssignmentStrands.find(j => j.camera_fiber_assignment_id === assignment.id && j.strand_role === 'RX')
+        setAssignedStrandTxId(txJoin?.strand_id || '')
+        setAssignedStrandRxId(rxJoin?.strand_id || '')
+      } else {
+        setCameraSourceNodeId('')
+        setCameraEnclosureId('')
+        setCameraDropCableId('')
+        setCameraBackboneCableId('')
+        setCameraFiberPathStatus('Planned')
+        setCameraSpliceStatus('Not Spliced')
+        setCameraTestStatus('Not Tested')
+        setAssignedStrandTxId('')
+        setAssignedStrandRxId('')
+        setConnectivityPathType('Fiber -> Camera')
+        setAssignedCabinetId('')
+        setAssignedSwitchId('')
+        setAssignedSwitchPortId('')
+        setAssignedSfpPortId('')
+        setAssignedFppId('')
+        setAssignedFduId('')
+      }
+
+      // Find if this camera is assigned to a switch port (for copper comm type or fallback)
+      const targetSwitchId = selectedCamera.assigned_network_device_id || (assignment && assignment.assigned_switch_id)
+      if (targetSwitchId) {
+        loadSwitchPorts(targetSwitchId).then(() => {
           // Find port number assigned
           const port = switchPorts.find(p => p.assigned_camera_location_id === selectedCamera.id)
           setAssignedPortId(port?.id || '')
@@ -266,7 +378,7 @@ export default function ProjectMapCanvas({
         setAssignedPortId('')
       }
     }
-  }, [selectedCamera])
+  }, [selectedCamera, fiberAssignments, fiberAssignmentStrands])
 
   // Reload ports list when camera's assigned switch changes in dropdown
   useEffect(() => {
@@ -293,7 +405,7 @@ export default function ProjectMapCanvas({
       setDeviceLocRef(selectedDevice.location_reference || '')
       setDevicePanelMessage(null)
 
-      if (selectedDevice.device_type === 'switch') {
+      if (selectedDevice.device_type === 'switch' || selectedDevice.device_type === 'Industrial Switch') {
         loadSwitchPorts(selectedDevice.id)
       } else {
         setSwitchPorts([])
@@ -312,19 +424,21 @@ export default function ProjectMapCanvas({
   // ── Color helpers (no google.maps dependency – safe to call in JSX render) ──
 
   const getCameraStatusColor = (status: Database['public']['Enums']['camera_status']): string => {
-    if (status === 'in_progress') return '#3b82f6' // Blue
-    if (status === 'complete') return '#22c55e'     // Green
-    if (status === 'issue') return '#ef4444'         // Red
-    if (status === 'unknown') return '#64748b'       // Gray
-    return '#eab308'                                 // Yellow - planned (default)
+    if (status === 'in_progress') return '#3b82f6'   // Blue
+    if (status === 'complete') return '#22c55e'       // Green
+    if (status === 'issue') return '#ef4444'          // Red
+    return '#eab308'                                  // Yellow - planned (default)
   }
 
   const getNetworkDeviceColor = (type: Database['public']['Enums']['device_type']): string => {
     if (type === 'nvr') return '#8b5cf6'
-    if (type === 'cabinet_device') return '#f97316'
     if (type === 'router') return '#06b6d4'
-    if (type === 'other') return '#64748b'
-    return '#2563eb' // switch
+    if (type === 'UPS') return '#10b981'
+    if (type === 'Wireless Radio') return '#f97316'
+    if (type === 'Industrial Switch') return '#3b82f6'
+    if (type === 'switch') return '#2563eb'
+    if (type === 'Media Converter') return '#ec4899'
+    return '#64748b' // other / default
   }
 
   // ── Camera marker: custom SVG with CCTV body, lens, video module, and label ──
@@ -607,6 +721,217 @@ export default function ProjectMapCanvas({
     })
   }, [networkDevices, map, selectedDevice, showDevices, projectId])
 
+  // Synchronize Fiber Map Elements
+  useEffect(() => {
+    if (!map) return
+
+    // 1. Clear old route polylines
+    fiberRoutePolylinesRef.current.forEach(p => p.setMap(null))
+    fiberRoutePolylinesRef.current = []
+
+    // 2. Clear old node markers
+    Object.keys(fiberNodeMarkersRef.current).forEach(id => {
+      fiberNodeMarkersRef.current[id].setMap(null)
+      delete fiberNodeMarkersRef.current[id]
+    })
+
+    const getStatusColor = (status: string) => {
+      const s = status ? status.toLowerCase() : ''
+      if (s === 'planned') return '#eab308'
+      if (s === 'pulled' || s === 'in progress' || s === 'needs survey' || s === 'needs retest' || s === 'splicing pending' || s === 'testing pending' || s === 'fiber pulled') return '#3b82f6'
+      if (s === 'installed' || s === 'complete' || s === 'passed' || s === 'tested' || s === 'spliced' || s === 'connected') return '#10b981'
+      if (s === 'blocked' || s === 'failed' || s === 'damaged' || s === 'removed') return '#ef4444'
+      return '#64748b'
+    }
+
+    const getRouteColor = (route: any) => {
+      const cable = fiberCables.find(c => c.route_id === route.id)
+      if (!cable) return '#eab308'
+      if (cable.test_status === 'Passed') return '#10b981'
+      if (cable.install_status === 'Installed') return '#10b981'
+      if (cable.install_status === 'Pulled') return '#3b82f6'
+      if (cable.install_status === 'Blocked' || cable.install_status === 'Damaged') return '#ef4444'
+      return '#eab308'
+    }
+
+    let infoWindow = (window as any)._mapInfoWindow
+    if (!infoWindow && typeof google !== 'undefined') {
+      infoWindow = new google.maps.InfoWindow();
+      (window as any)._mapInfoWindow = infoWindow
+    }
+
+    // 3. Draw Nodes if enabled
+    if (showFiberNodes) {
+      fiberNodes.forEach(node => {
+        const statusColor = getStatusColor(node.status)
+        let svgShape = `<circle cx="12" cy="12" r="10" fill="${statusColor}" stroke="#ffffff" stroke-width="2"/>`
+        
+        const typeLower = node.node_type ? node.node_type.toLowerCase() : ''
+        if (typeLower === 'cabinet') {
+          svgShape = `<rect x="3" y="3" width="18" height="18" rx="2" fill="${statusColor}" stroke="#ffffff" stroke-width="2"/>`
+        } else if (typeLower === 'pole') {
+          svgShape = `<polygon points="12,2 22,20 2,20" fill="${statusColor}" stroke="#ffffff" stroke-width="2"/>`
+        } else if (typeLower === 'building' || typeLower === 'existing fiber source') {
+          svgShape = `<polygon points="12,2 21,7 21,17 12,22 3,17 3,7" fill="${statusColor}" stroke="#ffffff" stroke-width="2"/>`
+        }
+
+        const svgPin = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+            ${svgShape}
+            <text x="12" y="15" fill="#ffffff" font-size="8" font-family="sans-serif" font-weight="bold" text-anchor="middle">
+              ${node.node_tag.substring(0, 3)}
+            </text>
+          </svg>
+        `
+
+        const marker = new google.maps.Marker({
+          position: { lat: node.latitude, lng: node.longitude },
+          map: map,
+          draggable: false,
+          title: `${node.node_tag} (${node.node_type})`,
+          icon: {
+            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svgPin),
+            scaledSize: new google.maps.Size(24, 24),
+            anchor: new google.maps.Point(12, 12)
+          }
+        })
+
+        // Hover Card
+        marker.addListener('mouseover', () => {
+          const enclosures = fiberEnclosures.filter((e: any) => e.node_id === node.id)
+          const cables = fiberCables.filter((c: any) => c.from_node_id === node.id || c.to_node_id === node.id)
+          const served = fiberAssignments.filter((a: any) => a.source_node_id === node.id)
+          const servedTags = served.map((a: any) => {
+            const cam = cameras.find((c: any) => c.id === a.camera_id)
+            return cam ? cam.camera_id_tag : 'Unknown'
+          }).join(', ')
+
+          const content = `
+            <div style="padding: 8px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a; max-width: 200px;">
+              <div style="font-weight: bold; font-size: 12px; margin-bottom: 4px; border-b: 1px solid #e2e8f0; padding-bottom: 2px;">
+                ${node.node_tag}
+              </div>
+              <div><strong>Type:</strong> ${node.node_type}</div>
+              <div><strong>Status:</strong> <span style="color: ${statusColor}; font-weight: bold;">${node.status}</span></div>
+              <div><strong>Cables:</strong> ${cables.length > 0 ? cables.map((c: any) => c.cable_tag).join(', ') : 'None'}</div>
+              <div><strong>Served Cams:</strong> ${servedTags || 'None'}</div>
+            </div>
+          `
+          if (infoWindow) {
+            infoWindow.setContent(content)
+            infoWindow.open(map, marker)
+          }
+        })
+
+        marker.addListener('mouseout', () => {
+          if (infoWindow) infoWindow.close()
+        })
+
+        fiberNodeMarkersRef.current[node.id] = marker
+      })
+    }
+
+    // 4. Draw Routes and Drop Cables if enabled
+    if (showFiberRoutes) {
+      // Draw conduits
+      fiberRoutes.forEach(route => {
+        const segs = fiberRouteSegments.filter(s => s.route_id === route.id)
+        const points: google.maps.LatLngLiteral[] = []
+        segs.forEach(s => {
+          points.push({ lat: s.start_latitude, lng: s.start_longitude })
+          points.push({ lat: s.end_latitude, lng: s.end_longitude })
+        })
+
+        if (points.length === 0) return
+
+        const strokeCol = getRouteColor(route)
+        const poly = new google.maps.Polyline({
+          path: points,
+          geodesic: true,
+          strokeColor: strokeCol,
+          strokeOpacity: 0.8,
+          strokeWeight: 4,
+          map: map
+        })
+
+        poly.addListener('mouseover', (e: google.maps.PolyMouseEvent) => {
+          const cable = fiberCables.find(c => c.route_id === route.id)
+          const content = `
+            <div style="padding: 8px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a;">
+              <strong>Route: ${route.route_id_tag}</strong><br/>
+              Length: ${route.measured_length_feet} ft<br/>
+              Conduit Size: ${route.conduit_diameter_inches} in<br/>
+              ${cable ? `Cable: ${cable.cable_tag} (${cable.fiber_count}F)` : 'No cable'}
+            </div>
+          `
+          if (infoWindow && e.latLng) {
+            infoWindow.setContent(content)
+            infoWindow.setPosition(e.latLng)
+            infoWindow.open(map)
+          }
+        })
+
+        poly.addListener('mouseout', () => {
+          if (infoWindow) infoWindow.close()
+        })
+
+        fiberRoutePolylinesRef.current.push(poly)
+      })
+
+      // Draw drop cables (dashed)
+      fiberAssignments.forEach(assignment => {
+        if (!assignment.source_node_id || !assignment.camera_id) return
+        const node = fiberNodes.find(n => n.id === assignment.source_node_id)
+        const camera = cameras.find(c => c.id === assignment.camera_id)
+
+        if (node && camera) {
+          const symbol = {
+            path: 'M 0,-1 0,1',
+            strokeOpacity: 0.8,
+            scale: 2
+          }
+          const poly = new google.maps.Polyline({
+            path: [
+              { lat: node.latitude, lng: node.longitude },
+              { lat: camera.latitude, lng: camera.longitude }
+            ],
+            geodesic: true,
+            strokeColor: getStatusColor(assignment.fiber_path_status),
+            strokeOpacity: 0,
+            icons: [{
+              icon: symbol,
+              offset: '0',
+              repeat: '10px'
+            }],
+            map: map
+          })
+
+          poly.addListener('mouseover', (e: google.maps.PolyMouseEvent) => {
+            const content = `
+              <div style="padding: 8px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a;">
+                <strong>Camera Drop: ${camera.camera_id_tag}</strong><br/>
+                Status: ${assignment.fiber_path_status}<br/>
+                Splicing: ${assignment.splice_status}<br/>
+                Testing: ${assignment.test_status}
+              </div>
+            `
+            if (infoWindow && e.latLng) {
+              infoWindow.setContent(content)
+              infoWindow.setPosition(e.latLng)
+              infoWindow.open(map)
+            }
+          })
+
+          poly.addListener('mouseout', () => {
+            if (infoWindow) infoWindow.close()
+          })
+
+          fiberRoutePolylinesRef.current.push(poly)
+        }
+      })
+    }
+  }, [map, fiberNodes, fiberRoutes, fiberRouteSegments, fiberCables, fiberAssignments, showFiberNodes, showFiberRoutes, cameras])
+
   // Setup click listeners for map addition modes
   useEffect(() => {
     if (!map) return
@@ -644,7 +969,7 @@ export default function ProjectMapCanvas({
           } else if (addDeviceMode) {
             const result = await createNetworkDevice({
               projectId,
-              deviceType: 'switch', // Default type is switch
+              deviceType: 'switch', // Default type is PoE switch
               totalPorts: 8,
               poeBudgetWatts: 120,
               latitude: lat,
@@ -763,6 +1088,75 @@ export default function ProjectMapCanvas({
         }
       }
 
+      // 3. Handle OSP Fiber updates
+      if (cameraCommType === 'fiber') {
+        const fiberAssignResult = await updateCameraFiberAssignment({
+          cameraId: selectedCamera.id,
+          projectId,
+          sourceNodeId: cameraSourceNodeId || undefined,
+          enclosureId: cameraEnclosureId || undefined,
+          backboneCableId: cameraBackboneCableId || undefined,
+          dropCableId: cameraDropCableId || undefined,
+          spliceStatus: cameraSpliceStatus as any,
+          testStatus: cameraTestStatus as any,
+          fiberPathStatus: cameraFiberPathStatus as any,
+          notes: cameraNotes || undefined,
+          connectivityPathType,
+          assignedCabinetId: assignedCabinetId || null,
+          assignedSwitchId: assignedSwitchId || null,
+          assignedSwitchPortId: assignedSwitchPortId || null,
+          assignedSfpPortId: assignedSfpPortId || null,
+          assignedFppId: assignedFppId || null,
+          assignedFduId: assignedFduId || null,
+          assignedUplinkFiberStrandId: assignedStrandTxId || null,
+        })
+
+        if (fiberAssignResult.error) {
+          setCameraPanelMessage({ type: 'error', text: `Saved details but fiber assignment failed: ${fiberAssignResult.error}` })
+          return
+        }
+
+        // Clear old strand assignments first
+        await clearStrandAssignmentsForCamera({
+          projectId,
+          cameraId: selectedCamera.id
+        })
+
+        // Assign selected strands
+        if (fiberAssignResult.data) {
+          const assignmentId = fiberAssignResult.data.id
+          if (assignedStrandTxId) {
+            const txRes = await assignStrandToCamera({
+              projectId,
+              cameraFiberAssignmentId: assignmentId,
+              cameraId: selectedCamera.id,
+              strandId: assignedStrandTxId,
+              strandRole: 'TX'
+            })
+            if (txRes.error) {
+              setCameraPanelMessage({ type: 'error', text: `Failed to assign TX strand: ${txRes.error}` })
+              return
+            }
+          }
+          if (assignedStrandRxId) {
+            const rxRes = await assignStrandToCamera({
+              projectId,
+              cameraFiberAssignmentId: assignmentId,
+              cameraId: selectedCamera.id,
+              strandId: assignedStrandRxId,
+              strandRole: 'RX'
+            })
+            if (rxRes.error) {
+              setCameraPanelMessage({ type: 'error', text: `Failed to assign RX strand: ${rxRes.error}` })
+              return
+            }
+          }
+        }
+
+        // Reload fiber data
+        await loadFiberData()
+      }
+
       // Reload lists locally
       setCameras(prev => prev.map(c => c.id === selectedCamera.id ? { 
         ...c, 
@@ -774,7 +1168,7 @@ export default function ProjectMapCanvas({
         ...details,
         assigned_network_device_id: assignedSwitchId || null 
       } : null)
-      setCameraPanelMessage({ type: 'success', text: 'Camera details and port assignment updated!' })
+      setCameraPanelMessage({ type: 'success', text: 'Camera details and fiber/port assignments updated!' })
     })
   }
 
@@ -1044,8 +1438,8 @@ export default function ProjectMapCanvas({
       device_type: deviceType,
       manufacturer: deviceBrand || null,
       model_number: deviceModel || null,
-      total_ports: deviceType === 'switch' ? deviceTotalPorts : null,
-      poe_budget_watts: deviceType === 'switch' ? devicePoeBudget : 0,
+      total_ports: (deviceType === 'switch' || deviceType === 'Industrial Switch') ? deviceTotalPorts : null,
+      poe_budget_watts: (deviceType === 'switch' || deviceType === 'Industrial Switch') ? devicePoeBudget : 0,
       location_reference: deviceLocRef || null,
       ip_address: deviceIp || null,
       rack_unit: deviceRackUnit || null,
@@ -1121,7 +1515,7 @@ export default function ProjectMapCanvas({
   const getPoeWarningsCount = () => {
     let count = 0
     networkDevices.forEach(d => {
-      if (d.device_type === 'switch') {
+      if (d.device_type === 'switch' || d.device_type === 'Industrial Switch') {
         const switchCameras = cameras.filter(c => c.assigned_network_device_id === d.id)
         const totalDraw = switchCameras.reduce((acc, cam) => {
           const model = cameraModels.find(m => m.id === cam.camera_model_id)
@@ -1285,6 +1679,29 @@ export default function ProjectMapCanvas({
               }
             }}
           />
+
+          {/* OSP Fiber Layer Overlay Checkboxes */}
+          <div className="absolute top-4 right-4 z-20 bg-slate-900/90 backdrop-blur-md border border-slate-800 p-2.5 rounded-xl shadow-xl flex flex-col gap-1.5 text-[10px] font-bold text-slate-300 font-sans pointer-events-auto">
+            <div className="text-[9px] text-indigo-400 uppercase tracking-wider border-b border-slate-800 pb-1 mb-0.5">Fiber Layers</div>
+            <label className="flex items-center gap-2 cursor-pointer hover:text-white transition-colors">
+              <input
+                type="checkbox"
+                checked={showFiberNodes}
+                onChange={() => setShowFiberNodes(!showFiberNodes)}
+                className="rounded border-slate-800 bg-slate-950 text-indigo-500 focus:ring-0 focus:ring-offset-0 w-3 h-3 cursor-pointer"
+              />
+              Nodes (HH/MH/ENC)
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer hover:text-white transition-colors">
+              <input
+                type="checkbox"
+                checked={showFiberRoutes}
+                onChange={() => setShowFiberRoutes(!showFiberRoutes)}
+                className="rounded border-slate-800 bg-slate-950 text-indigo-500 focus:ring-0 focus:ring-offset-0 w-3 h-3 cursor-pointer"
+              />
+              Conduit & Drops
+            </label>
+          </div>
 
           {/* ── Camera Hover Info Card ── */}
           {hoveredCamera && hoverPosition && (() => {
@@ -1520,7 +1937,7 @@ export default function ProjectMapCanvas({
                       className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-[11px] focus:outline-none focus:border-indigo-500"
                     >
                       <option value="">Unassigned</option>
-                      {networkDevices.filter(d => d.device_type === 'switch').map(sw => (
+                      {networkDevices.filter(d => d.device_type === 'switch' || d.device_type === 'Industrial Switch').map(sw => (
                         <option key={sw.id} value={sw.id}>{sw.name} ({sw.manufacturer || 'Generic'})</option>
                       ))}
                     </select>
@@ -1581,6 +1998,370 @@ export default function ProjectMapCanvas({
                     </select>
                   </div>
                 </div>
+
+                {cameraCommType === 'fiber' && (
+                  <div className="border border-indigo-950 p-3.5 rounded-2xl bg-indigo-950/10 space-y-3.5 relative overflow-hidden">
+                    <div className="absolute top-0 left-0 right-0 h-[2px] bg-indigo-500/30" />
+                    <span className="block text-[10px] font-bold text-indigo-400 uppercase tracking-wider">OSP Fiber Pathway Connection</span>
+                    
+                    {/* Connectivity Path Type */}
+                    <div>
+                      <label className="block text-[9px] font-semibold text-slate-400 mb-1">Connectivity Path Type</label>
+                      <select
+                        value={connectivityPathType}
+                        onChange={e => setConnectivityPathType(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-[11px] focus:outline-none"
+                      >
+                        <option value="Fiber -> Camera">Fiber → Camera (Direct Drop)</option>
+                        <option value="Fiber -> Switch -> Camera">Fiber → Switch → Camera</option>
+                        <option value="Fiber -> Switch -> Wireless Radio -> Camera">Fiber → Switch → Wireless → Camera</option>
+                      </select>
+                    </div>
+
+                    {/* Source Node */}
+                    <div>
+                      <label className="block text-[9px] font-semibold text-slate-400 mb-1">Source Node</label>
+                      <select
+                        value={cameraSourceNodeId} onChange={e => {
+                          setCameraSourceNodeId(e.target.value)
+                          setCameraEnclosureId('') // reset enclosure on node change
+                        }}
+                        className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-[11px] focus:outline-none"
+                      >
+                        <option value="">Select Source Node...</option>
+                        {fiberNodes.map(node => (
+                          <option key={node.id} value={node.id}>
+                            {node.node_tag} ({node.node_type})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Enclosure */}
+                    <div>
+                      <label className="block text-[9px] font-semibold text-slate-400 mb-1">Enclosure</label>
+                      <select
+                        value={cameraEnclosureId} onChange={e => setCameraEnclosureId(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-[11px] focus:outline-none"
+                        disabled={!cameraSourceNodeId}
+                      >
+                        <option value="">Select Enclosure...</option>
+                        {fiberEnclosures
+                          .filter(e => e.node_id === cameraSourceNodeId)
+                          .map(enc => (
+                            <option key={enc.id} value={enc.id}>
+                              {enc.enclosure_tag} ({enc.enclosure_type})
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    {/* Drop Cable */}
+                    <div>
+                      <label className="block text-[9px] font-semibold text-slate-400 mb-1">Drop Cable</label>
+                      <select
+                        value={cameraDropCableId} onChange={e => setCameraDropCableId(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-[11px] focus:outline-none"
+                      >
+                        <option value="">Select Drop Cable...</option>
+                        {fiberCables
+                          .filter(c => c.cable_type === 'Drop')
+                          .map(cable => (
+                            <option key={cable.id} value={cable.id}>
+                              {cable.cable_tag} ({cable.fiber_count}F)
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    {/* Backbone Cable */}
+                    <div>
+                      <label className="block text-[9px] font-semibold text-slate-400 mb-1">Backbone Cable</label>
+                      <select
+                        value={cameraBackboneCableId} onChange={e => setCameraBackboneCableId(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-[11px] focus:outline-none"
+                      >
+                        <option value="">Select Backbone Cable...</option>
+                        {fiberCables
+                          .filter(c => c.cable_type === 'Backbone')
+                          .map(cable => (
+                            <option key={cable.id} value={cable.id}>
+                              {cable.cable_tag} ({cable.fiber_count}F)
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    {/* Strands (TX/RX) */}
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-[9px] font-semibold text-slate-400 mb-1">TX/Uplink Strand</label>
+                        <select
+                          value={assignedStrandTxId} onChange={e => setAssignedStrandTxId(e.target.value)}
+                          className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-[11px] focus:outline-none"
+                          disabled={!cameraDropCableId && !cameraBackboneCableId}
+                        >
+                          <option value="">Unassigned</option>
+                          {fiberStrands
+                            .filter(s => s.cable_id === (cameraDropCableId || cameraBackboneCableId))
+                            .map(strand => (
+                              <option key={strand.id} value={strand.id}>
+                                Core {strand.strand_number} ({strand.fiber_color})
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[9px] font-semibold text-slate-400 mb-1">RX Strand</label>
+                        <select
+                          value={assignedStrandRxId} onChange={e => setAssignedStrandRxId(e.target.value)}
+                          className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-[11px] focus:outline-none"
+                          disabled={!cameraDropCableId && !cameraBackboneCableId}
+                        >
+                          <option value="">Unassigned</option>
+                          {fiberStrands
+                            .filter(s => s.cable_id === (cameraDropCableId || cameraBackboneCableId))
+                            .map(strand => (
+                              <option key={strand.id} value={strand.id}>
+                                Core {strand.strand_number} ({strand.fiber_color})
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Switch / Cabinet patching details (only visible if connectivity path uses a switch) */}
+                    {connectivityPathType !== 'Fiber -> Camera' && (
+                      <div className="pt-2.5 border-t border-slate-850 space-y-3">
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cabinet & Switch Termination</span>
+                        
+                        {/* Cabinet */}
+                        <div>
+                          <label className="block text-[9px] font-semibold text-slate-400 mb-1">Assigned Cabinet</label>
+                          <select
+                            value={assignedCabinetId}
+                            onChange={e => {
+                              setAssignedCabinetId(e.target.value)
+                              setAssignedSwitchId('') // reset dependent selects
+                              setAssignedSwitchPortId('')
+                              setAssignedSfpPortId('')
+                              setAssignedFppId('')
+                              setAssignedFduId('')
+                            }}
+                            className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-[11px] focus:outline-none"
+                          >
+                            <option value="">Select Cabinet...</option>
+                            {cabinets.map(cab => (
+                              <option key={cab.id} value={cab.id}>
+                                {cab.cabinet_tag} ({cab.cabinet_type})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* FDU */}
+                        <div>
+                          <label className="block text-[9px] font-semibold text-slate-400 mb-1">Assigned FDU</label>
+                          <select
+                            value={assignedFduId}
+                            onChange={e => setAssignedFduId(e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-[11px] focus:outline-none"
+                            disabled={!assignedCabinetId}
+                          >
+                            <option value="">Select FDU...</option>
+                            {fdus
+                              .filter(f => f.cabinet_id === assignedCabinetId)
+                              .map(fdu => (
+                                <option key={fdu.id} value={fdu.id}>
+                                  {fdu.fdu_tag} ({fdu.fiber_capacity}F)
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+
+                        {/* FPP */}
+                        <div>
+                          <label className="block text-[9px] font-semibold text-slate-400 mb-1">Assigned FPP</label>
+                          <select
+                            value={assignedFppId}
+                            onChange={e => setAssignedFppId(e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-[11px] focus:outline-none"
+                            disabled={!assignedCabinetId}
+                          >
+                            <option value="">Select FPP...</option>
+                            {fpps
+                              .filter(f => f.cabinet_id === assignedCabinetId)
+                              .map(fpp => (
+                                <option key={fpp.id} value={fpp.id}>
+                                  {fpp.fpp_tag} ({fpp.port_count} Ports)
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+
+                        {/* Switch */}
+                        <div>
+                          <label className="block text-[9px] font-semibold text-slate-400 mb-1">Assigned switch</label>
+                          <select
+                            value={assignedSwitchId}
+                            onChange={e => {
+                              setAssignedSwitchId(e.target.value)
+                              setAssignedSwitchPortId('')
+                              setAssignedSfpPortId('')
+                            }}
+                            className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-[11px] focus:outline-none"
+                            disabled={!assignedCabinetId}
+                          >
+                            <option value="">Select Switch...</option>
+                            {networkDevices
+                              .filter(d => d.cabinet_id === assignedCabinetId && (d.device_type === 'Industrial Switch' || d.device_type === 'switch'))
+                              .map(sw => (
+                                <option key={sw.id} value={sw.id}>
+                                  {sw.name} ({sw.device_type})
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+
+                        {/* Switch Port fields & calculations */}
+                        {assignedSwitchId && (() => {
+                          const selectedSwitch = networkDevices.find(d => d.id === assignedSwitchId)
+                          const totalPorts = selectedSwitch?.total_ports || 0
+                          const switchPortsList = allSwitchPorts.filter(p => p.network_device_id === assignedSwitchId)
+                          const usedPorts = switchPortsList.filter(p => p.assigned_camera_location_id || p.assigned_fiber_strand_id || p.assigned_device_type !== 'unused').length
+                          const availablePorts = totalPorts - usedPorts
+
+                          return (
+                            <div className="space-y-3.5 bg-slate-950/60 p-2.5 rounded-xl border border-slate-900">
+                              <div className="flex justify-between items-center text-[10px]">
+                                <span className="font-semibold text-slate-450">Switch Port Status:</span>
+                                <span className={`px-2 py-0.5 rounded-full font-bold font-mono text-[9px] ${availablePorts > 0 ? 'bg-emerald-950 text-emerald-400' : 'bg-rose-950 text-rose-400'}`}>
+                                  Used: {usedPorts}/{totalPorts} ({availablePorts} Avail)
+                                </span>
+                              </div>
+
+                              {/* Copper Port */}
+                              <div>
+                                <label className="block text-[8px] font-bold text-slate-450 uppercase mb-1">Copper / RJ45 Port</label>
+                                <select
+                                  value={assignedSwitchPortId}
+                                  onChange={e => setAssignedSwitchPortId(e.target.value)}
+                                  className="w-full px-2 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-white text-[10px] focus:outline-none"
+                                >
+                                  <option value="">Select RJ45 Port...</option>
+                                  {switchPortsList
+                                    .filter(p => p.port_type === 'rj45')
+                                    .map(port => {
+                                      const isAssignedToOther = port.assigned_camera_location_id && port.assigned_camera_location_id !== selectedCamera.id
+                                      return (
+                                        <option key={port.id} value={port.id} disabled={!!isAssignedToOther}>
+                                          Port {port.port_number} {isAssignedToOther ? '(Assigned)' : '(Available)'}
+                                        </option>
+                                      )
+                                    })}
+                                </select>
+                              </div>
+
+                              {/* SFP Port */}
+                              <div>
+                                <label className="block text-[8px] font-bold text-slate-450 uppercase mb-1">SFP Jumper Port (Uplink)</label>
+                                <select
+                                  value={assignedSfpPortId}
+                                  onChange={e => setAssignedSfpPortId(e.target.value)}
+                                  className="w-full px-2 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-white text-[10px] focus:outline-none"
+                                >
+                                  <option value="">Select SFP Port...</option>
+                                  {switchPortsList
+                                    .filter(p => p.port_type === 'sfp' || p.port_type === 'sfp_plus')
+                                    .map(port => {
+                                      const isAssignedToOther = port.assigned_fiber_strand_id && port.assigned_fiber_strand_id !== assignedStrandTxId
+                                      return (
+                                        <option key={port.id} value={port.id} disabled={!!isAssignedToOther}>
+                                          Port {port.port_number} - {port.port_type.toUpperCase()} {isAssignedToOther ? '(Assigned)' : '(Available)'}
+                                        </option>
+                                      )
+                                    })}
+                                </select>
+                              </div>
+                            </div>
+                          )
+                        })()}
+                      </div>
+                    )}
+
+                    {/* Fiber Path Status */}
+                    <div>
+                      <label className="block text-[9px] font-semibold text-slate-400 mb-1">Path Status</label>
+                      <select
+                        value={cameraFiberPathStatus} onChange={e => setCameraFiberPathStatus(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-[11px] focus:outline-none"
+                      >
+                        <option value="Planned">Planned</option>
+                        <option value="Fiber Pulled">Fiber Pulled</option>
+                        <option value="Splicing Pending">Splicing Pending</option>
+                        <option value="Spliced">Spliced</option>
+                        <option value="Testing Pending">Testing Pending</option>
+                        <option value="Tested">Tested</option>
+                        <option value="Connected">Connected</option>
+                        <option value="Complete">Complete</option>
+                        <option value="Blocked">Blocked</option>
+                      </select>
+                    </div>
+
+                    {/* Generate Fiber Tasks & Infrastructure Tasks Buttons */}
+                    <div className="pt-2 border-t border-slate-850 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!selectedCamera) return
+                          if (confirm(`Do you want to generate Fiber installation, splicing and testing tasks for ${selectedCamera.camera_id_tag}?`)) {
+                            startTransition(async () => {
+                              const res = await generateFiberTasksForCamera({
+                                projectId,
+                                cameraId: selectedCamera.id,
+                                cameraTag: selectedCamera.camera_id_tag
+                              })
+                              if (res.success) {
+                                alert(`Generated ${res.created} new tasks (${res.skipped} skipped).`)
+                                await loadCameraTasksAndHistory(selectedCamera.id)
+                              } else if (res.error) {
+                                alert(`Error: ${res.error}`)
+                              }
+                            })
+                          }
+                        }}
+                        className="flex-1 py-1.5 px-2 bg-indigo-600/25 hover:bg-indigo-600/40 border border-indigo-500/30 text-indigo-300 rounded-lg text-[10px] font-bold transition text-center"
+                      >
+                        Generate Fiber Tasks
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!selectedCamera) return
+                          if (confirm(`Do you want to initialize all standard camera infrastructure checklists for ${selectedCamera.camera_id_tag}?`)) {
+                            startTransition(async () => {
+                              const res = await generateScopeTemplateTasks({
+                                projectId,
+                                cameraId: selectedCamera.id,
+                                communicationType: 'fiber'
+                              })
+                              if (res.success) {
+                                alert(`Initialized checklist successfully.`)
+                                await loadCameraTasksAndHistory(selectedCamera.id)
+                              } else if (res.error) {
+                                alert(`Error: ${res.error}`)
+                              }
+                            })
+                          }
+                        }}
+                        className="flex-1 py-1.5 px-2 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-300 rounded-lg text-[10px] font-bold transition text-center"
+                      >
+                        Generate Infra Tasks
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Status</label>
@@ -1924,7 +2705,7 @@ export default function ProjectMapCanvas({
                   </div>
                 </div>
 
-                {deviceType === 'switch' && (
+                {(deviceType === 'switch' || deviceType === 'Industrial Switch') && (
                   <div className="grid grid-cols-2 gap-3 border border-slate-850 p-3 rounded-xl bg-slate-950/20">
                     <div>
                       <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Total Ports</label>
@@ -1969,7 +2750,7 @@ export default function ProjectMapCanvas({
                 </div>
 
                 {/* Show switch ports matrix quick summary list inside panel */}
-                {deviceType === 'switch' && (
+                {(deviceType === 'switch' || deviceType === 'Industrial Switch') && (
                   <div className="space-y-2 border-t border-slate-850 pt-4">
                     <span className="block text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Ports Status Matrix</span>
                     {loadingPorts ? (

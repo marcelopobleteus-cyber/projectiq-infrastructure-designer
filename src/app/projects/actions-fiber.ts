@@ -2,213 +2,222 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
-import { Database } from '@/types/supabase'
 
-type FiberNodeInsert = Database['public']['Tables']['fiber_nodes']['Insert']
-type FiberRouteInsert = Database['public']['Tables']['fiber_routes']['Insert']
-type FiberRouteSegmentInsert = Database['public']['Tables']['fiber_route_segments']['Insert']
-type FiberCableInsert = Database['public']['Tables']['fiber_cables']['Insert']
+// ─── Types ──────────────────────────────────────────────────────────────────
 
-// 1. Fetch fiber catalog items
-export async function getFiberCatalog() {
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('fiber_catalog')
-    .select('*')
-    .order('manufacturer', { ascending: true })
-    .order('fiber_count', { ascending: true })
+export type FiberNodeType =
+  | 'Manhole'
+  | 'Handhole'
+  | 'Pull Box'
+  | 'Cabinet'
+  | 'Pole'
+  | 'Building'
+  | 'Existing Fiber Source'
+  | 'Camera Location'
+  | 'Custom'
 
-  if (error) {
-    throw new Error(`Failed to fetch fiber catalog: ${error.message}`)
-  }
-  return data
+export type FiberNodeStatus = 'Planned' | 'Existing' | 'Installed' | 'Blocked' | 'Needs Survey' | 'Removed'
+export type FiberCableType = 'Backbone' | 'Drop' | 'Existing' | 'Spare' | 'Temporary' | 'Custom'
+export type FiberInstallStatus = 'Planned' | 'Pulled' | 'Installed' | 'Blocked' | 'Damaged' | 'Removed'
+export type FiberTestStatus = 'Not Tested' | 'Passed' | 'Failed' | 'Needs Retest'
+export type FiberSpliceStatus = 'Not Spliced' | 'Spliced' | 'Failed' | 'Needs Rework'
+export type FiberPathStatus =
+  | 'Planned'
+  | 'Fiber Pulled'
+  | 'Splicing Pending'
+  | 'Spliced'
+  | 'Testing Pending'
+  | 'Tested'
+  | 'Connected'
+  | 'Complete'
+  | 'Blocked'
+export type EnclosureType =
+  | 'Splice Enclosure'
+  | 'Patch Panel'
+  | 'Cabinet Enclosure'
+  | 'Wall Mount'
+  | 'Underground Closure'
+  | 'Custom'
+export type StrandRole = 'TX' | 'RX' | 'Spare' | 'Data' | 'Custom'
+export type InstallationType = 'underground' | 'aerial' | 'direct_buried'
+export type RoutePurpose = 'camera_backbone' | 'camera_drop' | 'network_backbone' | 'power_monitoring' | 'spare'
+
+// ─── Haversine helper ───────────────────────────────────────────────────────
+
+function haversineDistanceFeet(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLon = (lon2 - lon1) * Math.PI / 180
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 3.28084
 }
 
-// 2. Fetch all fiber components for a project
+// ─── 1. Get fiber design data ────────────────────────────────────────────────
+
 export async function getFiberDesignData(projectId: string) {
   const supabase = await createClient()
 
   const [
     nodesRes,
-    enclosuresRes,
     routesRes,
     segmentsRes,
     cablesRes,
-    splicesRes,
+    strandsRes,
+    enclosuresRes,
+    spliceRecordsRes,
     assignmentsRes,
-    camerasRes
+    assignmentStrandsRes,
+    camerasRes,
+    catalogRes,
+    cabinetsRes,
+    fdusRes,
+    fppsRes,
+    patchCordsRes,
+    switchPortsRes,
+    networkDevicesRes,
   ] = await Promise.all([
-    supabase.from('fiber_nodes').select('*').eq('project_id', projectId).order('node_id_tag', { ascending: true }),
-    supabase.from('fiber_enclosures').select('*'),
-    supabase.from('fiber_routes').select('*').eq('project_id', projectId).order('route_id_tag', { ascending: true }),
-    supabase.from('fiber_route_segments').select('*').order('segment_index', { ascending: true }),
-    supabase.from('fiber_cables').select('*').eq('project_id', projectId),
-    supabase.from('fiber_splices').select('*'),
-    supabase.from('camera_fiber_assignments').select('*'),
-    supabase.from('camera_locations').select('id, camera_id_tag, status').eq('project_id', projectId)
+    supabase.from('fiber_nodes').select('*').eq('project_id', projectId).order('node_tag'),
+    supabase.from('fiber_routes').select('*').eq('project_id', projectId).order('route_id_tag'),
+    supabase.from('fiber_route_segments').select('*').eq('project_id', projectId).order('segment_index'),
+    supabase.from('fiber_cables').select('*').eq('project_id', projectId).order('cable_tag'),
+    supabase.from('fiber_strands').select('*').eq('project_id', projectId).order('strand_number'),
+    supabase.from('fiber_enclosures').select('*').eq('project_id', projectId).order('enclosure_tag'),
+    supabase.from('fiber_splice_records').select('*').eq('project_id', projectId),
+    supabase.from('camera_fiber_assignments').select('*').eq('project_id', projectId),
+    supabase.from('camera_fiber_assignment_strands').select('*').eq('project_id', projectId),
+    supabase.from('camera_locations').select('id, camera_id_tag, status, latitude, longitude, communication_type').eq('project_id', projectId).order('camera_id_tag'),
+    supabase.from('fiber_catalog').select('*').order('manufacturer').order('fiber_count'),
+    supabase.from('cabinets').select('*').eq('project_id', projectId).order('cabinet_tag'),
+    supabase.from('fiber_distribution_units').select('*').eq('project_id', projectId).order('fdu_tag'),
+    supabase.from('fiber_patch_panels').select('*').eq('project_id', projectId).order('fpp_tag'),
+    supabase.from('fiber_patch_cords').select('*').eq('project_id', projectId).order('patch_cord_tag'),
+    supabase.from('switch_ports').select('*, network_devices!inner(project_id)').eq('network_devices.project_id', projectId),
+    supabase.from('network_devices').select('*').eq('project_id', projectId).order('name'),
   ])
 
-  if (nodesRes.error) throw new Error(`Nodes fetch error: ${nodesRes.error.message}`)
-  if (routesRes.error) throw new Error(`Routes fetch error: ${routesRes.error.message}`)
+  if (nodesRes.error) throw new Error(`Nodes: ${nodesRes.error.message}`)
+  if (routesRes.error) throw new Error(`Routes: ${routesRes.error.message}`)
 
   return {
-    nodes: nodesRes.data || [],
-    enclosures: enclosuresRes.data || [],
-    routes: routesRes.data || [],
-    segments: segmentsRes.data || [],
-    cables: cablesRes.data || [],
-    splices: splicesRes.data || [],
-    assignments: assignmentsRes.data || [],
-    cameras: camerasRes.data || []
+    nodes: nodesRes.data ?? [],
+    routes: routesRes.data ?? [],
+    segments: segmentsRes.data ?? [],
+    cables: cablesRes.data ?? [],
+    strands: strandsRes.data ?? [],
+    enclosures: enclosuresRes.data ?? [],
+    spliceRecords: spliceRecordsRes.data ?? [],
+    assignments: assignmentsRes.data ?? [],
+    assignmentStrands: assignmentStrandsRes.data ?? [],
+    cameras: camerasRes.data ?? [],
+    catalog: catalogRes.data ?? [],
+    cabinets: cabinetsRes.data ?? [],
+    fdus: fdusRes.data ?? [],
+    fpps: fppsRes.data ?? [],
+    patchCords: patchCordsRes.data ?? [],
+    switchPorts: (switchPortsRes.data ?? []) as any[],
+    networkDevices: networkDevicesRes.data ?? [],
   }
 }
 
-// 3. Create a fiber node and its automatic BOM items
+// ─── 2. Get fiber dashboard summary ─────────────────────────────────────────
+
+export async function getFiberDashboardSummary(projectId: string) {
+  const supabase = await createClient()
+
+  const [totalCamerasRes, assignmentsRes, enclosuresRes, splicesRes] = await Promise.all([
+    supabase.from('camera_locations').select('id, communication_type').eq('project_id', projectId),
+    supabase.from('camera_fiber_assignments').select('id, fiber_path_status, test_status, splice_status').eq('project_id', projectId),
+    supabase.from('fiber_enclosures').select('id, splice_count').eq('project_id', projectId),
+    supabase.from('fiber_splice_records').select('id, splice_status, test_status').eq('project_id', projectId),
+  ])
+
+  const fiberCameras = (totalCamerasRes.data ?? []).filter(c => c.communication_type === 'fiber')
+  const assignments = assignmentsRes.data ?? []
+  const splices = splicesRes.data ?? []
+
+  return {
+    totalFiberCameras: fiberCameras.length,
+    fiberDrops: assignments.length,
+    splicedCount: splices.filter(s => s.splice_status === 'Spliced').length,
+    testedPassed: splices.filter(s => s.test_status === 'Passed').length,
+    blockedPaths: assignments.filter(a => a.fiber_path_status === 'Blocked').length,
+    completedPaths: assignments.filter(a => a.fiber_path_status === 'Complete').length,
+    totalSplices: splices.length,
+    totalEnclosures: (enclosuresRes.data ?? []).length,
+  }
+}
+
+// ─── 3. Create fiber node ────────────────────────────────────────────────────
+
 export async function createFiberNode(params: {
   projectId: string
-  nodeIdTag: string
-  nodeType: 'handhole' | 'pull_box' | 'splice_enclosure' | 'cabinet' | 'building_entry'
+  nodeTag: string
+  nodeType: FiberNodeType
   latitude: number
   longitude: number
-  elevationM?: number
-  sizeDims?: string
-  slackFeet?: number
-  closureType?: 'Dome Closure' | 'Inline Closure' | 'Patch Panel' | 'ODF'
-  capacity?: number
+  address?: string
+  status?: FiberNodeStatus
+  elevationFt?: number
+  structureDepthFt?: number
+  sizeDescription?: string
+  slackLoopFt?: number
   notes?: string
 }) {
   const supabase = await createClient()
 
-  // Set default slack values
-  const defaultSlack = (params.nodeType === 'handhole' || params.nodeType === 'cabinet') 
-    ? 20.0 
-    : params.nodeType === 'building_entry' 
-      ? 10.0 
-      : 0.0
-  const slackVal = params.slackFeet !== undefined ? params.slackFeet : defaultSlack
-
-  const defaultSize = params.nodeType === 'handhole' 
-    ? '24x36x36' 
-    : params.nodeType === 'pull_box' 
-      ? '12x12x6' 
-      : params.nodeType === 'cabinet' 
-        ? 'Outdoor Cabinet' 
-        : params.nodeType === 'building_entry' 
-          ? 'Wall Transition Box' 
-          : 'Dome Closure'
+  const defaultSlack =
+    params.nodeType === 'Handhole' || params.nodeType === 'Cabinet' ? 20.0
+    : params.nodeType === 'Building' ? 10.0
+    : 0.0
 
   const { data: newNode, error: nodeErr } = await supabase
     .from('fiber_nodes')
     .insert({
       project_id: params.projectId,
-      node_id_tag: params.nodeIdTag,
+      // organization_id filled by trigger
+      organization_id: '', // placeholder — trigger will override via set_fiber_organization_id_from_project
+      node_tag: params.nodeTag,
       node_type: params.nodeType,
       latitude: params.latitude,
       longitude: params.longitude,
-      elevation_m: params.elevationM || 0.0,
-      size_dims: params.sizeDims || defaultSize,
-      slack_feet: slackVal,
-      notes: params.notes || ''
+      address: params.address,
+      status: params.status ?? 'Planned',
+      elevation_ft: params.elevationFt ?? 0.0,
+      structure_depth_ft: params.structureDepthFt ?? 0.0,
+      size_description: params.sizeDescription ?? '24x36x36',
+      slack_loop_ft: params.slackLoopFt ?? defaultSlack,
+      notes: params.notes,
     })
     .select()
     .single()
 
-  if (nodeErr) {
-    return { error: `Failed to create fiber node: ${nodeErr.message}` }
+  if (nodeErr) return { error: `Failed to create fiber node: ${nodeErr.message}` }
+
+  // Auto BOM by node type
+  const bomByType: Record<string, { part_number: string; description: string; unit_cost: number }> = {
+    'Handhole': { part_number: 'HH-BOX', description: `Handhole Box (${params.sizeDescription ?? '24x36x36'})`, unit_cost: 850.00 },
+    'Manhole': { part_number: 'MH-COVER', description: 'Concrete Manhole with Cast Iron Cover', unit_cost: 2400.00 },
+    'Pull Box': { part_number: 'PB-BOX', description: `Pull Box (${params.sizeDescription ?? '12x12x6'})`, unit_cost: 150.00 },
+    'Cabinet': { part_number: 'CAB-OUTDOOR', description: `Outdoor Equipment Cabinet`, unit_cost: 1200.00 },
+    'Building': { part_number: 'BLDG-ENTRY-KIT', description: `Building Entrance Transition Kit`, unit_cost: 250.00 },
   }
 
-  // If node type is a splice enclosure, create its sub-specs
-  if (params.nodeType === 'splice_enclosure') {
-    const cType = params.closureType || 'Dome Closure'
-    const cap = params.capacity || 12
-
-    const { error: encErr } = await supabase
-      .from('fiber_enclosures')
-      .insert({
-        id: newNode.id,
-        closure_type: cType,
-        capacity: cap,
-        used_fibers: 0,
-        spare_fibers: cap
-      })
-
-    if (encErr) {
-      console.error('Failed to create enclosure specifications:', encErr)
-    }
-
-    // Auto BOM for Splice Enclosure
+  const bom = bomByType[params.nodeType]
+  if (bom) {
     await supabase.from('bom_items').insert({
       project_id: params.projectId,
-      category: 'Network',
-      part_number: 'SE-CLOSURE',
-      description: `Splice Enclosure (${cType}, ${cap}-Core Max)`,
-      quantity: 1.00,
+      category: 'Fiber',
+      part_number: bom.part_number,
+      description: bom.description,
+      quantity: 1.0,
       unit: 'pcs',
-      unit_cost: 450.00,
+      unit_cost: bom.unit_cost,
       source: 'catalog',
       manufacturer: 'Generic',
       fiber_node_id: newNode.id,
-      status: 'Planned'
-    })
-  } else if (params.nodeType === 'handhole') {
-    // Auto BOM for Handhole
-    await supabase.from('bom_items').insert({
-      project_id: params.projectId,
-      category: 'Miscellaneous',
-      part_number: 'HH-BOX',
-      description: `Outside Plant Utility Handhole Box (${params.sizeDims || '24x36x36'})`,
-      quantity: 1.00,
-      unit: 'pcs',
-      unit_cost: 850.00,
-      source: 'catalog',
-      manufacturer: 'Generic',
-      fiber_node_id: newNode.id,
-      status: 'Planned'
-    })
-  } else if (params.nodeType === 'pull_box') {
-    // Auto BOM for Pull Box
-    await supabase.from('bom_items').insert({
-      project_id: params.projectId,
-      category: 'Miscellaneous',
-      part_number: 'PB-BOX',
-      description: `Pull Box Outlet Fitting (${params.sizeDims || '12x12x6'})`,
-      quantity: 1.00,
-      unit: 'pcs',
-      unit_cost: 150.00,
-      source: 'catalog',
-      manufacturer: 'Generic',
-      fiber_node_id: newNode.id,
-      status: 'Planned'
-    })
-  } else if (params.nodeType === 'cabinet') {
-    // Auto BOM for Cabinet
-    await supabase.from('bom_items').insert({
-      project_id: params.projectId,
-      category: 'Miscellaneous',
-      part_number: 'CAB-OUTDOOR',
-      description: `Outdoor Equipment Cabinet (${params.sizeDims || 'Outdoor Cabinet'})`,
-      quantity: 1.00,
-      unit: 'pcs',
-      unit_cost: 1200.00,
-      source: 'catalog',
-      manufacturer: 'Generic',
-      fiber_node_id: newNode.id,
-      status: 'Planned'
-    })
-  } else if (params.nodeType === 'building_entry') {
-    // Auto BOM for Building Entry transition
-    await supabase.from('bom_items').insert({
-      project_id: params.projectId,
-      category: 'Miscellaneous',
-      part_number: 'BLDG-ENTRY-KIT',
-      description: `Building Entrance Transition Box (${params.sizeDims || 'Wall Transition Box'})`,
-      quantity: 1.00,
-      unit: 'pcs',
-      unit_cost: 250.00,
-      source: 'catalog',
-      manufacturer: 'Generic',
-      fiber_node_id: newNode.id,
-      status: 'Planned'
+      status: 'Planned',
     })
   }
 
@@ -217,46 +226,111 @@ export async function createFiberNode(params: {
   return { success: true, data: newNode }
 }
 
-// 4. Delete fiber node
-export async function deleteFiberNode(params: {
+// ─── 4. Update fiber node ────────────────────────────────────────────────────
+
+export async function updateFiberNode(params: {
   id: string
   projectId: string
+  status?: FiberNodeStatus
+  address?: string
+  elevationFt?: number
+  structureDepthFt?: number
+  sizeDescription?: string
+  slackLoopFt?: number
+  notes?: string
 }) {
   const supabase = await createClient()
+
   const { error } = await supabase
     .from('fiber_nodes')
-    .delete()
+    .update({
+      status: params.status,
+      address: params.address,
+      elevation_ft: params.elevationFt,
+      structure_depth_ft: params.structureDepthFt,
+      size_description: params.sizeDescription,
+      slack_loop_ft: params.slackLoopFt,
+      notes: params.notes,
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', params.id)
 
-  if (error) {
-    return { error: `Failed to delete node: ${error.message}` }
-  }
+  if (error) return { error: `Failed to update fiber node: ${error.message}` }
 
+  revalidatePath(`/projects/${params.projectId}/fiber`)
+  return { success: true }
+}
+
+// ─── 5. Delete fiber node ────────────────────────────────────────────────────
+
+export async function deleteFiberNode(params: { id: string; projectId: string }) {
+  const supabase = await createClient()
+  const { error } = await supabase.from('fiber_nodes').delete().eq('id', params.id)
+  if (error) return { error: `Failed to delete node: ${error.message}` }
   revalidatePath(`/projects/${params.projectId}/fiber`)
   revalidatePath(`/projects/${params.projectId}/bom`)
   return { success: true }
 }
 
-// Geodesic math formula: Haversine distance in feet
-function getHaversineDistanceFeet(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const R = 6371000 // Earth's radius in meters
-  const dLat = (lat2 - lat1) * Math.PI / 180
-  const dLon = (lon2 - lon1) * Math.PI / 180
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2)
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  const dMeters = R * c
-  return dMeters * 3.28084 // Convert to feet
+// ─── 6. Create fiber enclosure ───────────────────────────────────────────────
+
+export async function createFiberEnclosure(params: {
+  projectId: string
+  enclosureTag: string
+  nodeId: string
+  enclosureType: EnclosureType
+  capacity?: number
+  notes?: string
+}) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('fiber_enclosures')
+    .insert({
+      project_id: params.projectId,
+      organization_id: '', // trigger fills
+      enclosure_tag: params.enclosureTag,
+      node_id: params.nodeId,
+      enclosure_type: params.enclosureType,
+      capacity: params.capacity ?? 12,
+      installed_status: 'Planned',
+      splice_count: 0,
+      notes: params.notes,
+    })
+    .select()
+    .single()
+
+  if (error) return { error: `Failed to create enclosure: ${error.message}` }
+
+  // Auto BOM
+  await supabase.from('bom_items').insert({
+    project_id: params.projectId,
+    category: 'Fiber',
+    part_number: 'SE-CLOSURE',
+    description: `${params.enclosureType} (${params.capacity ?? 12}-Port)`,
+    quantity: 1.0,
+    unit: 'pcs',
+    unit_cost: 450.00,
+    source: 'catalog',
+    manufacturer: 'Generic',
+    fiber_node_id: params.nodeId,
+    status: 'Planned',
+  })
+
+  revalidatePath(`/projects/${params.projectId}/fiber`)
+  revalidatePath(`/projects/${params.projectId}/bom`)
+  return { success: true, data }
 }
+
+// ─── 7. Create fiber route ───────────────────────────────────────────────────
 
 export async function createFiberRoute(params: {
   projectId: string
   routeIdTag: string
+  installationType: InstallationType
+  routePurpose?: RoutePurpose
   conduitDiameterInches?: number
   slackPercentage?: number
-  installationType: 'underground' | 'aerial' | 'direct_buried'
   segments: {
     startLat: number
     startLng: number
@@ -266,76 +340,74 @@ export async function createFiberRoute(params: {
   }[]
   cableCatalogId?: string
   fiberCount?: number
-  routePurpose?: 'camera_backbone' | 'camera_drop' | 'network_backbone' | 'power_monitoring' | 'spare'
 }) {
   const supabase = await createClient()
 
-  // 1. Calculate measured length by summing segments
+  const slackPct = params.slackPercentage ?? 10.0
   let measuredLength = 0
-  const segmentInserts: any[] = []
+  const segmentInserts: {
+    segment_index: number
+    start_latitude: number
+    start_longitude: number
+    end_latitude: number
+    end_longitude: number
+    length_feet: number
+    slack_feet: number
+  }[] = []
 
   params.segments.forEach((seg, idx) => {
-    const lenFeet = getHaversineDistanceFeet(seg.startLat, seg.startLng, seg.endLat, seg.endLng)
-    measuredLength += lenFeet
-
+    const lenFt = haversineDistanceFeet(seg.startLat, seg.startLng, seg.endLat, seg.endLng)
+    measuredLength += lenFt
     segmentInserts.push({
       segment_index: idx,
       start_latitude: seg.startLat,
       start_longitude: seg.startLng,
       end_latitude: seg.endLat,
       end_longitude: seg.endLng,
-      length_feet: Number(lenFeet.toFixed(2)),
-      slack_feet: seg.slackFeet || 0.0
+      length_feet: Number(lenFt.toFixed(2)),
+      slack_feet: seg.slackFeet ?? 0.0,
     })
   })
 
-  const slackPercent = params.slackPercentage !== undefined ? params.slackPercentage : 10.0
-  const segmentSlackSum = params.segments.reduce((acc, s) => acc + (s.slackFeet || 0), 0)
+  const segmentSlack = params.segments.reduce((s, seg) => s + (seg.slackFeet ?? 0), 0)
+  const installedLength = measuredLength * (1 + slackPct / 100) + segmentSlack
 
-  // installed_length_feet = (measured * (1 + slack% / 100)) + segment slack
-  const installedLength = (measuredLength * (1 + slackPercent / 100)) + segmentSlackSum
-
-  // 2. Insert fiber route
+  // Insert route
   const { data: newRoute, error: routeErr } = await supabase
     .from('fiber_routes')
     .insert({
       project_id: params.projectId,
+      organization_id: '', // trigger fills
       route_id_tag: params.routeIdTag,
       measured_length_feet: Number(measuredLength.toFixed(2)),
-      slack_percentage: slackPercent,
+      slack_percentage: slackPct,
       installed_length_feet: Number(installedLength.toFixed(2)),
-      conduit_diameter_inches: params.conduitDiameterInches || 2.0,
-      fill_percentage: 0.0, // Calculated on cable installation
+      conduit_diameter_inches: params.conduitDiameterInches ?? 2.0,
+      fill_percentage: 0.0,
       spare_capacity: 100.0,
       installation_type: params.installationType,
-      route_purpose: params.routePurpose || 'camera_backbone'
+      route_purpose: params.routePurpose ?? 'camera_backbone',
     })
     .select()
     .single()
 
-  if (routeErr) {
-    return { error: `Failed to create fiber route: ${routeErr.message}` }
-  }
+  if (routeErr) return { error: `Failed to create route: ${routeErr.message}` }
 
-  // 3. Insert consecutive segments
+  // Insert segments
   const finalSegments = segmentInserts.map(s => ({
     ...s,
-    route_id: newRoute.id
+    project_id: params.projectId,
+    organization_id: '', // trigger fills
+    route_id: newRoute.id,
   }))
 
-  const { error: segErr } = await supabase
-    .from('fiber_route_segments')
-    .insert(finalSegments)
+  const { error: segErr } = await supabase.from('fiber_route_segments').insert(finalSegments)
+  if (segErr) console.error('Segment insert error:', segErr.message)
 
-  if (segErr) {
-    console.error('Failed to create route segments:', segErr)
-  }
-
-  // 4. Install Cable & Calculate Fill if catalog ID is provided
-  let cableId = null
-  let cableCost = 0.50 // fallback per foot
-  let cableName = 'Generic Cable'
-  let cablePart = 'N/A'
+  // Auto-create backbone cable from catalog
+  let cableCost = 0.50
+  let cableName = 'OSP Fiber Cable'
+  let cablePart = 'FIBER-OSP'
   let cableBrand = 'Generic'
 
   if (params.cableCatalogId) {
@@ -346,301 +418,952 @@ export async function createFiberRoute(params: {
       .single()
 
     if (catalogItem) {
-      const fCount = params.fiberCount || catalogItem.fiber_count
-      
-      const { data: newCable, error: cableErr } = await supabase
+      const fCount = params.fiberCount ?? catalogItem.fiber_count
+      const cableTag = `BB-${params.routeIdTag}`
+
+      const { error: cableErr } = await supabase
         .from('fiber_cables')
         .insert({
           project_id: params.projectId,
+          organization_id: '', // trigger fills
           route_id: newRoute.id,
-          cable_id_tag: `CAB-${params.routeIdTag}`,
-          catalog_id: catalogItem.id,
-          fiber_count: fCount
+          cable_tag: cableTag,
+          cable_type: 'Backbone',
+          fiber_count: fCount,
+          length_ft: Number(installedLength.toFixed(2)),
+          install_status: 'Planned',
+          test_status: 'Not Tested',
         })
-        .select()
-        .single()
 
-      if (newCable) {
-        cableId = newCable.id
-        cableName = `${catalogItem.manufacturer} ${catalogItem.grade} ${catalogItem.mode} Cable`
-        cablePart = catalogItem.part_number
-        cableBrand = catalogItem.manufacturer
-        // Convert catalog cost per meter to cost per foot
-        cableCost = Number(catalogItem.cost_per_meter) / 3.28084
-
-        // Conduit Fill Percentage formula: fill = (cable_dia / (conduit_dia * 25.4))^2 * 100
-        const cableDia = Number(catalogItem.diameter_mm)
-        const condDiaInches = params.conduitDiameterInches || 2.0
-        const condDiaMm = condDiaInches * 25.4
-        const fill = Math.min(((cableDia * cableDia) / (condDiaMm * condDiaMm)) * 100, 100.0)
-        const spare = 100.0 - fill
-
-        // Update route fill specs
+      if (!cableErr) {
+        // Update route fill percentage
+        const condDiaMm = (params.conduitDiameterInches ?? 2.0) * 25.4
+        const fill = Math.min((catalogItem.diameter_mm ** 2 / condDiaMm ** 2) * 100, 100)
         await supabase
           .from('fiber_routes')
-          .update({
-            fill_percentage: Number(fill.toFixed(2)),
-            spare_capacity: Number(spare.toFixed(2))
-          })
+          .update({ fill_percentage: Number(fill.toFixed(2)), spare_capacity: Number((100 - fill).toFixed(2)) })
           .eq('id', newRoute.id)
       }
+
+      cableCost = catalogItem.cost_per_foot
+      cableName = `${catalogItem.manufacturer} ${catalogItem.grade} ${catalogItem.mode} ${fCount}F Cable`
+      cablePart = catalogItem.part_number
+      cableBrand = catalogItem.manufacturer
     }
   }
 
-  // 5. Automated BOM Engineering Generation (using installed_length_feet)
-  const bomItemsToInsert = [
-    // Protective conduit duct
+  // BOM generation
+  const bomItems = [
     {
       project_id: params.projectId,
       category: 'Fiber',
       part_number: 'HDPE-COND',
-      description: `HDPE Conduit Duct (${params.conduitDiameterInches || 2.0}-inch)`,
+      description: `HDPE Conduit (${params.conduitDiameterInches ?? 2.0}-in)`,
       quantity: Number(installedLength.toFixed(2)),
       unit: 'ft',
       unit_cost: 1.50,
       source: 'catalog' as const,
       manufacturer: 'Generic',
       fiber_route_id: newRoute.id,
-      status: 'Planned'
+      status: 'Planned',
     },
-    // Innerduct
     {
       project_id: params.projectId,
       category: 'Fiber',
       part_number: 'INNER-1.25',
-      description: '1.25-inch Corrugated Flexible Innerduct',
+      description: '1.25-in Corrugated Innerduct',
       quantity: Number(installedLength.toFixed(2)),
       unit: 'ft',
       unit_cost: 0.75,
       source: 'catalog' as const,
       manufacturer: 'Generic',
       fiber_route_id: newRoute.id,
-      status: 'Planned'
+      status: 'Planned',
     },
-    // Mule tape pull tape
     {
       project_id: params.projectId,
       category: 'Fiber',
       part_number: 'MULE-WP1250',
-      description: 'Mule tape Cable Pulling Tape (1250 lbs)',
+      description: 'Mule Tape 1250 lbs Pull Tape',
       quantity: Number(installedLength.toFixed(2)),
       unit: 'ft',
       unit_cost: 0.15,
       source: 'catalog' as const,
       manufacturer: 'Generic',
       fiber_route_id: newRoute.id,
-      status: 'Planned'
+      status: 'Planned',
     },
-    // Future expansion anchors: Grounding Kits & Cable Wrap labels (architecture proofing)
-    {
-      project_id: params.projectId,
-      category: 'Power',
-      part_number: 'COND-GK-01',
-      description: 'OSP Conduit Grounding Kit / Bond strap',
-      quantity: 2.00,
-      unit: 'pcs',
-      unit_cost: 35.00,
-      source: 'catalog' as const,
-      manufacturer: 'Generic',
-      fiber_route_id: newRoute.id,
-      status: 'Planned'
-    },
-    {
-      project_id: params.projectId,
-      category: 'Miscellaneous',
-      part_number: 'CBL-LBL-01',
-      description: 'Optical wrap marker tags',
-      quantity: 4.00,
-      unit: 'pcs',
-      unit_cost: 2.50,
-      source: 'catalog' as const,
-      manufacturer: 'Generic',
-      fiber_route_id: newRoute.id,
-      status: 'Planned'
-    }
   ]
 
-  // Add the OSP Fiber Cable itself if catalog item was installed
   if (params.cableCatalogId) {
-    bomItemsToInsert.push({
+    bomItems.push({
       project_id: params.projectId,
       category: 'Fiber',
       part_number: cablePart,
-      description: `${cableName} (${params.fiberCount || 12} Cores)`,
+      description: cableName,
       quantity: Number(installedLength.toFixed(2)),
       unit: 'ft',
       unit_cost: Number(cableCost.toFixed(2)),
       source: 'catalog' as const,
       manufacturer: cableBrand,
       fiber_route_id: newRoute.id,
-      status: 'Planned'
+      status: 'Planned',
     })
   }
 
-  await supabase
-    .from('bom_items')
-    .insert(bomItemsToInsert)
+  await supabase.from('bom_items').insert(bomItems)
 
   revalidatePath(`/projects/${params.projectId}/fiber`)
   revalidatePath(`/projects/${params.projectId}/bom`)
   return { success: true, data: newRoute }
 }
 
-// 6. Delete fiber route
-export async function deleteFiberRoute(params: {
-  id: string
-  projectId: string
-}) {
+// ─── 8. Delete fiber route ───────────────────────────────────────────────────
+
+export async function deleteFiberRoute(params: { id: string; projectId: string }) {
   const supabase = await createClient()
-  const { error } = await supabase
-    .from('fiber_routes')
-    .delete()
-    .eq('id', params.id)
-
-  if (error) {
-    return { error: `Failed to delete route: ${error.message}` }
-  }
-
+  const { error } = await supabase.from('fiber_routes').delete().eq('id', params.id)
+  if (error) return { error: `Failed to delete route: ${error.message}` }
   revalidatePath(`/projects/${params.projectId}/fiber`)
   revalidatePath(`/projects/${params.projectId}/bom`)
   return { success: true }
 }
 
-export async function saveFiberSplices(params: {
+// ─── 9. Create drop cable for a camera ──────────────────────────────────────
+
+export async function createDropCable(params: {
   projectId: string
-  nodeId: string
-  splices: {
-    cableAId: string
-    cableBId: string
-    fiberNumA: number
-    fiberNumB: number
-    color?: string
-    status?: 'planned' | 'installed' | 'tested' | 'abandoned'
+  cameraId: string
+  cameraTag: string
+  fromNodeId: string
+  toNodeId: string
+  fiberCount: number
+  lengthFt: number
+  notes?: string
+}) {
+  const supabase = await createClient()
+
+  const cableTag = `DROP-${params.cameraTag}-${params.fiberCount}F`
+
+  const { data: newCable, error: cableErr } = await supabase
+    .from('fiber_cables')
+    .insert({
+      project_id: params.projectId,
+      organization_id: '', // trigger fills
+      cable_tag: cableTag,
+      cable_type: 'Drop',
+      fiber_count: params.fiberCount,
+      from_node_id: params.fromNodeId,
+      to_node_id: params.toNodeId,
+      length_ft: params.lengthFt,
+      install_status: 'Planned',
+      test_status: 'Not Tested',
+      notes: params.notes,
+    })
+    .select()
+    .single()
+
+  if (cableErr) return { error: `Failed to create drop cable: ${cableErr.message}` }
+
+  // BOM for drop cable
+  await supabase.from('bom_items').insert({
+    project_id: params.projectId,
+    category: 'Fiber',
+    part_number: 'DROP-CBL-SM',
+    description: `SM Drop Cable ${params.fiberCount}F (${params.cameraTag})`,
+    quantity: params.lengthFt,
+    unit: 'ft',
+    unit_cost: 0.45,
+    source: 'catalog',
+    manufacturer: 'Generic',
+    status: 'Planned',
+  })
+
+  revalidatePath(`/projects/${params.projectId}/fiber`)
+  revalidatePath(`/projects/${params.projectId}/bom`)
+  return { success: true, data: newCable }
+}
+
+// ─── 10. Preview bulk fiber drops ───────────────────────────────────────────
+
+export async function previewBulkFiberDrops(params: {
+  projectId: string
+  sourceNodeId: string
+  enclosureId: string
+  cameraIds: string[]
+  fiberCountPerDrop?: number
+  slackFactor?: number
+}) {
+  const supabase = await createClient()
+
+  const fiberCount = params.fiberCountPerDrop ?? 6
+  const slackFactor = params.slackFactor ?? 1.10
+
+  // Get cameras
+  const { data: cameras } = await supabase
+    .from('camera_locations')
+    .select('id, camera_id_tag, latitude, longitude')
+    .in('id', params.cameraIds)
+
+  // Get source node
+  const { data: sourceNode } = await supabase
+    .from('fiber_nodes')
+    .select('id, node_tag, latitude, longitude')
+    .eq('id', params.sourceNodeId)
+    .single()
+
+  if (!cameras || !sourceNode) return { error: 'Could not load cameras or source node' }
+
+  // Check which cameras already have assignments
+  const { data: existingAssignments } = await supabase
+    .from('camera_fiber_assignments')
+    .select('camera_id')
+    .in('camera_id', params.cameraIds)
+
+  const alreadyAssigned = new Set((existingAssignments ?? []).map(a => a.camera_id))
+
+  const preview = cameras.map(cam => {
+    const distanceFt = haversineDistanceFeet(
+      sourceNode.latitude, sourceNode.longitude,
+      cam.latitude, cam.longitude
+    )
+    const estimatedLengthFt = Math.round(distanceFt * slackFactor)
+    const cableTag = `DROP-${cam.camera_id_tag}-${fiberCount}F`
+    const nodeTag = `NODE-CAM-${cam.id.slice(0, 4)}`
+
+    return {
+      cameraId: cam.id,
+      cameraTag: cam.camera_id_tag,
+      cableTag,
+      nodeTag,
+      estimatedLengthFt,
+      straightLineDistanceFt: Math.round(distanceFt),
+      fiberCount,
+      alreadyAssigned: alreadyAssigned.has(cam.id),
+      estimatedCost: estimatedLengthFt * 0.45,
+    }
+  })
+
+  return { success: true, preview }
+}
+
+// ─── 11. Confirm bulk fiber drops ────────────────────────────────────────────
+
+export async function confirmBulkFiberDrops(params: {
+  projectId: string
+  sourceNodeId: string
+  enclosureId: string
+  drops: {
+    cameraId: string
+    cameraTag: string
+    cableTag: string
+    nodeTag: string
+    estimatedLengthFt: number
+    fiberCount: number
   }[]
 }) {
   const supabase = await createClient()
 
-  // Rebuild splices in transaction
-  // Delete old splices
+  const results: { cameraId: string; success: boolean; error?: string }[] = []
+
+  for (const drop of params.drops) {
+    // 1. Create Camera Location Node
+    const { data: camNode, error: nodeErr } = await supabase
+      .from('fiber_nodes')
+      .insert({
+        project_id: params.projectId,
+        organization_id: '', // trigger fills
+        node_tag: drop.nodeTag,
+        node_type: 'Camera Location',
+        latitude: 0, // will be updated from camera coords below
+        longitude: 0,
+        status: 'Planned',
+        size_description: 'Pole Mount Transition',
+        slack_loop_ft: 10.0,
+        notes: `Auto-created for camera ${drop.cameraTag}`,
+      })
+      .select()
+      .single()
+
+    if (nodeErr) {
+      // If conflict (node already exists), query it
+      const { data: existing } = await supabase
+        .from('fiber_nodes')
+        .select('id')
+        .eq('project_id', params.projectId)
+        .eq('node_tag', drop.nodeTag)
+        .single()
+
+      if (!existing) {
+        results.push({ cameraId: drop.cameraId, success: false, error: `Node error: ${nodeErr.message}` })
+        continue
+      }
+    }
+
+    // Update node coords from camera
+    const { data: cam } = await supabase
+      .from('camera_locations')
+      .select('latitude, longitude')
+      .eq('id', drop.cameraId)
+      .single()
+
+    if (cam && camNode) {
+      await supabase
+        .from('fiber_nodes')
+        .update({ latitude: cam.latitude, longitude: cam.longitude })
+        .eq('id', camNode.id)
+    }
+
+    const toNodeId = camNode?.id ?? (
+      await supabase.from('fiber_nodes').select('id').eq('project_id', params.projectId).eq('node_tag', drop.nodeTag).single()
+    ).data?.id
+
+    if (!toNodeId) {
+      results.push({ cameraId: drop.cameraId, success: false, error: 'Could not resolve camera location node' })
+      continue
+    }
+
+    // 2. Create drop cable
+    const { data: dropCable, error: cableErr } = await supabase
+      .from('fiber_cables')
+      .insert({
+        project_id: params.projectId,
+        organization_id: '', // trigger fills
+        cable_tag: drop.cableTag,
+        cable_type: 'Drop',
+        fiber_count: drop.fiberCount,
+        from_node_id: params.sourceNodeId,
+        to_node_id: toNodeId,
+        length_ft: drop.estimatedLengthFt,
+        install_status: 'Planned',
+        test_status: 'Not Tested',
+      })
+      .select()
+      .single()
+
+    if (cableErr) {
+      results.push({ cameraId: drop.cameraId, success: false, error: `Cable: ${cableErr.message}` })
+      continue
+    }
+
+    // 3. Create camera fiber assignment
+    const { error: assignErr } = await supabase
+      .from('camera_fiber_assignments')
+      .upsert({
+        project_id: params.projectId,
+        organization_id: '', // trigger fills
+        camera_id: drop.cameraId,
+        source_node_id: params.sourceNodeId,
+        enclosure_id: params.enclosureId,
+        drop_cable_id: dropCable.id,
+        splice_status: 'Not Spliced',
+        test_status: 'Not Tested',
+        fiber_path_status: 'Planned',
+      }, { onConflict: 'camera_id' })
+
+    if (assignErr) {
+      results.push({ cameraId: drop.cameraId, success: false, error: `Assignment: ${assignErr.message}` })
+      continue
+    }
+
+    results.push({ cameraId: drop.cameraId, success: true })
+  }
+
+  revalidatePath(`/projects/${params.projectId}/fiber`)
+  revalidatePath(`/projects/${params.projectId}/bom`)
+  return { success: true, results }
+}
+
+// ─── 12. Create splice record ────────────────────────────────────────────────
+
+export async function createSpliceRecord(params: {
+  projectId: string
+  enclosureId: string
+  fromCableId: string
+  fromStrandId: string
+  toCableId: string
+  toStrandId: string
+  assignedCameraId?: string
+  notes?: string
+}) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('fiber_splice_records')
+    .insert({
+      project_id: params.projectId,
+      organization_id: '', // trigger fills
+      enclosure_id: params.enclosureId,
+      from_cable_id: params.fromCableId,
+      from_strand_id: params.fromStrandId,
+      to_cable_id: params.toCableId,
+      to_strand_id: params.toStrandId,
+      assigned_camera_id: params.assignedCameraId,
+      splice_status: 'Not Spliced',
+      test_status: 'Not Tested',
+      notes: params.notes,
+    })
+    .select()
+    .single()
+
+  if (error) return { error: `Failed to create splice record: ${error.message}` }
+
+  // Update strand statuses
   await supabase
-    .from('fiber_splices')
-    .delete()
-    .eq('node_id', params.nodeId)
+    .from('fiber_strands')
+    .update({ splice_status: 'Spliced', updated_at: new Date().toISOString() })
+    .in('id', [params.fromStrandId, params.toStrandId])
 
-  if (params.splices.length > 0) {
-    const spliceInserts = params.splices.map(s => ({
-      node_id: params.nodeId,
-      cable_a_id: s.cableAId,
-      cable_b_id: s.cableBId,
-      fiber_number_a: s.fiberNumA,
-      fiber_number_b: s.fiberNumB,
-      color: s.color || 'blue',
-      status: s.status || 'planned'
-    }))
+  revalidatePath(`/projects/${params.projectId}/fiber`)
+  return { success: true, data }
+}
 
-    const { error: spliceErr } = await supabase
-      .from('fiber_splices')
-      .insert(spliceInserts)
+// ─── 13. Update splice record status ────────────────────────────────────────
 
-    if (spliceErr) {
-      return { error: `Failed to save splices: ${spliceErr.message}` }
+export async function updateSpliceStatus(params: {
+  id: string
+  projectId: string
+  spliceStatus: FiberSpliceStatus
+  testStatus?: FiberTestStatus
+  notes?: string
+}) {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('fiber_splice_records')
+    .update({
+      splice_status: params.spliceStatus,
+      test_status: params.testStatus,
+      notes: params.notes,
+      completed_at: params.spliceStatus === 'Spliced' ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', params.id)
+
+  if (error) return { error: `Failed to update splice: ${error.message}` }
+
+  revalidatePath(`/projects/${params.projectId}/fiber`)
+  return { success: true }
+}
+
+// ─── 14. Update camera fiber assignment ─────────────────────────────────────
+
+export async function updateCameraFiberAssignment(params: {
+  cameraId: string
+  projectId: string
+  sourceNodeId?: string | null
+  enclosureId?: string | null
+  backboneCableId?: string | null
+  dropCableId?: string | null
+  spliceStatus?: FiberSpliceStatus
+  testStatus?: FiberTestStatus
+  fiberPathStatus?: FiberPathStatus
+  notes?: string | null
+  connectivityPathType?: string
+  assignedCabinetId?: string | null
+  assignedSwitchId?: string | null
+  assignedSwitchPortId?: string | null
+  assignedSfpPortId?: string | null
+  assignedFppId?: string | null
+  assignedFduId?: string | null
+  assignedUplinkFiberStrandId?: string | null
+}) {
+  const supabase = await createClient()
+
+  // Prepare payload
+  const payload: any = {
+    project_id: params.projectId,
+    organization_id: '00000000-0000-0000-0000-000000000000', // trigger fills
+    camera_id: params.cameraId,
+    source_node_id: params.sourceNodeId === '' ? null : params.sourceNodeId,
+    enclosure_id: params.enclosureId === '' ? null : params.enclosureId,
+    backbone_cable_id: params.backboneCableId === '' ? null : params.backboneCableId,
+    drop_cable_id: params.dropCableId === '' ? null : params.dropCableId,
+    notes: params.notes,
+    updated_at: new Date().toISOString(),
+  }
+
+  if (params.spliceStatus !== undefined) payload.splice_status = params.spliceStatus
+  if (params.testStatus !== undefined) payload.test_status = params.testStatus
+  if (params.fiberPathStatus !== undefined) payload.fiber_path_status = params.fiberPathStatus
+  if (params.connectivityPathType !== undefined) payload.connectivity_path_type = params.connectivityPathType
+  if (params.assignedCabinetId !== undefined) payload.assigned_cabinet_id = params.assignedCabinetId === '' ? null : params.assignedCabinetId
+  if (params.assignedSwitchId !== undefined) payload.assigned_switch_id = params.assignedSwitchId === '' ? null : params.assignedSwitchId
+  if (params.assignedSwitchPortId !== undefined) payload.assigned_switch_port_id = params.assignedSwitchPortId === '' ? null : params.assignedSwitchPortId
+  if (params.assignedSfpPortId !== undefined) payload.assigned_sfp_port_id = params.assignedSfpPortId === '' ? null : params.assignedSfpPortId
+  if (params.assignedFppId !== undefined) payload.assigned_fpp_id = params.assignedFppId === '' ? null : params.assignedFppId
+  if (params.assignedFduId !== undefined) payload.assigned_fdu_id = params.assignedFduId === '' ? null : params.assignedFduId
+
+  const { data, error } = await supabase
+    .from('camera_fiber_assignments')
+    .upsert(payload, { onConflict: 'camera_id' })
+    .select()
+    .single()
+
+  if (error) return { error: `Failed to update fiber assignment: ${error.message}` }
+
+  // Clear previous copper port associations for this camera
+  await supabase
+    .from('switch_ports')
+    .update({
+      assigned_camera_location_id: null,
+      assigned_device_type: 'unused',
+      updated_at: new Date().toISOString()
+    })
+    .eq('assigned_camera_location_id', params.cameraId)
+
+  // Clear previous fiber strand port links for this camera's SFP port
+  if (params.assignedSfpPortId && params.assignedUplinkFiberStrandId) {
+    await supabase
+      .from('switch_ports')
+      .update({
+        assigned_fiber_strand_id: null,
+        assigned_fiber_cable_id: null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('assigned_fiber_strand_id', params.assignedUplinkFiberStrandId)
+  }
+
+  // Update switch copper port to camera if selected
+  if (params.assignedSwitchPortId && params.assignedSwitchPortId !== '') {
+    await supabase
+      .from('switch_ports')
+      .update({
+        assigned_camera_location_id: params.cameraId,
+        assigned_device_type: 'camera',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', params.assignedSwitchPortId)
+  }
+
+  // Update switch SFP port with uplink strand if selected
+  if (params.assignedSfpPortId && params.assignedSfpPortId !== '') {
+    await supabase
+      .from('switch_ports')
+      .update({
+        assigned_fiber_strand_id: params.assignedUplinkFiberStrandId === '' ? null : params.assignedUplinkFiberStrandId,
+        assigned_fiber_cable_id: params.dropCableId || params.backboneCableId || null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', params.assignedSfpPortId)
+  }
+
+  revalidatePath(`/projects/${params.projectId}/fiber`)
+  revalidatePath(`/projects/${params.projectId}/cameras`)
+  return { success: true, data }
+}
+
+// ─── 15. Assign strand to camera assignment ──────────────────────────────────
+
+export async function assignStrandToCamera(params: {
+  projectId: string
+  cameraFiberAssignmentId: string
+  cameraId: string
+  strandId: string
+  strandRole: StrandRole
+}) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('camera_fiber_assignment_strands')
+    .upsert({
+      project_id: params.projectId,
+      organization_id: '', // trigger fills
+      camera_fiber_assignment_id: params.cameraFiberAssignmentId,
+      camera_id: params.cameraId,
+      strand_id: params.strandId,
+      strand_role: params.strandRole,
+    }, { onConflict: 'strand_id' })
+    .select()
+    .single()
+
+  if (error) return { error: `Failed to assign strand: ${error.message}` }
+
+  // Update the strand's assigned_camera_id
+  await supabase
+    .from('fiber_strands')
+    .update({ assigned_camera_id: params.cameraId, updated_at: new Date().toISOString() })
+    .eq('id', params.strandId)
+
+  revalidatePath(`/projects/${params.projectId}/fiber`)
+  return { success: true, data }
+}
+
+// ─── 16. Generate fiber tasks for a camera ───────────────────────────────────
+
+export async function generateFiberTasksForCamera(params: {
+  projectId: string
+  organizationId?: string
+  cameraId: string
+  cameraTag: string
+}) {
+  const supabase = await createClient()
+
+  let orgId = params.organizationId
+  if (!orgId) {
+    const { data: project } = await supabase
+      .from('projects')
+      .select('organization_id')
+      .eq('id', params.projectId)
+      .single()
+    if (project) {
+      orgId = project.organization_id
     }
   }
 
-  // Update enclosure ports counts
-  const used = params.splices.filter(s => s.status === 'installed' || s.status === 'tested').length
-  const { data: enclosure } = await supabase
-    .from('fiber_enclosures')
-    .select('capacity')
-    .eq('id', params.nodeId)
+  if (!orgId) {
+    return { error: 'Failed to resolve organization: Project not found' }
+  }
+
+
+  const fiberTaskTemplates = [
+    {
+      title: `[${params.cameraTag}] Pull Drop Cable`,
+      task_type: 'installation',
+      template_key: 'fiber_pull_drop',
+      priority: 'high',
+    },
+    {
+      title: `[${params.cameraTag}] Splice Fiber Strands`,
+      task_type: 'splicing',
+      template_key: 'fiber_splice_fiber',
+      priority: 'high',
+    },
+    {
+      title: `[${params.cameraTag}] Test Fiber Path (OTDR / Continuity)`,
+      task_type: 'testing',
+      template_key: 'fiber_test_fiber',
+      priority: 'medium',
+    },
+  ]
+
+  // Check if tasks already exist for this camera
+  const { data: existingTasks } = await supabase
+    .from('camera_tasks')
+    .select('template_key')
+    .eq('camera_id', params.cameraId)
+    .in('template_key', fiberTaskTemplates.map(t => t.template_key))
+
+  const existingKeys = new Set((existingTasks ?? []).map(t => t.template_key))
+  const tasksToCreate = fiberTaskTemplates.filter(t => !existingKeys.has(t.template_key))
+
+  if (tasksToCreate.length === 0) {
+    return { success: true, created: 0, skipped: fiberTaskTemplates.length }
+  }
+
+  const taskInserts = tasksToCreate.map(t => ({
+    project_id: params.projectId,
+    organization_id: orgId,
+    camera_id: params.cameraId,
+    title: t.title,
+    task_type: t.task_type,
+    template_key: t.template_key,
+    priority: t.priority,
+    status: 'To Do',
+  }))
+
+  const { error } = await supabase.from('camera_tasks').insert(taskInserts)
+  if (error) return { error: `Failed to generate fiber tasks: ${error.message}` }
+
+  revalidatePath(`/projects/${params.projectId}/tasks`)
+  revalidatePath(`/projects/${params.projectId}/fiber`)
+  return { success: true, created: tasksToCreate.length, skipped: existingKeys.size }
+}
+
+// ─── 17. Fetch fiber catalog ─────────────────────────────────────────────────
+
+export async function getFiberCatalog() {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('fiber_catalog')
+    .select('*')
+    .order('manufacturer')
+    .order('fiber_count')
+
+  if (error) throw new Error(`Failed to fetch fiber catalog: ${error.message}`)
+  return data
+}
+
+// ─── 18. Update cable status ─────────────────────────────────────────────────
+
+export async function updateCableStatus(params: {
+  id: string
+  projectId: string
+  installStatus?: FiberInstallStatus
+  testStatus?: FiberTestStatus
+  notes?: string
+}) {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('fiber_cables')
+    .update({
+      install_status: params.installStatus,
+      test_status: params.testStatus,
+      notes: params.notes,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', params.id)
+
+  if (error) return { error: `Failed to update cable: ${error.message}` }
+
+  revalidatePath(`/projects/${params.projectId}/fiber`)
+  return { success: true }
+}
+
+// ─── 19. Delete fiber cable ───────────────────────────────────────────────────
+
+export async function deleteFiberCable(params: { id: string; projectId: string }) {
+  const supabase = await createClient()
+  const { error } = await supabase.from('fiber_cables').delete().eq('id', params.id)
+  if (error) return { error: `Failed to delete cable: ${error.message}` }
+  revalidatePath(`/projects/${params.projectId}/fiber`)
+  return { success: true }
+}
+
+export async function deleteSpliceRecord(params: {
+  id: string
+  projectId: string
+}) {
+  const supabase = await createClient()
+  
+  // Find the strands involved before deleting to reset their status
+  const { data: splice } = await supabase
+    .from('fiber_splice_records')
+    .select('from_strand_id, to_strand_id')
+    .eq('id', params.id)
     .single()
 
-  if (enclosure) {
-    const spare = Math.max(enclosure.capacity - used, 0)
+  const { error } = await supabase.from('fiber_splice_records').delete().eq('id', params.id)
+  if (error) return { error: `Failed to delete splice record: ${error.message}` }
+
+  if (splice) {
     await supabase
-      .from('fiber_enclosures')
-      .update({
-        used_fibers: used,
-        spare_fibers: spare
-      })
-      .eq('id', params.nodeId)
+      .from('fiber_strands')
+      .update({ splice_status: 'Not Spliced', updated_at: new Date().toISOString() })
+      .in('id', [splice.from_strand_id, splice.to_strand_id])
   }
 
   revalidatePath(`/projects/${params.projectId}/fiber`)
   return { success: true }
 }
 
-// 8. Assign a Camera to a Fiber cable link channel (supports redundant backup route patching)
-export async function assignCameraFiber(params: {
+export async function clearSplicesForCables(params: {
   projectId: string
-  cameraId: string
-  cableId: string
   enclosureId: string
-  txCore: number
-  rxCore: number
-  linkRole: 'primary' | 'backup'
+  cableIdA: string
+  cableIdB: string
 }) {
   const supabase = await createClient()
+  
+  // Get all matching splices first to reset strand statuses
+  const { data: splices } = await supabase
+    .from('fiber_splice_records')
+    .select('id, from_strand_id, to_strand_id')
+    .eq('enclosure_id', params.enclosureId)
+    .or(`and(from_cable_id.eq.${params.cableIdA},to_cable_id.eq.${params.cableIdB}),and(from_cable_id.eq.${params.cableIdB},to_cable_id.eq.${params.cableIdA})`)
 
-  // Check unique constraints for cores (no core double assignment on the same cable)
-  const { data: duplicate } = await supabase
-    .from('camera_fiber_assignments')
-    .select('id, camera_id')
-    .eq('cable_id', params.cableId)
-    .or(`tx_core.eq.${params.txCore},rx_core.eq.${params.rxCore},tx_core.eq.${params.rxCore},rx_core.eq.${params.txCore}`)
-    .limit(1)
-
-  if (duplicate && duplicate.length > 0 && duplicate[0].camera_id !== params.cameraId) {
-    return { error: 'One or more of the selected fiber cores are already patched to another camera.' }
-  }
-
-  // Insert or update camera assignment
   const { error } = await supabase
-    .from('camera_fiber_assignments')
-    .upsert({
-      camera_id: params.cameraId,
-      cable_id: params.cableId,
-      enclosure_id: params.enclosureId,
-      tx_core: params.txCore,
-      rx_core: params.rxCore,
-      link_role: params.linkRole
-    }, {
-      onConflict: 'camera_id,link_role'
-    })
+    .from('fiber_splice_records')
+    .delete()
+    .eq('enclosure_id', params.enclosureId)
+    .or(`and(from_cable_id.eq.${params.cableIdA},to_cable_id.eq.${params.cableIdB}),and(from_cable_id.eq.${params.cableIdB},to_cable_id.eq.${params.cableIdA})`)
 
-  if (error) {
-    return { error: `Failed to patch camera fiber assignment: ${error.message}` }
+  if (error) return { error: `Failed to clear splices: ${error.message}` }
+
+  if (splices && splices.length > 0) {
+    const strandIds = splices.flatMap(s => [s.from_strand_id, s.to_strand_id])
+    await supabase
+      .from('fiber_strands')
+      .update({ splice_status: 'Not Spliced', updated_at: new Date().toISOString() })
+      .in('id', strandIds)
   }
-
-  // Update camera status to in_progress or complete
-  await supabase
-    .from('camera_locations')
-    .update({ status: 'in_progress' })
-    .eq('id', params.cameraId)
 
   revalidatePath(`/projects/${params.projectId}/fiber`)
-  revalidatePath(`/projects/${params.projectId}/cameras`)
   return { success: true }
 }
 
-// 9. Remove camera fiber assignment
-export async function removeCameraFiber(params: {
+export async function clearStrandAssignmentsForCamera(params: {
   projectId: string
   cameraId: string
-  linkRole: 'primary' | 'backup'
 }) {
   const supabase = await createClient()
-  const { error } = await supabase
-    .from('camera_fiber_assignments')
-    .delete()
-    .eq('camera_id', params.cameraId)
-    .eq('link_role', params.linkRole)
 
-  if (error) {
-    return { error: `Failed to unpatch camera fiber assignment: ${error.message}` }
+  // Find existing strand assignments
+  const { data: existing } = await supabase
+    .from('camera_fiber_assignment_strands')
+    .select('strand_id')
+    .eq('camera_id', params.cameraId)
+
+  if (existing && existing.length > 0) {
+    const strandIds = existing.map(e => e.strand_id)
+    // Reset assigned_camera_id to null
+    await supabase
+      .from('fiber_strands')
+      .update({ assigned_camera_id: null, updated_at: new Date().toISOString() })
+      .in('id', strandIds)
+
+    // Delete assignment strands
+    await supabase
+      .from('camera_fiber_assignment_strands')
+      .delete()
+      .eq('camera_id', params.cameraId)
   }
 
   revalidatePath(`/projects/${params.projectId}/fiber`)
-  revalidatePath(`/projects/${params.projectId}/cameras`)
   return { success: true }
 }
+
+// ─── 19. Cabinets, FDUs, FPPs, and Patch Cords CRUD ───────────────────────────
+
+export async function createCabinet(params: {
+  projectId: string
+  cabinetTag: string
+  cabinetType: 'CCTV Cabinet' | 'Traffic Cabinet' | 'Fiber Cabinet' | 'Custom Cabinet'
+  latitude: number
+  longitude: number
+  status?: 'Planned' | 'Installed' | 'Existing' | 'Blocked' | 'Needs Survey' | 'Removed'
+  notes?: string
+}) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('cabinets')
+    .insert({
+      project_id: params.projectId,
+      organization_id: '00000000-0000-0000-0000-000000000000', // trigger fills
+      cabinet_tag: params.cabinetTag,
+      cabinet_type: params.cabinetType,
+      latitude: params.latitude,
+      longitude: params.longitude,
+      status: params.status || 'Planned',
+      notes: params.notes,
+    })
+    .select()
+    .single()
+
+  if (error) return { error: `Failed to create cabinet: ${error.message}` }
+
+  revalidatePath(`/projects/${params.projectId}/fiber`)
+  return { success: true, data }
+}
+
+export async function deleteCabinet(id: string, projectId: string) {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('cabinets')
+    .delete()
+    .eq('id', id)
+
+  if (error) return { error: `Failed to delete cabinet: ${error.message}` }
+
+  revalidatePath(`/projects/${projectId}/fiber`)
+  return { success: true }
+}
+
+export async function createFDU(params: {
+  projectId: string
+  fduTag: string
+  cabinetId: string | null
+  fiberCapacity: number
+  assignedBackboneCableId?: string | null
+  status?: string
+}) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('fiber_distribution_units')
+    .insert({
+      project_id: params.projectId,
+      organization_id: '00000000-0000-0000-0000-000000000000',
+      fdu_tag: params.fduTag,
+      cabinet_id: params.cabinetId === '' ? null : params.cabinetId,
+      fiber_capacity: params.fiberCapacity,
+      assigned_backbone_cable_id: params.assignedBackboneCableId === '' ? null : params.assignedBackboneCableId,
+      status: params.status || 'Planned',
+    })
+    .select()
+    .single()
+
+  if (error) return { error: `Failed to create FDU: ${error.message}` }
+
+  revalidatePath(`/projects/${params.projectId}/fiber`)
+  return { success: true, data }
+}
+
+export async function createFPP(params: {
+  projectId: string
+  fppTag: string
+  cabinetId: string | null
+  portCount: number
+  assignedFduId?: string | null
+  status?: string
+}) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('fiber_patch_panels')
+    .insert({
+      project_id: params.projectId,
+      organization_id: '00000000-0000-0000-0000-000000000000',
+      fpp_tag: params.fppTag,
+      cabinet_id: params.cabinetId === '' ? null : params.cabinetId,
+      port_count: params.portCount,
+      assigned_fdu_id: params.assignedFduId === '' ? null : params.assignedFduId,
+      status: params.status || 'Planned',
+    })
+    .select()
+    .single()
+
+  if (error) return { error: `Failed to create FPP: ${error.message}` }
+
+  revalidatePath(`/projects/${params.projectId}/fiber`)
+  return { success: true, data }
+}
+
+export async function createPatchCord(params: {
+  projectId: string
+  patchCordTag: string
+  jumperType: 'LC-LC Jumper' | 'LC-SC Jumper' | 'SC-SC Jumper' | 'Patch Cord' | 'Custom'
+  lengthFeet: number
+  connectorA?: 'LC' | 'SC' | 'ST' | 'FC' | 'MPO' | 'Custom'
+  connectorB?: 'LC' | 'SC' | 'ST' | 'FC' | 'MPO' | 'Custom'
+  polarity?: 'A-to-A' | 'A-to-B' | 'Straight' | 'Custom'
+  fromFduId?: string | null
+  fromFppId?: string | null
+  toFppId?: string | null
+  toPortId?: string | null
+  status?: string
+  notes?: string
+}) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('fiber_patch_cords')
+    .insert({
+      project_id: params.projectId,
+      organization_id: '00000000-0000-0000-0000-000000000000',
+      patch_cord_tag: params.patchCordTag,
+      jumper_type: params.jumperType,
+      length_feet: params.lengthFeet,
+      connector_a: params.connectorA || null,
+      connector_b: params.connectorB || null,
+      polarity: params.polarity || null,
+      from_fdu_id: params.fromFduId === '' ? null : params.fromFduId,
+      from_fpp_id: params.fromFppId === '' ? null : params.fromFppId,
+      to_fpp_id: params.toFppId === '' ? null : params.toFppId,
+      to_port_id: params.toPortId === '' ? null : params.toPortId,
+      status: params.status || 'Planned',
+      notes: params.notes,
+    })
+    .select()
+    .single()
+
+  if (error) return { error: `Failed to create Patch Cord: ${error.message}` }
+
+  revalidatePath(`/projects/${params.projectId}/fiber`)
+  return { success: true, data }
+}
+
+

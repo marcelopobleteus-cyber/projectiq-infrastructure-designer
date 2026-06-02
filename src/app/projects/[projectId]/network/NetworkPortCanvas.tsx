@@ -48,7 +48,7 @@ export default function NetworkPortCanvas({
 
   // Filter out switches only
   useEffect(() => {
-    const sws = networkDevices.filter(d => d.device_type === 'switch')
+    const sws = networkDevices.filter(d => d.device_type === 'switch' || d.device_type === 'Industrial Switch')
     setSwitches(sws)
     if (sws.length > 0 && !selectedSwitchId) {
       setSelectedSwitchId(sws[0].id)

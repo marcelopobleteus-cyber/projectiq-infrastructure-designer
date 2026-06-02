@@ -45,7 +45,28 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
   const cameraDeviceSubtotal = items
     .filter(item => ['camera', 'network'].includes(item.category.toLowerCase()))
     .reduce((acc, item) => acc + item.totalCost, 0)
+  const laborSubtotal = items
+    .filter(item => item.category.toLowerCase() === 'labor')
+    .reduce((acc, item) => acc + item.totalCost, 0)
   const totalItemsCount = items.reduce((acc, item) => acc + (item.unit === 'pcs' ? item.quantity : 1), 0)
+
+  const fiberCableLength = items
+    .filter(item => item.category.toLowerCase() === 'fiber' && item.unit === 'ft' && (item.description.toLowerCase().includes('cable') || item.description.toLowerCase().includes('fiber')))
+    .reduce((acc, item) => acc + item.quantity, 0)
+
+  const conduitLength = items
+    .filter(item => item.category.toLowerCase() === 'fiber' && item.unit === 'ft' && item.description.toLowerCase().includes('conduit'))
+    .reduce((acc, item) => acc + item.quantity, 0)
+
+  const totalLaborHours = items
+    .filter(item => item.category.toLowerCase() === 'labor')
+    .reduce((acc, item) => {
+      if (item.partNumber === 'LAB-OSP-SPLICING') return acc + item.quantity * 1.5 // 1.5 hours per splice
+      if (item.partNumber === 'LAB-OSP-CONDUIT') return acc + item.quantity * 0.08
+      if (item.partNumber === 'LAB-OSP-CABLE-PULL') return acc + item.quantity * 0.05
+      if (item.partNumber === 'LAB-OSP-NODE-SET') return acc + item.quantity * 8
+      return acc
+    }, 0)
 
   // Currency Formatter
   const formatCurrency = (val: number) => {
@@ -92,10 +113,24 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
           <p className="text-[9px] text-slate-500 mt-2">Combined hardware & outside plant</p>
         </div>
 
-        <div className="bg-slate-900/60 backdrop-blur-md border border-slate-850 p-4 rounded-2xl flex flex-col justify-between shadow-xl">
-          <span className="text-[10px] font-bold text-slate-555 uppercase tracking-wider block">Fiber & OSP Subtotal</span>
-          <span className="text-2xl font-black text-indigo-400 font-mono tracking-tight mt-1">{formatCurrency(fiberOSPSubtotal)}</span>
-          <p className="text-[9px] text-indigo-500/80 mt-2">HDPE, Fiber cables, Handholes</p>
+        <div className="bg-slate-900/60 backdrop-blur-md border border-slate-850 p-4 rounded-2xl flex flex-col justify-between shadow-xl relative overflow-hidden group hover:border-indigo-500/30 transition-all">
+          <div className="absolute top-0 right-0 p-3 text-indigo-500/10 group-hover:text-indigo-500/20 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          </div>
+          <div>
+            <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider block">Outside Plant (OSP)</span>
+            <span className="text-2xl font-black text-white font-mono tracking-tight mt-1">{formatCurrency(fiberOSPSubtotal)}</span>
+          </div>
+          <div className="text-[9px] text-slate-400 mt-2 space-y-1">
+            <div className="flex justify-between">
+              <span>Fiber Cable:</span>
+              <span className="font-mono text-slate-200">{fiberCableLength.toFixed(1)} ft</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Conduit/HDPE:</span>
+              <span className="font-mono text-slate-200">{conduitLength.toFixed(1)} ft</span>
+            </div>
+          </div>
         </div>
 
         <div className="bg-slate-900/60 backdrop-blur-md border border-slate-850 p-4 rounded-2xl flex flex-col justify-between shadow-xl">
@@ -104,10 +139,24 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
           <p className="text-[9px] text-emerald-500/80 mt-2">CCTV Cameras & Network switches</p>
         </div>
 
-        <div className="bg-slate-900/60 backdrop-blur-md border border-slate-850 p-4 rounded-2xl flex flex-col justify-between shadow-xl">
-          <span className="text-[10px] font-bold text-slate-555 uppercase tracking-wider block">Procured Items (Qty)</span>
-          <span className="text-2xl font-black text-slate-200 font-mono tracking-tight mt-1">{totalItemsCount}</span>
-          <p className="text-[9px] text-slate-500 mt-2">Total distinct units specified</p>
+        <div className="bg-slate-900/60 backdrop-blur-md border border-slate-850 p-4 rounded-2xl flex flex-col justify-between shadow-xl relative overflow-hidden group hover:border-amber-500/30 transition-all">
+          <div className="absolute top-0 right-0 p-3 text-amber-500/10 group-hover:text-amber-500/20 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          </div>
+          <div>
+            <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider block">Labor & Construction</span>
+            <span className="text-2xl font-black text-white font-mono tracking-tight mt-1">{formatCurrency(laborSubtotal)}</span>
+          </div>
+          <div className="text-[9px] text-slate-400 mt-2 space-y-1">
+            <div className="flex justify-between">
+              <span>Est. Construction Labor:</span>
+              <span className="font-mono text-slate-200">{totalLaborHours.toFixed(1)} hrs</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Distinct items count:</span>
+              <span className="font-mono text-slate-200">{totalItemsCount} units</span>
+            </div>
+          </div>
         </div>
       </div>
 

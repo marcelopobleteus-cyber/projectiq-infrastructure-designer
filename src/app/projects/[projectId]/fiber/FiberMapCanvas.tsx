@@ -8,9 +8,11 @@ import {
   deleteFiberNode, 
   createFiberRoute, 
   deleteFiberRoute, 
-  saveFiberSplices, 
-  assignCameraFiber, 
-  removeCameraFiber 
+  createSpliceRecord,
+  updateCameraFiberAssignment,
+  createFiberEnclosure,
+  deleteSpliceRecord,
+  clearSplicesForCables
 } from '../../actions-fiber'
 
 interface FiberMapCanvasProps {
@@ -21,9 +23,12 @@ interface FiberMapCanvasProps {
     routes: any[]
     segments: any[]
     cables: any[]
+    strands: any[]
     splices: any[]
     assignments: any[]
     cameras: any[]
+    spliceRecords?: any[]
+    assignmentStrands?: any[]
   }
   fiberCatalog: any[]
   defaultLatitude: number
@@ -47,13 +52,13 @@ export default function FiberMapCanvas({
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   // Map drawing mode state
-  // Modes: 'select' (default), 'handhole', 'pull_box', 'splice_enclosure', 'draw_route'
-  const [toolMode, setToolMode] = useState<'select' | 'handhole' | 'pull_box' | 'splice_enclosure' | 'draw_route'>('select')
+  // Modes: 'select' (default), 'Manhole', 'Handhole', 'Pull Box', 'Cabinet', 'Pole', 'Building', 'Existing Fiber Source', 'Camera Location', 'Custom', 'draw_route'
+  const [toolMode, setToolMode] = useState<'select' | 'Manhole' | 'Handhole' | 'Pull Box' | 'Cabinet' | 'Pole' | 'Building' | 'Existing Fiber Source' | 'Camera Location' | 'Custom' | 'draw_route'>('select')
   const [tempRoutePoints, setTempRoutePoints] = useState<google.maps.LatLngLiteral[]>([])
   const [tempPolyline, setTempPolyline] = useState<google.maps.Polyline | null>(null)
 
   // Sidebar States
-  const [activeTab, setActiveTab] = useState<'catalog' | 'properties' | 'splice' | 'cameras'>('properties')
+  const [activeTab, setActiveTab] = useState<'catalog' | 'properties' | 'splice' | 'cameras' | 'lists'>('properties')
   const [selectedNode, setSelectedNode] = useState<any | null>(null)
   const [selectedRoute, setSelectedRoute] = useState<any | null>(null)
 
@@ -186,6 +191,31 @@ export default function FiberMapCanvas({
     polylinesRef.current.forEach(p => p.setMap(null))
     polylinesRef.current = []
 
+    const getStatusColor = (status: string) => {
+      const s = status ? status.toLowerCase() : ''
+      if (s === 'planned') return '#eab308'      // Yellow
+      if (s === 'pulled' || s === 'in progress' || s === 'needs survey' || s === 'needs retest' || s === 'splicing pending' || s === 'testing pending' || s === 'fiber pulled') return '#3b82f6' // Blue
+      if (s === 'installed' || s === 'complete' || s === 'passed' || s === 'tested' || s === 'spliced' || s === 'connected') return '#10b981'  // Green
+      if (s === 'blocked' || s === 'failed' || s === 'damaged' || s === 'removed') return '#ef4444' // Red
+      return '#64748b' // Gray (Existing, Unknown)
+    }
+
+    const getRouteColor = (route: any) => {
+      const cable = initialData.cables.find(c => c.route_id === route.id)
+      if (!cable) return '#eab308' // Planned (Yellow)
+      if (cable.test_status === 'Passed') return '#10b981' // Green
+      if (cable.install_status === 'Installed') return '#10b981' // Green
+      if (cable.install_status === 'Pulled') return '#3b82f6' // Blue
+      if (cable.install_status === 'Blocked' || cable.install_status === 'Damaged') return '#ef4444' // Red
+      return '#eab308' // Planned (Yellow)
+    }
+
+    let infoWindow = (window as any)._mapInfoWindow
+    if (!infoWindow && typeof google !== 'undefined') {
+      infoWindow = new google.maps.InfoWindow();
+      (window as any)._mapInfoWindow = infoWindow
+    }
+
     // Draw Routes (conduits)
     initialData.routes.forEach(route => {
       // Find segments matching this route
@@ -199,11 +229,13 @@ export default function FiberMapCanvas({
 
       if (points.length === 0) return
 
+      const strokeCol = getRouteColor(route)
+
       // Draw Polyline path
       const poly = new google.maps.Polyline({
         path: points,
         geodesic: true,
-        strokeColor: '#818cf8',
+        strokeColor: strokeCol,
         strokeOpacity: 0.8,
         strokeWeight: 4,
         map: map
@@ -220,26 +252,66 @@ export default function FiberMapCanvas({
         setActiveTab('properties')
       })
 
+      poly.addListener('mouseover', (e: google.maps.PolyMouseEvent) => {
+        const cable = initialData.cables.find(c => c.route_id === route.id)
+        const fromNode = initialData.nodes.find(n => n.id === cable?.from_node_id)
+        const toNode = initialData.nodes.find(n => n.id === cable?.to_node_id)
+
+        const contentString = `
+          <div style="padding: 8px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a; max-width: 220px;">
+            <div style="font-weight: bold; font-size: 12px; margin-bottom: 4px; border-b: 1px solid #e2e8f0; padding-bottom: 2px;">
+              Route: ${route.route_id_tag}
+            </div>
+            <div><strong>Measured Length:</strong> ${route.measured_length_feet} ft</div>
+            <div><strong>Installed Length:</strong> ${route.installed_length_feet} ft</div>
+            <div><strong>Type:</strong> ${route.installation_type}</div>
+            <div><strong>Conduit Size:</strong> ${route.conduit_diameter_inches} in</div>
+            <div><strong>Fill:</strong> ${route.fill_percentage}%</div>
+            ${cable ? `
+              <div style="margin-top: 6px; border-t: 1px dashed #cbd5e1; padding-top: 4px;">
+                <strong>Cable:</strong> ${cable.cable_tag} (${cable.fiber_count}F)<br/>
+                <strong>Install Status:</strong> ${cable.install_status}<br/>
+                <strong>Test Status:</strong> ${cable.test_status}<br/>
+                <strong>From:</strong> ${fromNode ? fromNode.node_tag : 'Start'}<br/>
+                <strong>To:</strong> ${toNode ? toNode.node_tag : 'End'}
+              </div>
+            ` : '<div><em>No Cable Installed</em></div>'}
+          </div>
+        `
+
+        if (infoWindow && e.latLng) {
+          infoWindow.setContent(contentString)
+          infoWindow.setPosition(e.latLng)
+          infoWindow.open(map)
+        }
+      })
+
+      poly.addListener('mouseout', () => {
+        if (infoWindow) infoWindow.close()
+      })
+
       polylinesRef.current.push(poly)
     })
 
     // Draw Nodes (markers)
     initialData.nodes.forEach(node => {
-      let iconColor = '#10b981' // Green for handhole
-      let shape = 'circle'
-      if (node.node_type === 'pull_box') {
-        iconColor = '#64748b' // Slate for pull box
-        shape = 'square'
-      } else if (node.node_type === 'splice_enclosure') {
-        iconColor = '#6366f1' // Indigo for splice enclosure
-        shape = 'hex'
+      const statusColor = getStatusColor(node.status)
+      let svgShape = `<circle cx="12" cy="12" r="10" fill="${statusColor}" stroke="#ffffff" stroke-width="2"/>`
+      
+      const typeLower = node.node_type ? node.node_type.toLowerCase() : ''
+      if (typeLower === 'cabinet') {
+        svgShape = `<rect x="3" y="3" width="18" height="18" rx="2" fill="${statusColor}" stroke="#ffffff" stroke-width="2"/>`
+      } else if (typeLower === 'pole') {
+        svgShape = `<polygon points="12,2 22,20 2,20" fill="${statusColor}" stroke="#ffffff" stroke-width="2"/>`
+      } else if (typeLower === 'building' || typeLower === 'existing fiber source') {
+        svgShape = `<polygon points="12,2 21,7 21,17 12,22 3,17 3,7" fill="${statusColor}" stroke="#ffffff" stroke-width="2"/>`
       }
 
       const svgPin = `
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
-          <circle cx="12" cy="12" r="10" fill="${iconColor}" stroke="#ffffff" stroke-width="2"/>
-          <text x="12" y="15" fill="#ffffff" font-size="9" font-family="monospace" font-weight="bold" text-anchor="middle">
-            ${node.node_id_tag.substring(0, 3)}
+          ${svgShape}
+          <text x="12" y="15" fill="#ffffff" font-size="8" font-family="sans-serif" font-weight="bold" text-anchor="middle">
+            ${node.node_tag.substring(0, 3)}
           </text>
         </svg>
       `
@@ -248,7 +320,7 @@ export default function FiberMapCanvas({
         position: { lat: node.latitude, lng: node.longitude },
         map: map,
         draggable: true,
-        title: `${node.node_id_tag} (${node.node_type.toUpperCase()})`,
+        title: `${node.node_tag} (${node.node_type.toUpperCase()})`,
         icon: {
           url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svgPin),
           scaledSize: new google.maps.Size(26, 26),
@@ -263,17 +335,51 @@ export default function FiberMapCanvas({
         setActiveTab('properties')
 
         // Initialize form states
-        setNodeIdTag(node.node_id_tag)
-        setNodeSize(node.size_dims)
-        setNodeElevation(Number(node.elevation_m))
-        setNodeSlack(Number(node.slack_feet))
+        setNodeIdTag(node.node_tag)
+        setNodeSize(node.size_description || '24x36x36')
+        setNodeElevation(Number(node.elevation_ft || 0))
+        setNodeSlack(Number(node.slack_loop_ft || 0))
         setNodeNotes(node.notes || '')
 
-        const enclosure = initialData.enclosures.find(e => e.id === node.id)
+        const enclosure = initialData.enclosures.find((e: any) => e.node_id === node.id)
         if (enclosure) {
-          setNodeClosureType(enclosure.closure_type)
-          setNodeCapacity(enclosure.capacity)
+          setNodeClosureType(enclosure.enclosure_type)
+          setNodeCapacity(enclosure.capacity || 12)
         }
+      })
+
+      // Hover card for node
+      marker.addListener('mouseover', () => {
+        const nodeEnclosures = initialData.enclosures.filter((e: any) => e.node_id === node.id)
+        const nodeCables = initialData.cables.filter((c: any) => c.from_node_id === node.id || c.to_node_id === node.id)
+        const servedAssignments = initialData.assignments.filter((a: any) => a.source_node_id === node.id)
+        
+        const servedCamTags = servedAssignments.map((a: any) => {
+          const cam = initialData.cameras.find((c: any) => c.id === a.camera_id)
+          return cam ? cam.camera_id_tag : 'Unknown'
+        }).join(', ')
+
+        const contentString = `
+          <div style="padding: 8px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a; max-width: 220px;">
+            <div style="font-weight: bold; font-size: 12px; margin-bottom: 4px; border-b: 1px solid #e2e8f0; padding-bottom: 2px;">
+              ${node.node_tag}
+            </div>
+            <div><strong>Type:</strong> ${node.node_type}</div>
+            <div><strong>Status:</strong> <span style="color: ${getStatusColor(node.status)}; font-weight: bold;">${node.status}</span></div>
+            <div><strong>Cables:</strong> ${nodeCables.length > 0 ? nodeCables.map((c: any) => c.cable_tag).join(', ') : 'None'}</div>
+            <div><strong>Enclosures:</strong> ${nodeEnclosures.length}</div>
+            <div><strong>Served Cameras:</strong> ${servedCamTags || 'None'}</div>
+          </div>
+        `
+        
+        if (infoWindow) {
+          infoWindow.setContent(contentString)
+          infoWindow.open(map, marker)
+        }
+      })
+
+      marker.addListener('mouseout', () => {
+        if (infoWindow) infoWindow.close()
       })
 
       // Drag node coordinates persist
@@ -294,8 +400,7 @@ export default function FiberMapCanvas({
           if (error) {
             showNotification('error', `Failed to move node: ${error.message}`)
           } else {
-            showNotification('success', `Moved node ${node.node_id_tag}`)
-            // Revalidate page dynamically by reloading or updating local data
+            showNotification('success', `Moved node ${node.node_tag}`)
             window.location.reload()
           }
         } catch (err) {
@@ -304,6 +409,70 @@ export default function FiberMapCanvas({
       })
 
       markersRef.current.push(marker)
+    })
+
+    // Draw Drop Cables
+    initialData.assignments.forEach(assignment => {
+      if (!assignment.source_node_id || !assignment.camera_id) return
+
+      const sourceNode = initialData.nodes.find(n => n.id === assignment.source_node_id)
+      const camera = initialData.cameras.find(c => c.id === assignment.camera_id)
+
+      if (sourceNode && camera) {
+        const dropLineSymbol = {
+          path: 'M 0,-1 0,1',
+          strokeOpacity: 0.8,
+          scale: 2
+        }
+
+        const poly = new google.maps.Polyline({
+          path: [
+            { lat: sourceNode.latitude, lng: sourceNode.longitude },
+            { lat: camera.latitude, lng: camera.longitude }
+          ],
+          geodesic: true,
+          strokeColor: getStatusColor(assignment.fiber_path_status),
+          strokeOpacity: 0,
+          icons: [{
+            icon: dropLineSymbol,
+            offset: '0',
+            repeat: '10px'
+          }],
+          map: map
+        })
+
+        // Hover tooltip for drop cable
+        poly.addListener('mouseover', (e: google.maps.PolyMouseEvent) => {
+          const cable = initialData.cables.find(c => c.id === assignment.drop_cable_id)
+          const contentString = `
+            <div style="padding: 8px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a; max-width: 220px;">
+              <div style="font-weight: bold; font-size: 12px; margin-bottom: 4px; border-b: 1px solid #e2e8f0; padding-bottom: 2px;">
+                Camera Drop: ${camera.camera_id_tag}
+              </div>
+              <div><strong>Path Status:</strong> <span style="color: ${getStatusColor(assignment.fiber_path_status)}; font-weight: bold;">${assignment.fiber_path_status}</span></div>
+              <div><strong>Splice Status:</strong> ${assignment.splice_status}</div>
+              <div><strong>Test Status:</strong> ${assignment.test_status}</div>
+              ${cable ? `
+                <div style="margin-top: 4px; border-t: 1px dashed #cbd5e1; padding-top: 4px;">
+                  <strong>Cable Tag:</strong> ${cable.cable_tag}<br/>
+                  <strong>Length:</strong> ${cable.length_ft} ft
+                </div>
+              ` : ''}
+            </div>
+          `
+          if (infoWindow && e.latLng) {
+            infoWindow.setContent(contentString)
+            infoWindow.setPosition(e.latLng)
+            infoWindow.open(map)
+          }
+        })
+
+        poly.addListener('mouseout', () => {
+          if (infoWindow) infoWindow.close()
+        })
+
+        polylinesRef.current.push(poly)
+      }
     })
   }, [map, googleLoaded, initialData, selectedRoute])
 
@@ -342,21 +511,41 @@ export default function FiberMapCanvas({
     if (toolMode === 'select' || toolMode === 'draw_route') return
 
     // Auto calculate tag names
-    const typeLabel = toolMode === 'handhole' ? 'HH' : toolMode === 'pull_box' ? 'PB' : 'SE'
-    const matchCount = initialData.nodes.filter(n => n.node_type === toolMode).length + 1
+    const typeLabel = 
+      toolMode === 'Manhole' ? 'MH'
+      : toolMode === 'Handhole' ? 'HH'
+      : toolMode === 'Pull Box' ? 'PB'
+      : toolMode === 'Cabinet' ? 'CAB'
+      : toolMode === 'Pole' ? 'POL'
+      : toolMode === 'Building' ? 'BLDG'
+      : toolMode === 'Existing Fiber Source' ? 'EXT'
+      : toolMode === 'Camera Location' ? 'CAM'
+      : 'NODE'
+
+    const matchCount = initialData.nodes.filter((n: any) => n.node_type === toolMode).length + 1
     const tag = `${typeLabel}-${String(matchCount).padStart(3, '0')}`
+
+    const defaultSlack =
+      toolMode === 'Handhole' || toolMode === 'Cabinet' ? 20.0
+      : toolMode === 'Building' ? 10.0
+      : 0.0
+
+    const defaultSize =
+      toolMode === 'Handhole' ? '24x36x36'
+      : toolMode === 'Manhole' ? '48x48x48'
+      : toolMode === 'Pull Box' ? '12x12x6'
+      : toolMode === 'Cabinet' ? 'Outdoor NEMA'
+      : 'Standard'
 
     const res = await createFiberNode({
       projectId,
-      nodeIdTag: tag,
+      nodeTag: tag,
       nodeType: toolMode,
       latitude: lat,
       longitude: lng,
-      elevationM: 0.0,
-      sizeDims: toolMode === 'handhole' ? '24x36x36' : toolMode === 'pull_box' ? '12x12x6' : 'Dome Closure',
-      slackFeet: toolMode === 'handhole' ? 20.0 : 0.0,
-      closureType: toolMode === 'splice_enclosure' ? 'Dome Closure' : undefined,
-      capacity: toolMode === 'splice_enclosure' ? 24 : undefined
+      elevationFt: 0.0,
+      sizeDescription: defaultSize,
+      slackLoopFt: defaultSlack,
     })
 
     if (res.error) {
@@ -454,10 +643,10 @@ export default function FiberMapCanvas({
       const { error: nodeErr } = await supabase
         .from('fiber_nodes')
         .update({
-          node_id_tag: nodeIdTag,
-          size_dims: nodeSize,
-          elevation_m: nodeElevation,
-          slack_feet: nodeSlack,
+          node_tag: nodeIdTag,
+          size_description: nodeSize,
+          elevation_ft: nodeElevation,
+          slack_loop_ft: nodeSlack,
           notes: nodeNotes
         })
         .eq('id', selectedNode.id)
@@ -468,15 +657,14 @@ export default function FiberMapCanvas({
       }
 
       // If splice enclosure, update enclosures table
-      if (selectedNode.node_type === 'splice_enclosure') {
+      if (selectedNode.node_type === 'Splice Enclosure' || selectedNode.node_type === 'Cabinet') {
         const { error: encErr } = await supabase
           .from('fiber_enclosures')
           .update({
-            closure_type: nodeClosureType,
+            enclosure_type: nodeClosureType,
             capacity: nodeCapacity,
-            spare_fibers: nodeCapacity - (initialData.splices.filter(s => s.node_id === selectedNode.id).length)
           })
-          .eq('id', selectedNode.id)
+          .eq('node_id', selectedNode.id)
 
         if (encErr) {
           showNotification('error', `Failed to update enclosure details: ${encErr.message}`)
@@ -515,30 +703,70 @@ export default function FiberMapCanvas({
   const handleSaveSplices = async () => {
     if (!selectedNode || !spliceCableA || !spliceCableB) return
 
-    const splicesToSave = Object.keys(spliceConfig).map(numAStr => {
-      const numA = parseInt(numAStr, 10)
-      const numB = spliceConfig[numA]
-      return {
-        cableAId: spliceCableA,
-        cableBId: spliceCableB,
-        fiberNumA: numA,
-        fiberNumB: numB,
-        color: getFiberColor(numA).name.toLowerCase(),
-        status: 'installed' as const
+    try {
+      let enclosure = initialData.enclosures.find((e: any) => e.node_id === selectedNode.id)
+      if (!enclosure) {
+        const tag = `ENC-${selectedNode.node_tag}`
+        const res = await createFiberEnclosure({
+          projectId,
+          enclosureTag: tag,
+          nodeId: selectedNode.id,
+          enclosureType: 'Splice Enclosure',
+          capacity: 24
+        })
+        if (res.error) {
+          showNotification('error', `Failed to create enclosure: ${res.error}`)
+          return
+        }
+        enclosure = res.data
       }
-    })
 
-    const res = await saveFiberSplices({
-      projectId,
-      nodeId: selectedNode.id,
-      splices: splicesToSave
-    })
+      // First, clear existing splices between these two cables in this enclosure
+      const clearRes = await clearSplicesForCables({
+        projectId,
+        enclosureId: enclosure.id,
+        cableIdA: spliceCableA,
+        cableIdB: spliceCableB
+      })
+      if (clearRes.error) {
+        showNotification('error', `Failed to clear old splices: ${clearRes.error}`)
+        return
+      }
 
-    if (res.error) {
-      showNotification('error', res.error)
-    } else {
-      showNotification('success', 'Splice matrix core patching saved successfully!')
+      // Now create new splice records from spliceConfig
+      let successCount = 0
+      for (const coreNumStr of Object.keys(spliceConfig)) {
+        const coreNumA = parseInt(coreNumStr, 10)
+        const coreNumB = spliceConfig[coreNumA]
+
+        if (!coreNumB) continue // open/unused
+
+        // Find matching strands
+        const strandA = initialData.strands.find((s: any) => s.cable_id === spliceCableA && s.strand_number === coreNumA)
+        const strandB = initialData.strands.find((s: any) => s.cable_id === spliceCableB && s.strand_number === coreNumB)
+
+        if (strandA && strandB) {
+          const res = await createSpliceRecord({
+            projectId,
+            enclosureId: enclosure.id,
+            fromCableId: spliceCableA,
+            fromStrandId: strandA.id,
+            toCableId: spliceCableB,
+            toStrandId: strandB.id
+          })
+          if (res.error) {
+            console.error(`Splice error for Core ${coreNumA} -> ${coreNumB}:`, res.error)
+          } else {
+            successCount++
+          }
+        }
+      }
+
+      showNotification('success', `Applied ${successCount} splices inside ${enclosure.enclosure_tag}`)
       window.location.reload()
+    } catch (err) {
+      console.error(err)
+      showNotification('error', 'An unexpected error occurred while saving splices.')
     }
   }
 
@@ -550,42 +778,40 @@ export default function FiberMapCanvas({
     }
 
     if (!selectedNode) {
-      showNotification('error', 'Select a splice enclosure on the map first.')
+      showNotification('error', 'Select a node on the map first.')
       return
     }
 
-    const res = await assignCameraFiber({
-      projectId,
+    const res = await updateCameraFiberAssignment({
       cameraId: selectedCameraId,
-      cableId: selectedAssignCableId,
+      projectId,
+      sourceNodeId: selectedNode.id,
       enclosureId: selectedNode.id,
-      txCore: assignTxCore,
-      rxCore: assignRxCore,
-      linkRole: assignLinkRole
+      backboneCableId: selectedAssignCableId,
+      fiberPathStatus: 'Planned'
     })
 
     if (res.error) {
       showNotification('error', res.error)
     } else {
-      showNotification('success', `Patched camera to cores ${assignTxCore}/${assignRxCore}`)
+      showNotification('success', `Camera fiber assignment updated`)
       window.location.reload()
     }
   }
 
-  // Unpatch camera fiber handler
-  const handleRemoveCameraFiber = async (camId: string, linkRole: 'primary' | 'backup') => {
-    if (!confirm('Are you sure you want to unpatch this camera fiber assignment?')) return
+  const handleRemoveCameraFiber = async (camId: string, _linkRole: string) => {
+    if (!confirm('Are you sure you want to remove this camera fiber assignment?')) return
 
-    const res = await removeCameraFiber({
-      projectId,
+    const res = await updateCameraFiberAssignment({
       cameraId: camId,
-      linkRole
+      projectId,
+      fiberPathStatus: 'Planned',
     })
 
     if (res.error) {
       showNotification('error', res.error)
     } else {
-      showNotification('success', 'Fiber core assignment unpatched.')
+      showNotification('success', 'Fiber assignment cleared.')
       window.location.reload()
     }
   }
@@ -612,45 +838,58 @@ export default function FiberMapCanvas({
         <div className="flex-1 relative h-full flex flex-col min-w-0">
           
           {/* Map Toolbar Overlay */}
-          <div className="absolute top-3 left-3 z-20 bg-slate-900/90 backdrop-blur-md border border-slate-850 p-1.5 rounded-xl shadow-xl flex items-center gap-1">
+          <div className="absolute top-3 left-3 z-20 bg-slate-900/95 backdrop-blur-md border border-slate-800 p-1.5 rounded-xl shadow-xl flex items-center gap-1.5 font-sans">
             <button
               onClick={() => { setToolMode('select'); setTempRoutePoints([]) }}
               className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
-                toolMode === 'select' ? 'bg-indigo-650 text-white shadow-inner shadow-indigo-950/20' : 'bg-transparent text-slate-400 hover:text-white'
+                toolMode === 'select' ? 'bg-indigo-600 text-white shadow-inner shadow-indigo-950/20' : 'bg-transparent text-slate-400 hover:text-white'
               }`}
             >
               Select
             </button>
             <div className="w-px h-4 bg-slate-800" />
-            <button
-              onClick={() => { setToolMode('handhole'); setTempRoutePoints([]) }}
-              className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
-                toolMode === 'handhole' ? 'bg-emerald-650 text-white shadow-inner shadow-emerald-950/20' : 'bg-transparent text-slate-400 hover:text-white'
-              }`}
-            >
-              + Place Handhole
-            </button>
-            <button
-              onClick={() => { setToolMode('pull_box'); setTempRoutePoints([]) }}
-              className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
-                toolMode === 'pull_box' ? 'bg-slate-750 text-white' : 'bg-transparent text-slate-400 hover:text-white'
-              }`}
-            >
-              + Pull Box
-            </button>
-            <button
-              onClick={() => { setToolMode('splice_enclosure'); setTempRoutePoints([]) }}
-              className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
-                toolMode === 'splice_enclosure' ? 'bg-indigo-650 text-white' : 'bg-transparent text-slate-400 hover:text-white'
-              }`}
-            >
-              + Splice Enclosure
-            </button>
+            
+            <div className="flex items-center gap-1 bg-slate-950 border border-slate-850 p-0.5 rounded-lg">
+              <select
+                id="toolbar-node-type-select"
+                defaultValue="Handhole"
+                onChange={(e) => {
+                  const newMode = e.target.value as any
+                  setToolMode(newMode)
+                  setTempRoutePoints([])
+                }}
+                className="bg-transparent text-[10px] font-bold uppercase tracking-wide px-1.5 py-1 text-slate-350 focus:outline-none"
+              >
+                <option value="Manhole" className="bg-slate-900">Manhole</option>
+                <option value="Handhole" className="bg-slate-900">Handhole</option>
+                <option value="Pull Box" className="bg-slate-900">Pull Box</option>
+                <option value="Cabinet" className="bg-slate-900">Cabinet</option>
+                <option value="Pole" className="bg-slate-900">Pole</option>
+                <option value="Building" className="bg-slate-900">Building</option>
+                <option value="Existing Fiber Source" className="bg-slate-900">Existing Fiber Source</option>
+                <option value="Camera Location" className="bg-slate-900">Camera Location</option>
+                <option value="Custom" className="bg-slate-900">Custom</option>
+              </select>
+              <button
+                onClick={() => {
+                  const selectEl = document.getElementById('toolbar-node-type-select') as HTMLSelectElement
+                  const val = selectEl ? (selectEl.value as any) : 'Handhole'
+                  setToolMode(val)
+                  setTempRoutePoints([])
+                }}
+                className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide transition-all ${
+                  toolMode !== 'select' && toolMode !== 'draw_route' ? 'bg-emerald-600 text-white shadow shadow-emerald-800' : 'bg-slate-800 text-slate-400 hover:text-white'
+                }`}
+              >
+                + Place Node
+              </button>
+            </div>
+
             <div className="w-px h-4 bg-slate-800" />
             <button
               onClick={() => { setToolMode('draw_route'); setTempRoutePoints([]) }}
               className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
-                toolMode === 'draw_route' ? 'bg-rose-650 text-white' : 'bg-transparent text-slate-400 hover:text-white'
+                toolMode === 'draw_route' ? 'bg-rose-600 text-white' : 'bg-transparent text-slate-400 hover:text-white'
               }`}
             >
               Draw Route
@@ -661,7 +900,7 @@ export default function FiberMapCanvas({
               <>
                 <button
                   onClick={handleFinishRoute}
-                  className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 border border-indigo-500/20 text-white rounded-lg text-[10px] font-bold uppercase"
+                  className="px-2.5 py-1.5 bg-indigo-650 hover:bg-indigo-600 border border-indigo-500/20 text-white rounded-lg text-[10px] font-bold uppercase"
                 >
                   Finish Route
                 </button>
@@ -701,33 +940,41 @@ export default function FiberMapCanvas({
           <div className="flex border-b border-slate-850 shrink-0">
             <button
               onClick={() => setActiveTab('properties')}
-              className={`flex-1 py-3 text-center text-[10px] font-bold uppercase tracking-wider border-b-2 transition-all ${
+              className={`flex-1 py-3 text-center text-[9px] font-bold uppercase tracking-wider border-b-2 transition-all ${
                 activeTab === 'properties' ? 'border-indigo-500 text-white bg-slate-950/20' : 'border-transparent text-slate-450 hover:text-white'
               }`}
             >
-              Properties
+              Props
             </button>
             <button
               onClick={() => setActiveTab('splice')}
-              className={`flex-1 py-3 text-center text-[10px] font-bold uppercase tracking-wider border-b-2 transition-all ${
+              className={`flex-1 py-3 text-center text-[9px] font-bold uppercase tracking-wider border-b-2 transition-all ${
                 activeTab === 'splice' ? 'border-indigo-500 text-white bg-slate-950/20' : 'border-transparent text-slate-450 hover:text-white'
               }`}
-              disabled={!selectedNode || selectedNode.node_type !== 'splice_enclosure'}
-              title={(!selectedNode || selectedNode.node_type !== 'splice_enclosure') ? 'Select a Splice Enclosure on the map first' : ''}
+              disabled={!selectedNode || (selectedNode.node_type !== 'Splice Enclosure' && selectedNode.node_type !== 'Cabinet' && selectedNode.node_type !== 'Handhole')}
+              title={(!selectedNode || (selectedNode.node_type !== 'Splice Enclosure' && selectedNode.node_type !== 'Cabinet' && selectedNode.node_type !== 'Handhole')) ? 'Select a Splice Enclosure on the map first' : ''}
             >
               Splice
             </button>
             <button
               onClick={() => setActiveTab('cameras')}
-              className={`flex-1 py-3 text-center text-[10px] font-bold uppercase tracking-wider border-b-2 transition-all ${
+              className={`flex-1 py-3 text-center text-[9px] font-bold uppercase tracking-wider border-b-2 transition-all ${
                 activeTab === 'cameras' ? 'border-indigo-500 text-white bg-slate-950/20' : 'border-transparent text-slate-450 hover:text-white'
               }`}
             >
               Cameras
             </button>
             <button
+              onClick={() => setActiveTab('lists')}
+              className={`flex-1 py-3 text-center text-[9px] font-bold uppercase tracking-wider border-b-2 transition-all ${
+                activeTab === 'lists' ? 'border-indigo-500 text-white bg-slate-950/20' : 'border-transparent text-slate-450 hover:text-white'
+              }`}
+            >
+              Lists
+            </button>
+            <button
               onClick={() => setActiveTab('catalog')}
-              className={`flex-1 py-3 text-center text-[10px] font-bold uppercase tracking-wider border-b-2 transition-all ${
+              className={`flex-1 py-3 text-center text-[9px] font-bold uppercase tracking-wider border-b-2 transition-all ${
                 activeTab === 'catalog' ? 'border-indigo-500 text-white bg-slate-950/20' : 'border-transparent text-slate-450 hover:text-white'
               }`}
             >
@@ -742,14 +989,122 @@ export default function FiberMapCanvas({
             {activeTab === 'properties' && (
               <div className="space-y-4">
                 
-                {/* 1. Default (No selection) */}
+                {/* 1. Default (No selection) - Fiber Dashboard */}
                 {!selectedNode && !selectedRoute && (
-                  <div className="text-center py-12 text-slate-500 space-y-2">
-                    <svg className="mx-auto text-slate-650" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg>
-                    <p className="text-xs uppercase tracking-wider font-bold">No Node Selected</p>
-                    <p className="text-[10px] text-slate-450 max-w-[220px] mx-auto leading-normal">
-                      Click a handhole marker or route path polyline on the map to view/edit technical specs.
-                    </p>
+                  <div className="space-y-4 font-sans">
+                    <div className="border-b border-slate-800 pb-2">
+                      <h4 className="text-xs font-bold text-white uppercase tracking-wider">OSP Fiber Dashboard</h4>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Real-time status of the 35-camera fiber rollout</p>
+                    </div>
+
+                    {/* Calculated stats variables */}
+                    {(() => {
+                      const totalCams = initialData.cameras.length
+                      const fiberCams = initialData.cameras.filter(c => c.communication_type === 'fiber').length
+                      const ethCams = totalCams - fiberCams
+                      const assignedCams = initialData.assignments.length
+                      const dropsPlanned = initialData.assignments.filter(a => a.fiber_path_status === 'Planned').length
+                      const dropsPulled = initialData.assignments.filter(a => a.fiber_path_status !== 'Planned' && a.fiber_path_status !== 'Blocked').length
+                      const splicesPending = initialData.assignments.filter(a => a.splice_status === 'Not Spliced' || a.splice_status === 'Failed' || a.splice_status === 'Needs Rework').length
+                      const splicesComplete = initialData.assignments.filter(a => a.splice_status === 'Spliced').length
+                      const testsPending = initialData.assignments.filter(a => a.test_status === 'Not Tested' || a.test_status === 'Needs Retest').length
+                      const testsPassed = initialData.assignments.filter(a => a.test_status === 'Passed').length
+                      const blockedPaths = initialData.assignments.filter(a => a.fiber_path_status === 'Blocked').length
+
+                      return (
+                        <>
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <div className="bg-slate-950/40 border border-slate-850 p-2.5 rounded-xl">
+                              <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wide">Total Cameras</div>
+                              <div className="text-xl font-bold text-white mt-0.5">{totalCams}</div>
+                              <div className="text-[9px] text-slate-450 mt-1">{fiberCams} Fiber • {ethCams} Ethernet</div>
+                            </div>
+                            <div className="bg-slate-950/40 border border-slate-850 p-2.5 rounded-xl">
+                              <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wide">Fiber Paths</div>
+                              <div className="text-xl font-bold text-indigo-400 mt-0.5">{assignedCams}</div>
+                              <div className="text-[9px] text-slate-450 mt-1 font-mono">
+                                {fiberCams > 0 ? Math.round((assignedCams / fiberCams) * 100) : 0}% Assigned
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Progress bars / Rollout Status */}
+                          <div className="bg-slate-950/20 border border-slate-850 p-3 rounded-xl space-y-3.5">
+                            <h5 className="text-[10px] font-bold text-slate-450 uppercase tracking-wider border-b border-slate-850 pb-1.5">Rollout Execution</h5>
+                            
+                            {/* Pulling Drop Cables */}
+                            <div className="space-y-1">
+                              <div className="flex justify-between items-center text-[10px]">
+                                <span className="text-slate-400">Fiber Drops Pulled</span>
+                                <span className="font-mono text-white font-bold">{dropsPulled} / {assignedCams}</span>
+                              </div>
+                              <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden">
+                                <div 
+                                  className="bg-blue-500 h-1.5 rounded-full transition-all duration-500"
+                                  style={{ width: `${assignedCams > 0 ? (dropsPulled / assignedCams) * 100 : 0}%` }}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Splicing */}
+                            <div className="space-y-1">
+                              <div className="flex justify-between items-center text-[10px]">
+                                <span className="text-slate-400">Strands Spliced</span>
+                                <span className="font-mono text-white font-bold">{splicesComplete} / {assignedCams}</span>
+                              </div>
+                              <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden">
+                                <div 
+                                  className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500"
+                                  style={{ width: `${assignedCams > 0 ? (splicesComplete / assignedCams) * 100 : 0}%` }}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Testing */}
+                            <div className="space-y-1">
+                              <div className="flex justify-between items-center text-[10px]">
+                                <span className="text-slate-400">OTDR Tests Passed</span>
+                                <span className="font-mono text-white font-bold">{testsPassed} / {assignedCams}</span>
+                              </div>
+                              <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden">
+                                <div 
+                                  className="bg-teal-500 h-1.5 rounded-full transition-all duration-500"
+                                  style={{ width: `${assignedCams > 0 ? (testsPassed / assignedCams) * 100 : 0}%` }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Detailed Statistics list */}
+                          <div className="bg-slate-950/40 border border-slate-850 p-3 rounded-xl space-y-2 text-[11px]">
+                            <div className="flex justify-between text-slate-400">
+                              <span>Planned Drops (Not Pulled):</span>
+                              <span className="font-bold text-yellow-500">{dropsPlanned}</span>
+                            </div>
+                            <div className="flex justify-between text-slate-400">
+                              <span>Splicing Pending:</span>
+                              <span className="font-bold text-blue-400">{splicesPending}</span>
+                            </div>
+                            <div className="flex justify-between text-slate-400">
+                              <span>OTDR Retests Required:</span>
+                              <span className="font-bold text-amber-500">
+                                {initialData.assignments.filter(a => a.test_status === 'Needs Retest').length}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-slate-400">
+                              <span>Blocked Fiber Paths:</span>
+                              <span className="font-bold text-red-500">{blockedPaths}</span>
+                            </div>
+                          </div>
+
+                          <div className="text-center p-3 border border-indigo-500/10 bg-indigo-950/20 rounded-xl">
+                            <p className="text-[10px] text-indigo-300 leading-normal">
+                              Select any <strong>Fiber Node</strong> marker or <strong>Conduit Route</strong> on the map to configure splices, enclosures, physical specs, and camera loops.
+                            </p>
+                          </div>
+                        </>
+                      )
+                    })()}
                   </div>
                 )}
 
@@ -761,7 +1116,7 @@ export default function FiberMapCanvas({
                         {selectedNode.node_type.replace('_', ' ')}
                       </span>
                       <button 
-                        onClick={() => handleDeleteNode(selectedNode.id, selectedNode.node_id_tag)}
+                        onClick={() => handleDeleteNode(selectedNode.id, selectedNode.node_tag)}
                         className="text-[10px] text-rose-450 hover:underline font-bold"
                       >
                         Delete Node
@@ -920,7 +1275,7 @@ export default function FiberMapCanvas({
               <div className="space-y-4">
                 <div className="border-b border-slate-850 pb-2">
                   <h4 className="text-xs font-bold text-white uppercase tracking-wider">Visual Splice Matrix</h4>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Patch fiber cores inside {selectedNode.node_id_tag}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Patch fiber cores inside {selectedNode.node_tag}</p>
                 </div>
 
                 <div className="space-y-3.5 text-xs">
@@ -1101,25 +1456,30 @@ export default function FiberMapCanvas({
                     <div className="space-y-2">
                       {initialData.assignments.map(ass => {
                         const camera = initialData.cameras.find(c => c.id === ass.camera_id)
-                        const cable = initialData.cables.find(c => c.id === ass.cable_id)
+                        const cableId = ass.drop_cable_id || ass.backbone_cable_id
+                        const cable = initialData.cables.find(c => c.id === cableId)
+                        
+                        const assignmentStrands = initialData.assignmentStrands || []
+                        const txStrandJoin = assignmentStrands.find((js: any) => js.camera_fiber_assignment_id === ass.id && js.strand_role === 'TX')
+                        const rxStrandJoin = assignmentStrands.find((js: any) => js.camera_fiber_assignment_id === ass.id && js.strand_role === 'RX')
+                        const txStrand = txStrandJoin ? initialData.strands.find((s: any) => s.id === txStrandJoin.strand_id) : null
+                        const rxStrand = rxStrandJoin ? initialData.strands.find((s: any) => s.id === rxStrandJoin.strand_id) : null
                         
                         return (
                           <div key={ass.id} className="border border-slate-850 bg-slate-950/40 p-2.5 rounded-xl flex items-center justify-between text-[10px] leading-relaxed">
                             <div>
                               <p className="font-bold text-white">
                                 {camera?.camera_id_tag || 'Unknown'} 
-                                <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wider font-bold ${
-                                  ass.link_role === 'primary' ? 'bg-indigo-950 text-indigo-400' : 'bg-rose-950 text-rose-400'
-                                }`}>
-                                  {ass.link_role}
+                                <span className="ml-1.5 px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wider font-bold bg-indigo-950 text-indigo-400">
+                                  Patched
                                 </span>
                               </p>
                               <p className="text-slate-450 mt-0.5">
-                                Cable: {cable?.cable_id_tag || 'CAB-N/A'} | Cores: TX-{ass.tx_core} / RX-{ass.rx_core}
+                                Cable: {cable?.cable_id_tag || 'CAB-N/A'} | Cores: TX-{txStrand ? txStrand.strand_number : 'N/A'} / RX-{rxStrand ? rxStrand.strand_number : 'N/A'}
                               </p>
                             </div>
                             <button
-                              onClick={() => handleRemoveCameraFiber(ass.camera_id, ass.link_role as any)}
+                              onClick={() => handleRemoveCameraFiber(ass.camera_id, '')}
                               className="text-rose-450 hover:underline font-bold"
                             >
                               Unpatch
@@ -1160,6 +1520,174 @@ export default function FiberMapCanvas({
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* TABS 5: Directory & Infrastructure Lists */}
+            {activeTab === 'lists' && (
+              <div className="space-y-4">
+                <div className="border-b border-slate-850 pb-2">
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Infrastructure Directory</h4>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Quick lookup and navigation of project fiber assets</p>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Nodes Section */}
+                  <div className="space-y-2">
+                    <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+                      Fiber Nodes ({initialData.nodes.length})
+                    </h5>
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1 scrollbar-thin">
+                      {initialData.nodes.length === 0 ? (
+                        <div className="text-[10px] text-slate-500 italic">No nodes placed.</div>
+                      ) : (
+                        initialData.nodes.map(n => (
+                          <button
+                            key={n.id}
+                            onClick={() => {
+                              setSelectedNode(n)
+                              setSelectedRoute(null)
+                              setActiveTab('properties')
+                              if (map) {
+                                map.setCenter({ lat: n.latitude, lng: n.longitude })
+                                map.setZoom(17)
+                              }
+                              setNodeIdTag(n.node_tag)
+                              setNodeSize(n.size_description || '24x36x36')
+                              setNodeElevation(Number(n.elevation_ft || 0))
+                              setNodeSlack(Number(n.slack_loop_ft || 0))
+                              setNodeNotes(n.notes || '')
+                              const enclosure = initialData.enclosures.find((e: any) => e.node_id === n.id)
+                              if (enclosure) {
+                                setNodeClosureType(enclosure.enclosure_type)
+                                setNodeCapacity(enclosure.capacity || 12)
+                              }
+                            }}
+                            className="w-full text-left p-2 rounded-lg bg-slate-950/40 hover:bg-slate-950 border border-slate-850 hover:border-slate-750 transition-colors flex justify-between items-center text-[11px]"
+                          >
+                            <span className="font-bold text-white font-mono">{n.node_tag}</span>
+                            <span className="text-slate-450 text-[10px]">{n.node_type}</span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Cables Section */}
+                  <div className="space-y-2">
+                    <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+                      Fiber Cables ({initialData.cables.length})
+                    </h5>
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1 scrollbar-thin">
+                      {initialData.cables.length === 0 ? (
+                        <div className="text-[10px] text-slate-500 italic">No cables created.</div>
+                      ) : (
+                        initialData.cables.map(c => (
+                          <button
+                            key={c.id}
+                            onClick={() => {
+                              const route = initialData.routes.find((r: any) => r.id === c.route_id)
+                              if (route) {
+                                setSelectedRoute(route)
+                                setSelectedNode(null)
+                                setActiveTab('properties')
+                                const segs = initialData.segments.filter((s: any) => s.route_id === route.id)
+                                if (segs.length > 0 && map) {
+                                  map.setCenter({ lat: segs[0].start_latitude, lng: segs[0].start_longitude })
+                                  map.setZoom(16)
+                                }
+                              }
+                            }}
+                            className="w-full text-left p-2 rounded-lg bg-slate-950/40 hover:bg-slate-950 border border-slate-850 hover:border-slate-750 transition-colors flex justify-between items-center text-[11px]"
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-bold text-white font-mono">{c.cable_tag}</span>
+                              <span className="text-[9px] text-slate-550">{c.cable_type} • {c.fiber_count} Cores • {c.length_ft} ft</span>
+                            </div>
+                            <span className="text-indigo-400 text-[10px] font-bold">{c.install_status}</span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Enclosures Section */}
+                  <div className="space-y-2">
+                    <h5 className="text-[10px] font-bold text-slate-450 uppercase tracking-wide">
+                      Enclosures ({initialData.enclosures.length})
+                    </h5>
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1 scrollbar-thin">
+                      {initialData.enclosures.length === 0 ? (
+                        <div className="text-[10px] text-slate-500 italic">No enclosures.</div>
+                      ) : (
+                        initialData.enclosures.map(enc => {
+                          const parentNode = initialData.nodes.find(n => n.id === enc.node_id)
+                          return (
+                            <button
+                              key={enc.id}
+                              onClick={() => {
+                                if (parentNode) {
+                                  setSelectedNode(parentNode)
+                                  setSelectedRoute(null)
+                                  setActiveTab('properties')
+                                  if (map) {
+                                    map.setCenter({ lat: parentNode.latitude, lng: parentNode.longitude })
+                                    map.setZoom(17)
+                                  }
+                                }
+                              }}
+                              className="w-full text-left p-2 rounded-lg bg-slate-950/40 hover:bg-slate-950 border border-slate-850 hover:border-slate-750 transition-colors flex justify-between items-center text-[11px]"
+                            >
+                              <div className="flex flex-col">
+                                <span className="font-bold text-white font-mono">{enc.enclosure_tag}</span>
+                                <span className="text-[9px] text-slate-550">Node: {parentNode?.node_tag || 'Unknown'} • Splices: {enc.splice_count}</span>
+                              </div>
+                              <span className="text-emerald-400 text-[10px] font-bold">{enc.enclosure_type}</span>
+                            </button>
+                          )
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Assignments Section */}
+                  <div className="space-y-2">
+                    <h5 className="text-[10px] font-bold text-slate-450 uppercase tracking-wide">
+                      Camera Assignments ({initialData.assignments.length})
+                    </h5>
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1 scrollbar-thin">
+                      {initialData.assignments.length === 0 ? (
+                        <div className="text-[10px] text-slate-500 italic">No assignments.</div>
+                      ) : (
+                        initialData.assignments.map(ass => {
+                          const camera = initialData.cameras.find(c => c.id === ass.camera_id)
+                          const node = initialData.nodes.find(n => n.id === ass.source_node_id)
+                          return (
+                            <button
+                              key={ass.id}
+                              onClick={() => {
+                                if (camera && map) {
+                                  map.setCenter({ lat: camera.latitude, lng: camera.longitude })
+                                  map.setZoom(17)
+                                }
+                              }}
+                              className="w-full text-left p-2 rounded-lg bg-slate-950/40 hover:bg-slate-950 border border-slate-850 hover:border-slate-750 transition-colors flex justify-between items-center text-[11px]"
+                            >
+                              <div className="flex flex-col">
+                                <span className="font-bold text-white font-mono">{camera?.camera_id_tag || 'Unknown'}</span>
+                                <span className="text-[9px] text-slate-550">Node: {node?.node_tag || 'None'}</span>
+                              </div>
+                              <div className="flex flex-col items-end">
+                                <span className="text-indigo-400 text-[10px] font-bold">{ass.fiber_path_status}</span>
+                                <span className="text-[8px] text-slate-550">S: {ass.splice_status} | T: {ass.test_status}</span>
+                              </div>
+                            </button>
+                          )
+                        })
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

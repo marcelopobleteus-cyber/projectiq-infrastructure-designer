@@ -65,6 +65,8 @@ export async function createNetworkDevice(params: {
   locationReference?: string
   ipAddress?: string
   rackUnit?: string
+  cabinetId?: string | null
+  status?: string
 }) {
   const supabase = await createClient()
 
@@ -82,11 +84,12 @@ export async function createNetworkDevice(params: {
     }
 
     let prefix = 'DEV'
-    if (params.deviceType === 'switch') prefix = 'SW'
-    else if (params.deviceType === 'cabinet_device') prefix = 'CAB'
+    if (params.deviceType === 'switch' || params.deviceType === 'Industrial Switch') prefix = 'SW'
     else if (params.deviceType === 'nvr') prefix = 'NVR'
     else if (params.deviceType === 'router') prefix = 'RTR'
-    else if (params.deviceType === 'patch_panel') prefix = 'PP'
+    else if (params.deviceType === 'UPS') prefix = 'UPS'
+    else if (params.deviceType === 'Media Converter') prefix = 'MC'
+    else if (params.deviceType === 'Wireless Radio') prefix = 'RAD'
 
     let maxNum = 0
     const regex = new RegExp(`^${prefix}-(\\d+)$`, 'i')
@@ -101,11 +104,12 @@ export async function createNetworkDevice(params: {
   }
 
   // 2. Set default parameters for switch ports
-  const totalPorts = params.totalPorts || (params.deviceType === 'switch' ? 8 : null)
-  const poeBudgetWatts = params.poeBudgetWatts !== undefined ? params.poeBudgetWatts : (params.deviceType === 'switch' ? 120 : 0)
+  const isSwitch = params.deviceType === 'switch' || params.deviceType === 'Industrial Switch'
+  const totalPorts = params.totalPorts || (isSwitch ? 8 : null)
+  const poeBudgetWatts = params.poeBudgetWatts !== undefined ? params.poeBudgetWatts : (isSwitch ? 120 : 0)
 
   // 3. Insert device
-  const newDevice: NetworkDeviceInsert = {
+  const newDevice: any = {
     project_id: params.projectId,
     name,
     device_type: params.deviceType,
@@ -118,6 +122,8 @@ export async function createNetworkDevice(params: {
     location_reference: params.locationReference || null,
     ip_address: params.ipAddress || null,
     rack_unit: params.rackUnit || null,
+    cabinet_id: params.cabinetId === '' ? null : params.cabinetId,
+    status: params.status || 'Planned',
   }
 
   const { data: device, error: insertError } = await supabase
@@ -131,20 +137,22 @@ export async function createNetworkDevice(params: {
   }
 
   // 4. If device is a switch, generate ports automatically
-  if (params.deviceType === 'switch' && totalPorts && totalPorts > 0) {
+  if (isSwitch && totalPorts && totalPorts > 0) {
     const ports: SwitchPortInsert[] = []
     for (let i = 1; i <= totalPorts; i++) {
+      // Determine if port should be SFP or RJ45 (e.g. ports 7 and 8 are SFP for 8-port switches)
+      const isSfpPort = totalPorts >= 4 && i >= totalPorts - 1
       ports.push({
         network_device_id: device.id,
         port_number: i,
-        port_name: `Port ${i}`,
-        port_type: 'copper', // public.port_media_type enum
-        speed_mbps: 1000,
-        poe_budget_watts: 30,
-        poe_enabled: true,
+        port_name: isSfpPort ? `SFP Port ${i - (totalPorts - 2)}` : `Port ${i}`,
+        port_type: isSfpPort ? 'sfp' : 'rj45',
+        speed_mbps: isSfpPort ? 10000 : 1000,
+        poe_budget_watts: isSfpPort ? 0 : 30,
+        poe_enabled: !isSfpPort,
         vlan_id: 1,
         status: 'down',
-        assigned_device_type: 'unused', // public.port_assignment_type enum
+        assigned_device_type: 'unassigned',
         assigned_camera_location_id: null,
       })
     }
@@ -203,6 +211,8 @@ export async function updateNetworkDeviceDetails(params: {
     location_reference: string | null
     ip_address: string | null
     rack_unit: string | null
+    cabinet_id?: string | null
+    status?: string
   }
 }) {
   const supabase = await createClient()
@@ -220,24 +230,26 @@ export async function updateNetworkDeviceDetails(params: {
 
   const oldTotal = current.total_ports || 0
   const newTotal = params.details.total_ports || 0
+  const isSwitch = params.details.device_type === 'switch' || params.details.device_type === 'Industrial Switch'
 
-  // 2. Port adjustment logic (only applicable if device type is 'switch')
-  if (params.details.device_type === 'switch') {
+  // 2. Port adjustment logic (only applicable if device type is a switch)
+  if (isSwitch) {
     if (newTotal > oldTotal) {
       // Add missing ports
       const newPorts: SwitchPortInsert[] = []
       for (let i = oldTotal + 1; i <= newTotal; i++) {
+        const isSfpPort = newTotal >= 4 && i >= newTotal - 1
         newPorts.push({
           network_device_id: params.id,
           port_number: i,
-          port_name: `Port ${i}`,
-          port_type: 'copper',
-          speed_mbps: 1000,
-          poe_budget_watts: 30,
-          poe_enabled: true,
+          port_name: isSfpPort ? `SFP Port ${i - (newTotal - 2)}` : `Port ${i}`,
+          port_type: isSfpPort ? 'sfp' : 'rj45',
+          speed_mbps: isSfpPort ? 10000 : 1000,
+          poe_budget_watts: isSfpPort ? 0 : 30,
+          poe_enabled: !isSfpPort,
           vlan_id: 1,
           status: 'down',
-          assigned_device_type: 'unused',
+          assigned_device_type: 'unassigned',
           assigned_camera_location_id: null,
         })
       }
@@ -290,8 +302,8 @@ export async function updateNetworkDeviceDetails(params: {
       device_type: params.details.device_type,
       manufacturer: params.details.manufacturer,
       model_number: params.details.model_number,
-      total_ports: params.details.device_type === 'switch' ? newTotal : null,
-      poe_budget_watts: params.details.device_type === 'switch' ? params.details.poe_budget_watts : 0,
+      total_ports: isSwitch ? newTotal : null,
+      poe_budget_watts: isSwitch ? params.details.poe_budget_watts : 0,
       location_reference: params.details.location_reference,
       ip_address: params.details.ip_address,
       rack_unit: params.details.rack_unit,
@@ -354,7 +366,7 @@ export async function assignCameraToPort(params: {
   const supabase = await createClient()
   
   // Call transactional database function
-  const { error } = await supabase.rpc('assign_camera_to_switch_port', {
+  const { error } = await (supabase as any).rpc('assign_camera_to_switch_port', {
     camera_id: params.cameraLocationId,
     switch_port_id: params.switchPortId,
   })
@@ -376,7 +388,7 @@ export async function unassignCameraFromPort(params: {
   const supabase = await createClient()
 
   // Call transactional database function
-  const { error } = await supabase.rpc('unassign_camera_from_switch_port', {
+  const { error } = await (supabase as any).rpc('unassign_camera_from_switch_port', {
     camera_id: params.cameraLocationId,
   })
 

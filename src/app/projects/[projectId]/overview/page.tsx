@@ -43,7 +43,7 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
     const devices = await getNetworkDevices(projectId)
     camerasCount = cameras.length
     devicesCount = devices.length
-    switchesCount = devices.filter(d => d.device_type === 'switch').length
+    switchesCount = devices.filter(d => d.device_type === 'switch' || d.device_type === 'Industrial Switch').length
   } catch (err) {
     console.error('Failed to load summary stats:', err)
   }

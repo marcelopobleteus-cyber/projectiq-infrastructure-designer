@@ -54,13 +54,13 @@ export default async function ProjectMapsPage({ params }: PageProps) {
   // Calculate project metrics
   const totalCameras = cameras.length
   const totalNetworkDevices = networkDevices.length
-  const totalSwitches = networkDevices.filter(d => d.device_type === 'switch').length
+  const totalSwitches = networkDevices.filter(d => d.device_type === 'switch' || d.device_type === 'Industrial Switch').length
   const assignedCamerasCount = cameras.filter(c => c.assigned_network_device_id !== null).length
   const unassignedCamerasCount = totalCameras - assignedCamerasCount
 
   let poeWarningsCount = 0
   networkDevices.forEach(device => {
-    if (device.device_type === 'switch') {
+    if (device.device_type === 'switch' || device.device_type === 'Industrial Switch') {
       const switchCameras = cameras.filter(c => c.assigned_network_device_id === device.id)
       const totalDraw = switchCameras.reduce((acc, cam) => {
         const model = cameraModels.find(m => m.id === cam.camera_model_id)

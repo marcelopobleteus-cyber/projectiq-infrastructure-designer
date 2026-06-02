@@ -1,0 +1,86 @@
+{
+  "fiber_nodes": [
+    {
+      "id": "11111111-1111-1111-1111-111111111111",
+      "project_id": "c71f1704-a01b-4661-a079-55e5b66f166d",
+      "node_id_tag": "SE-001",
+      "node_type": "splice_enclosure",
+      "latitude": 33.749,
+      "longitude": -84.388,
+      "elevation_m": "10.50",
+      "size_dims": "Dome Closure",
+      "slack_feet": "20.00",
+      "notes": "Main distribution vault"
+    }
+  ],
+  "fiber_enclosures": [
+    {
+      "id": "11111111-1111-1111-1111-111111111111",
+      "closure_type": "Dome Closure",
+      "capacity": 24,
+      "used_fibers": 2,
+      "spare_fibers": 22
+    }
+  ],
+  "fiber_routes": [
+    {
+      "id": "22222222-2222-2222-2222-222222222222",
+      "project_id": "c71f1704-a01b-4661-a079-55e5b66f166d",
+      "route_id_tag": "R-001",
+      "measured_length_feet": "150.00",
+      "slack_percentage": "10.00",
+      "installed_length_feet": "165.00",
+      "conduit_diameter_inches": "2.00",
+      "fill_percentage": "8.50",
+      "spare_capacity": "91.50",
+      "installation_type": "underground",
+      "route_purpose": "camera_backbone"
+    }
+  ],
+  "fiber_route_segments": [
+    {
+      "id": "33333333-3333-3333-3333-333333333333",
+      "route_id": "22222222-2222-2222-2222-222222222222",
+      "segment_index": 0,
+      "start_latitude": 33.749,
+      "start_longitude": -84.388,
+      "end_latitude": 33.7493,
+      "end_longitude": -84.3885,
+      "length_feet": "150.00",
+      "slack_feet": "0.00"
+    }
+  ],
+  "fiber_cables": [
+    {
+      "id": "44444444-4444-4444-4444-444444444444",
+      "project_id": "c71f1704-a01b-4661-a079-55e5b66f166d",
+      "route_id": "22222222-2222-2222-2222-222222222222",
+      "cable_id_tag": "CAB-R-001",
+      "catalog_id": "e571009a-9400-4e92-a35c-2c9674f3f20e",
+      "fiber_count": 6
+    }
+  ],
+  "fiber_splices": [
+    {
+      "id": "66666666-6666-6666-6666-666666666666",
+      "node_id": "11111111-1111-1111-1111-111111111111",
+      "cable_a_id": "44444444-4444-4444-4444-444444444444",
+      "cable_b_id": "44444444-4444-4444-4444-444444444444",
+      "fiber_number_a": 1,
+      "fiber_number_b": 2,
+      "color": "blue",
+      "status": "installed"
+    }
+  ],
+  "camera_fiber_assignments": [
+    {
+      "id": "88888888-8888-8888-8888-888888888888",
+      "camera_id": "06c1ce91-90fc-48a5-bade-a6f69e0456d5",
+      "cable_id": "44444444-4444-4444-4444-444444444444",
+      "enclosure_id": "11111111-1111-1111-1111-111111111111",
+      "tx_core": 1,
+      "rx_core": 2,
+      "link_role": "primary"
+    }
+  ]
+}
