@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -265,6 +265,190 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      camera_task_history: {
+        Row: {
+          camera_id: string
+          camera_task_id: string
+          created_at: string
+          created_by: string | null
+          event_type: string
+          id: string
+          new_value: string | null
+          note: string | null
+          old_value: string | null
+          organization_id: string
+          project_id: string
+        }
+        Insert: {
+          camera_id: string
+          camera_task_id: string
+          created_at?: string
+          created_by?: string | null
+          event_type: string
+          id?: string
+          new_value?: string | null
+          note?: string | null
+          old_value?: string | null
+          organization_id: string
+          project_id: string
+        }
+        Update: {
+          camera_id?: string
+          camera_task_id?: string
+          created_at?: string
+          created_by?: string | null
+          event_type?: string
+          id?: string
+          new_value?: string | null
+          note?: string | null
+          old_value?: string | null
+          organization_id?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "camera_task_history_camera_id_fkey"
+            columns: ["camera_id"]
+            isOneToOne: false
+            referencedRelation: "camera_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camera_task_history_camera_task_id_fkey"
+            columns: ["camera_task_id"]
+            isOneToOne: false
+            referencedRelation: "camera_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camera_task_history_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camera_task_history_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camera_task_history_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      camera_tasks: {
+        Row: {
+          assigned_to: string | null
+          camera_id: string
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          due_date: string | null
+          id: string
+          notes: string | null
+          organization_id: string
+          priority: string
+          project_id: string
+          project_task_id: string | null
+          related_scope_item: string | null
+          status: string
+          task_type: string
+          template_key: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          camera_id: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          organization_id: string
+          priority?: string
+          project_id: string
+          project_task_id?: string | null
+          related_scope_item?: string | null
+          status?: string
+          task_type: string
+          template_key?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          camera_id?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          priority?: string
+          project_id?: string
+          project_task_id?: string | null
+          related_scope_item?: string | null
+          status?: string
+          task_type?: string
+          template_key?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "camera_tasks_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camera_tasks_camera_id_fkey"
+            columns: ["camera_id"]
+            isOneToOne: false
+            referencedRelation: "camera_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camera_tasks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camera_tasks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camera_tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camera_tasks_project_task_id_fkey"
+            columns: ["project_task_id"]
+            isOneToOne: false
+            referencedRelation: "field_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       fiber_cables: {
         Row: {
@@ -1190,4 +1374,3 @@ export const Constants = {
     },
   },
 } as const
-

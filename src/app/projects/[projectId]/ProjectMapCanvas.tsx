@@ -7,7 +7,14 @@ import {
   createCameraLocation,
   updateCameraCoordinates,
   updateCameraDetails,
-  deleteCameraLocation
+  deleteCameraLocation,
+  getCameraTasks,
+  getCameraTaskHistory,
+  createCameraTask,
+  updateCameraTaskStatus,
+  deleteCameraTask,
+  generateScopeTemplateTasks,
+  getProjectCameraTasks
 } from '../actions-sprint2'
 import {
   createNetworkDevice,
@@ -97,6 +104,17 @@ export default function ProjectMapCanvas({
   const [assignedPortId, setAssignedPortId] = useState('')
   const [cameraPanelMessage, setCameraPanelMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
+  // Camera Tasks & History states
+  const [cameraTasks, setCameraTasks] = useState<any[]>([])
+  const [cameraTaskHistory, setCameraTaskHistory] = useState<any[]>([])
+  const [allCameraTasks, setAllCameraTasks] = useState<any[]>([])
+  const [loadingTasks, setLoadingTasks] = useState(false)
+  const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [newTaskType, setNewTaskType] = useState('Cabling')
+  const [newTaskPriority, setNewTaskPriority] = useState('Medium')
+  const [isCreatingTask, setIsCreatingTask] = useState(false)
+  const [isInitializingChecklist, setIsInitializingChecklist] = useState(false)
+
   // Hover info card state
   const [hoveredCamera, setHoveredCamera] = useState<CameraLocation | null>(null)
   const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number } | null>(null)
@@ -130,6 +148,55 @@ export default function ProjectMapCanvas({
     setNetworkDevices(initialNetworkDevices)
   }, [initialNetworkDevices])
 
+  // Load all camera tasks for the project to display stats in hover cards
+  useEffect(() => {
+    getProjectCameraTasks(projectId).then(tasks => {
+      setAllCameraTasks(tasks)
+    }).catch(err => {
+      console.error('Failed to load project camera tasks:', err)
+    })
+  }, [projectId])
+
+  const loadCameraTasksAndHistory = async (cameraId: string) => {
+    setLoadingTasks(true)
+    try {
+      const [tasks, history] = await Promise.all([
+        getCameraTasks(cameraId),
+        getCameraTaskHistory(cameraId)
+      ])
+      setCameraTasks(tasks)
+      setCameraTaskHistory(history)
+      
+      // Update allCameraTasks state for hover card sync
+      setAllCameraTasks(prev => {
+        const filtered = prev.filter(t => t.camera_id !== cameraId)
+        return [...filtered, ...tasks]
+      })
+    } catch (err) {
+      console.error('Failed to load camera tasks or history:', err)
+    } finally {
+      setLoadingTasks(false)
+    }
+  }
+
+  const getCameraTaskStats = (cameraId: string) => {
+    const tasks = allCameraTasks.filter(t => t.camera_id === cameraId)
+    const total = tasks.length
+    if (total === 0) return null
+
+    const complete = tasks.filter(t => t.status === 'Complete').length
+    const blocked = tasks.filter(t => t.status === 'Blocked').length
+    const open = total - complete
+    const ratio = Math.round((complete / total) * 100)
+
+    const completedTasks = tasks
+      .filter(t => t.status === 'Complete' && t.completed_at)
+      .sort((a, b) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime())
+    const lastCompleted = completedTasks.length > 0 ? completedTasks[0].title : null
+
+    return { total, complete, blocked, open, ratio, lastCompleted }
+  }
+
   // Fetch switch ports helper
   const loadSwitchPorts = async (switchId: string) => {
     setLoadingPorts(true)
@@ -157,6 +224,9 @@ export default function ProjectMapCanvas({
       setCameraNotes(selectedCamera.notes || '')
       setAssignedSwitchId(selectedCamera.assigned_network_device_id || '')
       setCameraPanelMessage(null)
+
+      // Load tasks and history
+      loadCameraTasksAndHistory(selectedCamera.id)
 
       // Find if this camera is assigned to a switch port
       if (selectedCamera.assigned_network_device_id) {
@@ -678,6 +748,126 @@ export default function ProjectMapCanvas({
     })
   }
 
+  // Camera Tasks event handlers
+  const handleCreateTask = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedCamera || !newTaskTitle.trim()) return
+    setIsCreatingTask(true)
+    try {
+      const res = await createCameraTask({
+        projectId,
+        cameraId: selectedCamera.id,
+        title: newTaskTitle,
+        taskType: newTaskType,
+        priority: newTaskPriority
+      })
+      if (res.success && res.data) {
+        setNewTaskTitle('')
+        await loadCameraTasksAndHistory(selectedCamera.id)
+      } else if (res.error) {
+        alert(res.error)
+      }
+    } catch (err) {
+      console.error('Error creating task:', err)
+    } finally {
+      setIsCreatingTask(false)
+    }
+  }
+
+  const handleToggleTaskStatus = async (task: any) => {
+    if (!selectedCamera) return
+    const newStatus = task.status === 'Complete' ? 'Not Started' : 'Complete'
+    try {
+      const res = await updateCameraTaskStatus({
+        projectId,
+        taskId: task.id,
+        status: newStatus
+      })
+      if (res.success) {
+        await loadCameraTasksAndHistory(selectedCamera.id)
+      } else if (res.error) {
+        alert(res.error)
+      }
+    } catch (err) {
+      console.error('Error toggling task status:', err)
+    }
+  }
+
+  const handleTaskStatusChange = async (taskId: string, status: string) => {
+    if (!selectedCamera) return
+    try {
+      const res = await updateCameraTaskStatus({
+        projectId,
+        taskId,
+        status
+      })
+      if (res.success) {
+        await loadCameraTasksAndHistory(selectedCamera.id)
+      } else if (res.error) {
+        alert(res.error)
+      }
+    } catch (err) {
+      console.error('Error updating task status:', err)
+    }
+  }
+
+  const handleTaskPriorityChange = async (taskId: string, priority: string) => {
+    if (!selectedCamera) return
+    try {
+      const res = await updateCameraTaskStatus({
+        projectId,
+        taskId,
+        priority
+      })
+      if (res.success) {
+        await loadCameraTasksAndHistory(selectedCamera.id)
+      } else if (res.error) {
+        alert(res.error)
+      }
+    } catch (err) {
+      console.error('Error updating task priority:', err)
+    }
+  }
+
+  const handleDeleteTask = async (taskId: string) => {
+    if (!selectedCamera) return
+    if (!confirm('Are you sure you want to delete this task?')) return
+    try {
+      const res = await deleteCameraTask({
+        projectId,
+        taskId
+      })
+      if (res.success) {
+        await loadCameraTasksAndHistory(selectedCamera.id)
+      } else if (res.error) {
+        alert(res.error)
+      }
+    } catch (err) {
+      console.error('Error deleting task:', err)
+    }
+  }
+
+  const handleInitializeChecklist = async () => {
+    if (!selectedCamera) return
+    setIsInitializingChecklist(true)
+    try {
+      const res = await generateScopeTemplateTasks({
+        projectId,
+        cameraId: selectedCamera.id,
+        communicationType: selectedCamera.communication_type
+      })
+      if (res.success) {
+        await loadCameraTasksAndHistory(selectedCamera.id)
+      } else if (res.error) {
+        alert(res.error)
+      }
+    } catch (err) {
+      console.error('Error initializing checklist:', err)
+    } finally {
+      setIsInitializingChecklist(false)
+    }
+  }
+
   // Network device settings form save
   const handleSaveDevice = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -931,6 +1121,7 @@ export default function ProjectMapCanvas({
             const cardX = rawX + cardW > mapW ? hoverPosition.x - cardW - 12 : rawX
             const cardY = Math.max(hoverPosition.y - 110, 8)
             const accentColor = getCameraStatusColor(displayCam.status)
+            const stats = getCameraTaskStats(displayCam.id)
 
             return (
               <div
@@ -1008,6 +1199,32 @@ export default function ProjectMapCanvas({
                     )}
                   </div>
                 </div>
+
+                {/* Task Stats inside Hover Card */}
+                {stats && (
+                  <div className="mx-4 pb-3 pt-2.5 border-t border-slate-800/60 space-y-1.5">
+                    <div className="flex justify-between items-center text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                      <span>Task Progress</span>
+                      <span className="text-slate-300 font-mono">{stats.ratio}% ({stats.complete}/{stats.total})</span>
+                    </div>
+                    <div className="w-full bg-slate-950 rounded-full h-1">
+                      <div className="bg-indigo-500 h-1 rounded-full" style={{ width: `${stats.ratio}%` }} />
+                    </div>
+                    <div className="flex gap-2 text-[9px] text-slate-405 font-mono mt-1">
+                      <span>Open: <span className="text-white font-bold">{stats.open}</span></span>
+                      <span>•</span>
+                      <span>Blocked: <span className="text-red-400 font-bold">{stats.blocked}</span></span>
+                      {stats.lastCompleted && (
+                        <>
+                          <span>•</span>
+                          <span className="truncate max-w-[100px]" title={`Last completed: ${stats.lastCompleted}`}>
+                            Done: <span className="text-emerald-400 font-bold">{stats.lastCompleted}</span>
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Actions */}
                 <div className="px-4 pb-3 pt-1 flex gap-2 border-t border-slate-800/60">
@@ -1211,6 +1428,191 @@ export default function ProjectMapCanvas({
                     rows={2} placeholder="Obstructions, special notes..." value={cameraNotes} onChange={e => setCameraNotes(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs resize-none"
                   />
+                </div>
+
+                {/* Tasks Section */}
+                <div className="border-t border-slate-805 pt-4 space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="block text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Camera Checklist</span>
+                    {cameraTasks.length > 0 && (
+                      <span className="text-[10px] text-slate-400 font-semibold bg-slate-950 px-2 py-0.5 rounded-full">
+                        {cameraTasks.filter(t => t.status === 'Complete').length}/{cameraTasks.length} Done
+                      </span>
+                    )}
+                  </div>
+
+                  {loadingTasks ? (
+                    <div className="text-xs text-slate-500 animate-pulse">Loading checklist...</div>
+                  ) : cameraTasks.length === 0 ? (
+                    <div className="bg-slate-950/40 border border-slate-800 p-3 rounded-xl text-center space-y-2">
+                      <p className="text-[11px] text-slate-400">No tasks checklist generated for this camera.</p>
+                      <button
+                        type="button"
+                        onClick={handleInitializeChecklist}
+                        disabled={isInitializingChecklist}
+                        className="py-1.5 px-3 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-700 text-white rounded-lg text-[10px] font-semibold transition"
+                      >
+                        {isInitializingChecklist ? 'Initializing...' : `Initialize Checklist`}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {/* Progress Bar */}
+                      <div className="w-full bg-slate-950 rounded-full h-1.5">
+                        <div
+                          className="bg-indigo-500 h-1.5 rounded-full transition-all duration-300"
+                          style={{
+                            width: `${Math.round(
+                              (cameraTasks.filter(t => t.status === 'Complete').length / cameraTasks.length) * 100
+                            )}%`
+                          }}
+                        />
+                      </div>
+
+                      {/* Task List */}
+                      <div className="space-y-2.5 max-h-60 overflow-y-auto scrollbar-thin pr-1 bg-slate-950/20 p-2 rounded-xl border border-slate-850">
+                        {cameraTasks.map(task => (
+                          <div key={task.id} className="group border border-slate-800/80 bg-slate-950/30 p-2 rounded-lg flex flex-col gap-1.5">
+                            <div className="flex items-start gap-2 justify-between">
+                              <label className="flex items-start gap-2 cursor-pointer select-none grow">
+                                <input
+                                  type="checkbox"
+                                  checked={task.status === 'Complete'}
+                                  onChange={() => handleToggleTaskStatus(task)}
+                                  className="mt-0.5 rounded border-slate-800 bg-slate-950 text-indigo-600 focus:ring-indigo-500"
+                                />
+                                <span className={`text-[11px] font-medium text-slate-200 ${task.status === 'Complete' ? 'line-through text-slate-500' : ''}`}>
+                                  {task.title}
+                                </span>
+                              </label>
+                              
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteTask(task.id)}
+                                className="text-slate-500 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity p-0.5"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                              </button>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 justify-end">
+                              <span className="text-[9px] font-semibold text-slate-500 uppercase tracking-wider">{task.task_type}</span>
+                              <span className="text-[9px] text-slate-600">•</span>
+                              
+                              {/* Status Select */}
+                              <select
+                                value={task.status}
+                                onChange={e => handleTaskStatusChange(task.id, e.target.value)}
+                                className="bg-slate-950 border border-slate-850 text-slate-300 rounded px-1 py-0.5 text-[9px] focus:outline-none"
+                              >
+                                <option value="Not Started">Not Started</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Blocked">Blocked</option>
+                                <option value="Complete">Complete</option>
+                                <option value="Failed QA">Failed QA</option>
+                                <option value="Needs Rework">Needs Rework</option>
+                                <option value="Cancelled">Cancelled</option>
+                              </select>
+
+                              {/* Priority Select */}
+                              <select
+                                value={task.priority}
+                                onChange={e => handleTaskPriorityChange(task.id, e.target.value)}
+                                className={`rounded px-1 py-0.5 text-[9px] font-bold focus:outline-none border border-slate-850 ${
+                                  task.priority === 'Critical' ? 'bg-red-500/10 text-red-400' :
+                                  task.priority === 'High' ? 'bg-amber-500/10 text-amber-400' :
+                                  task.priority === 'Medium' ? 'bg-indigo-500/10 text-indigo-400' :
+                                  'bg-slate-500/10 text-slate-400'
+                                }`}
+                              >
+                                <option value="Low" className="bg-slate-950 text-white">Low</option>
+                                <option value="Medium" className="bg-slate-950 text-white">Medium</option>
+                                <option value="High" className="bg-slate-950 text-white">High</option>
+                                <option value="Critical" className="bg-slate-950 text-white">Critical</option>
+                              </select>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Add Manual Task Inline Form */}
+                  {cameraTasks.length > 0 && (
+                    <div className="bg-slate-950/20 border border-slate-850 p-2.5 rounded-xl space-y-2">
+                      <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Add Custom Task</span>
+                      <div className="flex gap-1.5">
+                        <input
+                          type="text"
+                          placeholder="Task title..."
+                          value={newTaskTitle}
+                          onChange={e => setNewTaskTitle(e.target.value)}
+                          className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-slate-200 text-xs grow focus:outline-none focus:border-indigo-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleCreateTask}
+                          disabled={isCreatingTask || !newTaskTitle.trim()}
+                          className="px-2 py-1 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-900 text-white text-xs font-semibold rounded-lg shrink-0"
+                        >
+                          + Add
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <select
+                          value={newTaskType}
+                          onChange={e => setNewTaskType(e.target.value)}
+                          className="bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5 text-[9px] text-slate-400 focus:outline-none"
+                        >
+                          <option value="Cabling">Cabling</option>
+                          <option value="Mounting">Mounting</option>
+                          <option value="Site Survey">Site Survey</option>
+                          <option value="Fiber">Fiber</option>
+                          <option value="Wireless">Wireless</option>
+                          <option value="Testing">Testing</option>
+                          <option value="Documentation">Documentation</option>
+                          <option value="Configuration">Configuration</option>
+                          <option value="Switch Assignment">Switch Assignment</option>
+                          <option value="IP Addressing">IP Addressing</option>
+                          <option value="Power">Power</option>
+                          <option value="Photos">Photos</option>
+                          <option value="Closeout">Closeout</option>
+                        </select>
+                        <select
+                          value={newTaskPriority}
+                          onChange={e => setNewTaskPriority(e.target.value)}
+                          className="bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5 text-[9px] text-slate-400 focus:outline-none"
+                        >
+                          <option value="Low">Low</option>
+                          <option value="Medium">Medium</option>
+                          <option value="High">High</option>
+                          <option value="Critical">Critical</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* History Section */}
+                <div className="border-t border-slate-800 pt-4 space-y-2">
+                  <span className="block text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Audit Log / History</span>
+                  {loadingTasks ? (
+                    <div className="text-xs text-slate-500 animate-pulse">Loading history...</div>
+                  ) : cameraTaskHistory.length === 0 ? (
+                    <div className="text-[10px] text-slate-500 italic">No history logged yet.</div>
+                  ) : (
+                    <div className="space-y-2 max-h-40 overflow-y-auto scrollbar-thin pr-1 text-[10px]">
+                      {cameraTaskHistory.map(h => (
+                        <div key={h.id} className="border-l-2 border-slate-800 pl-2 py-0.5 space-y-0.5">
+                          <div className="flex justify-between items-center text-slate-400">
+                            <span className="font-semibold text-slate-300">{h.event_type.replace('_', ' ')}</span>
+                            <span>{new Date(h.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                          <p className="text-slate-400 text-[9.5px] leading-snug">{h.note}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
