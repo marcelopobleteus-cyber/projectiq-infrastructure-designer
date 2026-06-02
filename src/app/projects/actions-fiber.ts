@@ -77,6 +77,11 @@ export async function getFiberDesignData(projectId: string) {
     patchCordsRes,
     switchPortsRes,
     networkDevicesRes,
+    bufferTubesRes,
+    cablePassThroughsRes,
+    spliceTraysRes,
+    fiberAssignmentsRes,
+    fiberAssignmentStrandsRes,
   ] = await Promise.all([
     supabase.from('fiber_nodes').select('*').eq('project_id', projectId).order('node_tag'),
     supabase.from('fiber_routes').select('*').eq('project_id', projectId).order('route_id_tag'),
@@ -95,6 +100,11 @@ export async function getFiberDesignData(projectId: string) {
     supabase.from('fiber_patch_cords').select('*').eq('project_id', projectId).order('patch_cord_tag'),
     supabase.from('switch_ports').select('*, network_devices!inner(project_id)').eq('network_devices.project_id', projectId),
     supabase.from('network_devices').select('*').eq('project_id', projectId).order('name'),
+    supabase.from('fiber_buffer_tubes').select('*').eq('project_id', projectId).order('tube_number'),
+    supabase.from('fiber_cable_pass_throughs').select('*').eq('project_id', projectId).order('sequence_order'),
+    supabase.from('splice_trays').select('*').eq('project_id', projectId).order('tray_number'),
+    supabase.from('fiber_assignments').select('*').eq('project_id', projectId),
+    supabase.from('fiber_assignment_strands').select('*').eq('project_id', projectId),
   ])
 
   if (nodesRes.error) throw new Error(`Nodes: ${nodesRes.error.message}`)
@@ -108,6 +118,7 @@ export async function getFiberDesignData(projectId: string) {
     strands: strandsRes.data ?? [],
     enclosures: enclosuresRes.data ?? [],
     spliceRecords: spliceRecordsRes.data ?? [],
+    splices: spliceRecordsRes.data ?? [],
     assignments: assignmentsRes.data ?? [],
     assignmentStrands: assignmentStrandsRes.data ?? [],
     cameras: camerasRes.data ?? [],
@@ -118,6 +129,11 @@ export async function getFiberDesignData(projectId: string) {
     patchCords: patchCordsRes.data ?? [],
     switchPorts: (switchPortsRes.data ?? []) as any[],
     networkDevices: networkDevicesRes.data ?? [],
+    bufferTubes: bufferTubesRes.data ?? [],
+    cablePassThroughs: cablePassThroughsRes.data ?? [],
+    spliceTrays: spliceTraysRes.data ?? [],
+    fiberAssignments: fiberAssignmentsRes.data ?? [],
+    fiberAssignmentStrands: fiberAssignmentStrandsRes.data ?? [],
   }
 }
 
@@ -566,6 +582,57 @@ export async function deleteFiberRoute(params: { id: string; projectId: string }
   return { success: true }
 }
 
+// ─── 8.1 Update fiber route ──────────────────────────────────────────────────
+
+export async function updateFiberRoute(params: {
+  id: string
+  projectId: string
+  routeIdTag?: string
+  conduitDiameterInches?: number
+  slackPercentage?: number
+  installationType?: 'underground' | 'aerial' | 'direct_buried'
+}) {
+  const supabase = await createClient()
+
+  // First, find the route to get its current values
+  const { data: route, error: fetchErr } = await supabase
+    .from('fiber_routes')
+    .select('measured_length_feet')
+    .eq('id', params.id)
+    .single()
+
+  if (fetchErr) return { error: `Route not found: ${fetchErr.message}` }
+
+  // Re-calculate installed length if slack percentage is updated
+  let installedLength = undefined
+  if (params.slackPercentage !== undefined && route.measured_length_feet !== undefined) {
+    const { data: segments } = await supabase
+      .from('fiber_route_segments')
+      .select('slack_feet')
+      .eq('route_id', params.id)
+
+    const segmentSlack = segments ? segments.reduce((sum, seg) => sum + (seg.slack_feet ?? 0), 0) : 0
+    installedLength = Number((route.measured_length_feet * (1 + params.slackPercentage / 100) + segmentSlack).toFixed(2))
+  }
+
+  const { error } = await supabase
+    .from('fiber_routes')
+    .update({
+      route_id_tag: params.routeIdTag,
+      conduit_diameter_inches: params.conduitDiameterInches,
+      slack_percentage: params.slackPercentage,
+      installed_length_feet: installedLength,
+      installation_type: params.installationType,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', params.id)
+
+  if (error) return { error: `Failed to update route: ${error.message}` }
+
+  revalidatePath(`/projects/${params.projectId}/fiber`)
+  return { success: true }
+}
+
 // ─── 9. Create drop cable for a camera ──────────────────────────────────────
 
 export async function createDropCable(params: {
@@ -822,6 +889,9 @@ export async function createSpliceRecord(params: {
   toStrandId: string
   assignedCameraId?: string
   notes?: string
+  trayId?: string | null
+  spliceLossDb?: number | null
+  spliceType?: 'Fusion' | 'Mechanical' | 'Pass Through'
 }) {
   const supabase = await createClient()
 
@@ -836,9 +906,12 @@ export async function createSpliceRecord(params: {
       to_cable_id: params.toCableId,
       to_strand_id: params.toStrandId,
       assigned_camera_id: params.assignedCameraId,
-      splice_status: 'Not Spliced',
+      splice_status: 'Spliced',
       test_status: 'Not Tested',
       notes: params.notes,
+      tray_id: params.trayId,
+      splice_loss_db: params.spliceLossDb,
+      splice_type: params.spliceType || 'Fusion',
     })
     .select()
     .single()
@@ -1001,6 +1074,7 @@ export async function assignStrandToCamera(params: {
 }) {
   const supabase = await createClient()
 
+  // 1. Insert into legacy table
   const { data, error } = await supabase
     .from('camera_fiber_assignment_strands')
     .upsert({
@@ -1016,7 +1090,45 @@ export async function assignStrandToCamera(params: {
 
   if (error) return { error: `Failed to assign strand: ${error.message}` }
 
-  // Update the strand's assigned_camera_id
+  // 2. Also insert into normalized unified tables
+  // 2a. Find or create unified fiber assignment for this camera
+  let { data: unifiedAssignment } = await supabase
+    .from('fiber_assignments')
+    .select('id')
+    .eq('camera_id', params.cameraId)
+    .single()
+
+  if (!unifiedAssignment) {
+    const { data: newUA, error: newUAErr } = await supabase
+      .from('fiber_assignments')
+      .insert({
+        project_id: params.projectId,
+        organization_id: '00000000-0000-0000-0000-000000000000', // trigger fills
+        camera_id: params.cameraId,
+        purpose: 'Camera',
+      })
+      .select('id')
+      .single()
+
+    if (!newUAErr && newUA) {
+      unifiedAssignment = newUA
+    }
+  }
+
+  if (unifiedAssignment) {
+    // 2b. Insert into fiber_assignment_strands
+    await supabase
+      .from('fiber_assignment_strands')
+      .upsert({
+        project_id: params.projectId,
+        organization_id: '00000000-0000-0000-0000-000000000000', // trigger fills
+        assignment_id: unifiedAssignment.id,
+        strand_id: params.strandId,
+        strand_role: params.strandRole,
+      }, { onConflict: 'strand_id' })
+  }
+
+  // 3. Update the strand's assigned_camera_id
   await supabase
     .from('fiber_strands')
     .update({ assigned_camera_id: params.cameraId, updated_at: new Date().toISOString() })
@@ -1226,7 +1338,7 @@ export async function clearStrandAssignmentsForCamera(params: {
 }) {
   const supabase = await createClient()
 
-  // Find existing strand assignments
+  // 1. Clear legacy assignments
   const { data: existing } = await supabase
     .from('camera_fiber_assignment_strands')
     .select('strand_id')
@@ -1245,6 +1357,41 @@ export async function clearStrandAssignmentsForCamera(params: {
       .from('camera_fiber_assignment_strands')
       .delete()
       .eq('camera_id', params.cameraId)
+  }
+
+  // 2. Clear normalized unified assignments
+  const { data: unifiedAssignments } = await supabase
+    .from('fiber_assignments')
+    .select('id')
+    .eq('camera_id', params.cameraId)
+
+  if (unifiedAssignments && unifiedAssignments.length > 0) {
+    const assignmentIds = unifiedAssignments.map(ua => ua.id)
+    
+    // Get strands linked to these unified assignments
+    const { data: unifiedStrands } = await supabase
+      .from('fiber_assignment_strands')
+      .select('strand_id')
+      .in('assignment_id', assignmentIds)
+      
+    if (unifiedStrands && unifiedStrands.length > 0) {
+      const strandIds = unifiedStrands.map(us => us.strand_id)
+      await supabase
+        .from('fiber_strands')
+        .update({ assigned_camera_id: null, updated_at: new Date().toISOString() })
+        .in('id', strandIds)
+    }
+
+    // Delete from join table first, then parent table
+    await supabase
+      .from('fiber_assignment_strands')
+      .delete()
+      .in('assignment_id', assignmentIds)
+
+    await supabase
+      .from('fiber_assignments')
+      .delete()
+      .in('id', assignmentIds)
   }
 
   revalidatePath(`/projects/${params.projectId}/fiber`)
@@ -1402,5 +1549,121 @@ export async function createPatchCord(params: {
   revalidatePath(`/projects/${params.projectId}/fiber`)
   return { success: true, data }
 }
+
+// ─── 17. Create Splice Tray ──────────────────────────────────────────────────
+export async function createSpliceTray(params: {
+  projectId: string
+  enclosureId: string
+  trayNumber: number
+  capacity: number
+  notes?: string
+}) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('splice_trays')
+    .insert({
+      project_id: params.projectId,
+      organization_id: '00000000-0000-0000-0000-000000000000', // trigger overrides
+      enclosure_id: params.enclosureId,
+      tray_number: params.trayNumber,
+      capacity: params.capacity,
+      notes: params.notes,
+    })
+    .select()
+    .single()
+
+  if (error) return { error: `Failed to create splice tray: ${error.message}` }
+
+  revalidatePath(`/projects/${params.projectId}/fiber`)
+  return { success: true, data }
+}
+
+// ─── 18. Assign Duplex Fiber Pair ─────────────────────────────────────────────
+export async function assignDuplexFiberPair(params: {
+  projectId: string
+  cameraId?: string | null
+  switchId?: string | null
+  cabinetId?: string | null
+  purpose: 'Camera' | 'Switch Uplink' | 'Spare' | 'Future Expansion' | 'Wireless Backhaul' | 'Custom'
+  notes?: string
+  strands: Array<{
+    strandId: string
+    strandRole: 'TX' | 'RX' | 'BiDi' | 'Primary' | 'Secondary' | 'Spare' | 'Custom'
+  }>
+}) {
+  const supabase = await createClient()
+
+  // 1. Create fiber assignment
+  const { data: assignment, error: assignErr } = await supabase
+    .from('fiber_assignments')
+    .insert({
+      project_id: params.projectId,
+      organization_id: '00000000-0000-0000-0000-000000000000', // trigger overrides
+      camera_id: params.cameraId === '' ? null : params.cameraId,
+      switch_id: params.switchId === '' ? null : params.switchId,
+      cabinet_id: params.cabinetId === '' ? null : params.cabinetId,
+      purpose: params.purpose,
+      notes: params.notes,
+    })
+    .select()
+    .single()
+
+  if (assignErr) return { error: `Failed to create assignment: ${assignErr.message}` }
+
+  // 2. Insert assignment strands
+  const strandPayloads = params.strands.map(s => ({
+    project_id: params.projectId,
+    organization_id: '00000000-0000-0000-0000-000000000000', // trigger overrides
+    assignment_id: assignment.id,
+    strand_id: s.strandId,
+    strand_role: s.strandRole,
+  }))
+
+  const { error: strandsErr } = await supabase
+    .from('fiber_assignment_strands')
+    .insert(strandPayloads)
+
+  if (strandsErr) {
+    // Rollback parent record
+    await supabase.from('fiber_assignments').delete().eq('id', assignment.id)
+    return { error: `Failed to create assignment strands: ${strandsErr.message}` }
+  }
+
+  revalidatePath(`/projects/${params.projectId}/fiber`)
+  return { success: true, assignment }
+}
+
+// ─── 19. Create Cable Pass-Through ───────────────────────────────────────────
+export async function createCablePassThrough(params: {
+  projectId: string
+  cableId: string
+  nodeId: string
+  sequenceOrder: number
+  hasSlackLoop?: boolean
+  slackLengthFt?: number
+}) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('fiber_cable_pass_throughs')
+    .insert({
+      project_id: params.projectId,
+      organization_id: '00000000-0000-0000-0000-000000000000', // trigger overrides
+      cable_id: params.cableId,
+      node_id: params.nodeId,
+      sequence_order: params.sequenceOrder,
+      has_slack_loop: params.hasSlackLoop || false,
+      slack_length_ft: params.slackLengthFt || 0.00,
+    })
+    .select()
+    .single()
+
+  if (error) return { error: `Failed to create cable pass-through: ${error.message}` }
+
+  revalidatePath(`/projects/${params.projectId}/fiber`)
+  return { success: true, data }
+}
+
 
 

@@ -8,11 +8,13 @@ import {
   deleteFiberNode, 
   createFiberRoute, 
   deleteFiberRoute, 
+  updateFiberRoute,
   createSpliceRecord,
   updateCameraFiberAssignment,
   createFiberEnclosure,
   deleteSpliceRecord,
-  clearSplicesForCables
+  clearSplicesForCables,
+  createSpliceTray
 } from '../../actions-fiber'
 
 interface FiberMapCanvasProps {
@@ -34,6 +36,11 @@ interface FiberMapCanvasProps {
     fpps?: any[]
     patchCords?: any[]
     networkDevices?: any[]
+    bufferTubes?: any[]
+    cablePassThroughs?: any[]
+    spliceTrays?: any[]
+    fiberAssignments?: any[]
+    fiberAssignmentStrands?: any[]
   }
   fiberCatalog: any[]
   defaultLatitude: number
@@ -96,6 +103,15 @@ export default function FiberMapCanvas({
   const [spliceCableA, setSpliceCableA] = useState('')
   const [spliceCableB, setSpliceCableB] = useState('')
   const [spliceConfig, setSpliceConfig] = useState<{ [fiberNumA: number]: number }>({})
+
+  // Splice Tray & Loss States
+  const [selectedTrayId, setSelectedTrayId] = useState('')
+  const [newTrayNumber, setNewTrayNumber] = useState(1)
+  const [newTrayCapacity, setNewTrayCapacity] = useState(12)
+  const [globalSpliceLoss, setGlobalSpliceLoss] = useState('0.020')
+  const [globalSpliceType, setGlobalSpliceType] = useState<'Fusion' | 'Mechanical' | 'Pass Through'>('Fusion')
+  const [spliceLosses, setSpliceLosses] = useState<{ [coreNum: number]: string }>({})
+  const [spliceTypes, setSpliceTypes] = useState<{ [coreNum: number]: 'Fusion' | 'Mechanical' | 'Pass Through' }>({})
 
   // Camera Assignment States
   const [selectedCameraId, setSelectedCameraId] = useState('')
@@ -272,6 +288,12 @@ export default function FiberMapCanvas({
         setSelectedRoute(route)
         setSelectedNode(null)
         setActiveTab('properties')
+
+        // Initialize route form states
+        setRouteIdTag(route.route_id_tag || '')
+        setConduitDiameter(Number(route.conduit_diameter_inches || 2.0))
+        setRouteSlackPercentage(Number(route.slack_percentage || 10.0))
+        setInstallationType(route.installation_type || 'underground')
       })
 
       poly.addListener('mouseover', (e: google.maps.PolyMouseEvent) => {
@@ -844,20 +866,60 @@ export default function FiberMapCanvas({
     }
   }
 
+  const handleSaveRouteDetails = async () => {
+    if (!selectedRoute) return
+
+    const res = await updateFiberRoute({
+      id: selectedRoute.id,
+      projectId,
+      routeIdTag,
+      conduitDiameterInches: conduitDiameter,
+      slackPercentage: routeSlackPercentage,
+      installationType: installationType
+    })
+
+    if (res.error) {
+      showNotification('error', res.error)
+    } else {
+      showNotification('success', 'Pathway specifications saved!')
+      window.location.reload()
+    }
+  }
+
   // Splice matrix load/save handlers
   const handleLoadSpliceConfig = () => {
     if (!selectedNode || !spliceCableA || !spliceCableB) return
 
-    const nodeSplices = initialData.splices.filter(
-      s => s.node_id === selectedNode.id && s.cable_a_id === spliceCableA && s.cable_b_id === spliceCableB
+    const enclosure = initialData.enclosures.find((e: any) => e.node_id === selectedNode.id)
+    if (!enclosure) return
+
+    const nodeSplices = initialData.splices.filter((s: any) =>
+      s.enclosure_id === enclosure.id &&
+      ((s.from_cable_id === spliceCableA && s.to_cable_id === spliceCableB) ||
+       (s.from_cable_id === spliceCableB && s.to_cable_id === spliceCableA))
     )
 
     const config: { [fiberNumA: number]: number } = {}
-    nodeSplices.forEach(s => {
-      config[s.fiber_number_a] = s.fiber_number_b
+    const losses: { [fiberNumA: number]: string } = {}
+    const types: { [fiberNumA: number]: 'Fusion' | 'Mechanical' | 'Pass Through' } = {}
+
+    nodeSplices.forEach((s: any) => {
+      const strandA = initialData.strands.find((st: any) => st.cable_id === spliceCableA && (st.id === s.from_strand_id || st.id === s.to_strand_id))
+      const strandB = initialData.strands.find((st: any) => st.cable_id === spliceCableB && (st.id === s.from_strand_id || st.id === s.to_strand_id))
+      
+      if (strandA && strandB) {
+        config[strandA.strand_number] = strandB.strand_number
+        losses[strandA.strand_number] = s.splice_loss_db !== null ? s.splice_loss_db.toString() : ''
+        types[strandA.strand_number] = s.splice_type
+        if (s.tray_id) {
+          setSelectedTrayId(s.tray_id)
+        }
+      }
     })
 
     setSpliceConfig(config)
+    setSpliceLosses(losses)
+    setSpliceTypes(types)
   }
 
   // Triggers splice configuration load on dropdown change
@@ -911,16 +973,24 @@ export default function FiberMapCanvas({
         const strandB = initialData.strands.find((s: any) => s.cable_id === spliceCableB && s.strand_number === coreNumB)
 
         if (strandA && strandB) {
+          const lossValue = spliceLosses[coreNumA] ? parseFloat(spliceLosses[coreNumA]) : (globalSpliceLoss ? parseFloat(globalSpliceLoss) : 0.020)
+          const typeValue = spliceTypes[coreNumA] || globalSpliceType
+
           const res = await createSpliceRecord({
             projectId,
             enclosureId: enclosure.id,
             fromCableId: spliceCableA,
             fromStrandId: strandA.id,
             toCableId: spliceCableB,
-            toStrandId: strandB.id
+            toStrandId: strandB.id,
+            trayId: selectedTrayId || null,
+            spliceLossDb: isNaN(lossValue) ? 0.020 : lossValue,
+            spliceType: typeValue
           })
           if (res.error) {
             console.error(`Splice error for Core ${coreNumA} -> ${coreNumB}:`, res.error)
+            showNotification('error', `Failed to splice Core ${coreNumA} -> ${coreNumB}: ${res.error}`)
+            return // abort to avoid partial capacity failures
           } else {
             successCount++
           }
@@ -1397,25 +1467,69 @@ export default function FiberMapCanvas({
                     </div>
 
                     <div className="space-y-3.5 text-xs">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <span className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px]">Measured Path</span>
-                          <span className="text-sm font-black text-white font-mono">{selectedRoute.measured_length_feet} ft</span>
+                      <div>
+                        <label className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px] mb-1">Route Tag/ID</label>
+                        <input
+                          type="text"
+                          value={routeIdTag}
+                          onChange={e => setRouteIdTag(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px] mb-1">Conduit Size (inches)</label>
+                          <select
+                            value={conduitDiameter}
+                            onChange={e => setConduitDiameter(Number(e.target.value))}
+                            className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                          >
+                            <option value={0.75}>0.75 in</option>
+                            <option value={1.0}>1.0 in</option>
+                            <option value={1.25}>1.25 in</option>
+                            <option value={1.5}>1.5 in</option>
+                            <option value={2.0}>2.0 in</option>
+                            <option value={3.0}>3.0 in</option>
+                            <option value={4.0}>4.0 in</option>
+                          </select>
                         </div>
-                        <div className="space-y-1">
-                          <span className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px]">Installed Length</span>
-                          <span className="text-sm font-black text-white font-mono">{selectedRoute.installed_length_feet} ft</span>
+                        <div>
+                          <label className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px] mb-1">Installation Type</label>
+                          <select
+                            value={installationType}
+                            onChange={e => setInstallationType(e.target.value as any)}
+                            className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                          >
+                            <option value="underground">Underground</option>
+                            <option value="aerial">Aerial</option>
+                            <option value="direct_buried">Direct Buried</option>
+                          </select>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <span className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px]">Conduit Size</span>
-                          <span className="text-sm font-bold text-slate-200">{selectedRoute.conduit_diameter_inches}-inch</span>
+                      <div>
+                        <label className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px] mb-1">Slack Loop (%)</label>
+                        <input
+                          type="number"
+                          value={routeSlackPercentage}
+                          onChange={e => setRouteSlackPercentage(Number(e.target.value))}
+                          className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 bg-slate-950/40 p-2.5 rounded-xl border border-slate-850">
+                        <div className="space-y-0.5">
+                          <span className="text-slate-500 block font-semibold uppercase tracking-wide text-[8px]">Measured</span>
+                          <span className="text-[11px] font-black text-white font-mono">{selectedRoute.measured_length_feet} ft</span>
                         </div>
-                        <div className="space-y-1">
-                          <span className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px]">Fill Percentage</span>
-                          <span className="text-sm font-bold text-slate-200">{selectedRoute.fill_percentage}%</span>
+                        <div className="space-y-0.5">
+                          <span className="text-slate-500 block font-semibold uppercase tracking-wide text-[8px]">Installed</span>
+                          <span className="text-[11px] font-black text-white font-mono">{selectedRoute.installed_length_feet} ft</span>
+                        </div>
+                        <div className="space-y-0.5">
+                          <span className="text-slate-500 block font-semibold uppercase tracking-wide text-[8px]">Conduit Fill</span>
+                          <span className="text-[11px] font-bold text-slate-200 font-mono">{selectedRoute.fill_percentage}%</span>
                         </div>
                       </div>
 
@@ -1429,6 +1543,13 @@ export default function FiberMapCanvas({
                           </div>
                         </div>
                       )}
+
+                      <button
+                        onClick={handleSaveRouteDetails}
+                        className="w-full py-2.5 bg-rose-650 hover:bg-rose-600 text-white rounded-xl text-xs font-bold transition-all shadow-lg"
+                      >
+                        Save Pathway Specifications
+                      </button>
                     </div>
                   </div>
                 )}
@@ -1436,98 +1557,232 @@ export default function FiberMapCanvas({
             )}
 
             {/* TABS 2: Splice Matrix Editor */}
-            {activeTab === 'splice' && selectedNode && (
-              <div className="space-y-4">
-                <div className="border-b border-slate-850 pb-2">
-                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Visual Splice Matrix</h4>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Patch fiber cores inside {selectedNode.node_tag}</p>
-                </div>
-
-                <div className="space-y-3.5 text-xs">
-                  {/* Select cables */}
-                  <div>
-                    <label className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px] mb-1">Cable A (Left)</label>
-                    <select
-                      value={spliceCableA}
-                      onChange={e => setSpliceCableA(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
-                    >
-                      <option value="">Select Cable...</option>
-                      {initialData.cables.map(c => (
-                        <option key={c.id} value={c.id}>{c.cable_id_tag} ({c.fiber_count} Cores)</option>
-                      ))}
-                    </select>
+            {activeTab === 'splice' && selectedNode && (() => {
+              const enclosure = initialData.enclosures.find((e: any) => e.node_id === selectedNode.id)
+              const trays = enclosure ? (initialData.spliceTrays || []).filter((t: any) => t.enclosure_id === enclosure.id) : []
+              return (
+                <div className="space-y-4">
+                  <div className="border-b border-slate-850 pb-2">
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">Visual Splice Matrix</h4>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Patch fiber cores inside {selectedNode.node_tag}</p>
                   </div>
 
-                  <div>
-                    <label className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px] mb-1">Cable B (Right)</label>
-                    <select
-                      value={spliceCableB}
-                      onChange={e => setSpliceCableB(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
-                    >
-                      <option value="">Select Cable...</option>
-                      {initialData.cables.map(c => (
-                        <option key={c.id} value={c.id}>{c.cable_id_tag} ({c.fiber_count} Cores)</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Splicing Core list */}
-                  {spliceCableA && spliceCableB && (
-                    <div className="border border-slate-850 rounded-xl p-3 bg-slate-950/40 space-y-3">
-                      <div className="flex justify-between items-center text-[9px] uppercase font-bold text-slate-500 border-b border-slate-850 pb-1.5">
-                        <span>Cable A Core</span>
-                        <span>Cable B Core Target</span>
-                      </div>
-                      
-                      <div className="space-y-2 max-h-60 overflow-y-auto pr-1 scrollbar-thin">
-                        {Array.from({ length: initialData.cables.find(c => c.id === spliceCableA)?.fiber_count || 12 }).map((_, idx) => {
-                          const coreNum = idx + 1
-                          const col = getFiberColor(coreNum)
-                          return (
-                            <div key={coreNum} className="flex justify-between items-center gap-4 text-[11px]">
-                              <div className="flex items-center gap-1.5">
-                                <span 
-                                  className="w-2.5 h-2.5 rounded-full border border-white/20"
-                                  style={{ backgroundColor: col.hex }} 
-                                  title={col.name}
+                  <div className="space-y-3.5 text-xs">
+                    {/* Splice Trays Configuration */}
+                    <div className="bg-slate-950/20 p-3.5 rounded-xl border border-slate-850 space-y-3">
+                      <span className="block text-[10px] font-bold text-slate-200 uppercase tracking-wider">Splice Trays</span>
+                      {enclosure ? (
+                        <>
+                          <div>
+                            <label className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px] mb-1">Select Active Tray</label>
+                            <select
+                              value={selectedTrayId}
+                              onChange={e => setSelectedTrayId(e.target.value)}
+                              className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                            >
+                              <option value="">No Tray (Loose Splice)</option>
+                              {trays.map((t: any) => {
+                                const count = (initialData.splices || []).filter((s: any) => s.tray_id === t.id).length
+                                return (
+                                  <option key={t.id} value={t.id}>
+                                    Tray {t.tray_number} ({count} / {t.capacity} Splices)
+                                  </option>
+                                )
+                              })}
+                            </select>
+                          </div>
+                          
+                          <div className="border-t border-slate-900 pt-2.5 space-y-2">
+                            <span className="block text-[8px] font-bold text-slate-500 uppercase tracking-wider">Create Splice Tray</span>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="text-slate-500 block text-[8px] mb-0.5">Tray Number</label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={newTrayNumber}
+                                  onChange={e => setNewTrayNumber(parseInt(e.target.value, 10))}
+                                  className="w-full px-2.5 py-1 bg-slate-950 border border-slate-800 rounded-lg text-white"
                                 />
-                                <span className="font-mono text-slate-300">Core {coreNum}</span>
                               </div>
-
-                              <select
-                                value={spliceConfig[coreNum] || ''}
-                                onChange={e => {
-                                  const val = e.target.value ? parseInt(e.target.value, 10) : 0
-                                  setSpliceConfig(prev => ({
-                                    ...prev,
-                                    [coreNum]: val
-                                  }))
-                                }}
-                                className="px-2 py-1 bg-slate-950 border border-slate-850 rounded text-[10px] text-white focus:outline-none"
-                              >
-                                <option value="">Open / Unused</option>
-                                {Array.from({ length: initialData.cables.find(c => c.id === spliceCableB)?.fiber_count || 12 }).map((_, bIdx) => (
-                                  <option key={bIdx + 1} value={bIdx + 1}>Core {bIdx + 1}</option>
-                                ))}
-                              </select>
+                              <div>
+                                <label className="text-slate-500 block text-[8px] mb-0.5">Capacity</label>
+                                <select
+                                  value={newTrayCapacity}
+                                  onChange={e => setNewTrayCapacity(parseInt(e.target.value, 10))}
+                                  className="w-full px-2.5 py-1 bg-slate-950 border border-slate-800 rounded-lg text-white"
+                                >
+                                  <option value={12}>12 Splices</option>
+                                  <option value={24}>24 Splices</option>
+                                  <option value={48}>48 Splices</option>
+                                </select>
+                              </div>
                             </div>
-                          )
-                        })}
-                      </div>
-
-                      <button
-                        onClick={handleSaveSplices}
-                        className="w-full py-2 bg-emerald-650 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition-all mt-2"
-                      >
-                        Apply Splicing Changes
-                      </button>
+                            <button
+                              onClick={async () => {
+                                const res = await createSpliceTray({
+                                  projectId,
+                                  enclosureId: enclosure.id,
+                                  trayNumber: newTrayNumber,
+                                  capacity: newTrayCapacity
+                                })
+                                if (res.error) {
+                                  showNotification('error', res.error)
+                                } else {
+                                  showNotification('success', `Splice Tray ${newTrayNumber} created!`)
+                                  window.location.reload()
+                                }
+                              }}
+                              className="w-full py-1.5 bg-slate-800 hover:bg-slate-750 text-white rounded-lg text-[9px] font-bold transition-all"
+                            >
+                              Add Splice Tray
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-[10px] text-slate-400 italic">Select cables to automatically generate enclosure and trays.</p>
+                      )}
                     </div>
-                  )}
+
+                    {/* Splicing Defaults Card */}
+                    <div className="bg-slate-950/20 p-3.5 rounded-xl border border-slate-850 space-y-2">
+                      <span className="block text-[10px] font-bold text-slate-200 uppercase tracking-wider">Splicing Defaults</span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-slate-500 block text-[8px] mb-0.5">Splice Loss (dB)</label>
+                          <input
+                            type="text"
+                            value={globalSpliceLoss}
+                            onChange={e => setGlobalSpliceLoss(e.target.value)}
+                            className="w-full px-2.5 py-1 bg-slate-950 border border-slate-800 rounded-lg text-white"
+                            placeholder="0.020"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-slate-500 block text-[8px] mb-0.5">Splice Type</label>
+                          <select
+                            value={globalSpliceType}
+                            onChange={e => setGlobalSpliceType(e.target.value as any)}
+                            className="w-full px-2.5 py-1 bg-slate-950 border border-slate-800 rounded-lg text-white"
+                          >
+                            <option value="Fusion">Fusion</option>
+                            <option value="Mechanical">Mechanical</option>
+                            <option value="Pass Through">Pass Through</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Select cables */}
+                    <div>
+                      <label className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px] mb-1">Cable A (Left)</label>
+                      <select
+                        value={spliceCableA}
+                        onChange={e => setSpliceCableA(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                      >
+                        <option value="">Select Cable...</option>
+                        {initialData.cables.map(c => (
+                          <option key={c.id} value={c.id}>{c.cable_id_tag} ({c.fiber_count} Cores)</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px] mb-1">Cable B (Right)</label>
+                      <select
+                        value={spliceCableB}
+                        onChange={e => setSpliceCableB(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                      >
+                        <option value="">Select Cable...</option>
+                        {initialData.cables.map(c => (
+                          <option key={c.id} value={c.id}>{c.cable_id_tag} ({c.fiber_count} Cores)</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Splicing Core list */}
+                    {spliceCableA && spliceCableB && (
+                      <div className="border border-slate-850 rounded-xl p-3 bg-slate-950/40 space-y-3">
+                        <div className="flex justify-between items-center text-[9px] uppercase font-bold text-slate-500 border-b border-slate-850 pb-1.5">
+                          <span>Cable A Core</span>
+                          <span>Cable B Target & Details</span>
+                        </div>
+                        
+                        <div className="space-y-2 max-h-60 overflow-y-auto pr-1 scrollbar-thin">
+                          {Array.from({ length: initialData.cables.find(c => c.id === spliceCableA)?.fiber_count || 12 }).map((_, idx) => {
+                            const coreNum = idx + 1
+                            const col = getFiberColor(coreNum)
+                            return (
+                              <div key={coreNum} className="flex justify-between items-center gap-2 text-[11px] border-b border-slate-900/40 pb-2">
+                                <div className="flex items-center gap-1.5 shrink-0 w-24">
+                                  <span 
+                                    className="w-2.5 h-2.5 rounded-full border border-white/20"
+                                    style={{ backgroundColor: col.hex }} 
+                                    title={col.name}
+                                  />
+                                  <span className="font-mono text-slate-300">Core {coreNum}</span>
+                                </div>
+
+                                <div className="flex items-center gap-1.5 grow justify-end">
+                                  <select
+                                    value={spliceConfig[coreNum] || ''}
+                                    onChange={e => {
+                                      const val = e.target.value ? parseInt(e.target.value, 10) : 0
+                                      setSpliceConfig(prev => ({
+                                        ...prev,
+                                        [coreNum]: val
+                                      }))
+                                    }}
+                                    className="px-1.5 py-1 bg-slate-950 border border-slate-850 rounded text-[10px] text-white focus:outline-none w-28"
+                                  >
+                                    <option value="">Open / Unused</option>
+                                    {Array.from({ length: initialData.cables.find(c => c.id === spliceCableB)?.fiber_count || 12 }).map((_, bIdx) => (
+                                      <option key={bIdx + 1} value={bIdx + 1}>Core {bIdx + 1}</option>
+                                    ))}
+                                  </select>
+
+                                  {spliceConfig[coreNum] && (
+                                    <>
+                                      <input
+                                        type="text"
+                                        placeholder={globalSpliceLoss}
+                                        value={spliceLosses[coreNum] || ''}
+                                        onChange={e => setSpliceLosses(prev => ({ ...prev, [coreNum]: e.target.value }))}
+                                        className="w-10 px-1 py-0.5 bg-slate-950 border border-slate-850 rounded text-[10px] text-white focus:outline-none text-center"
+                                        title="Splice Loss (dB)"
+                                      />
+                                      <select
+                                        value={spliceTypes[coreNum] || globalSpliceType}
+                                        onChange={e => setSpliceTypes(prev => ({ ...prev, [coreNum]: e.target.value as any }))}
+                                        className="px-1 py-0.5 bg-slate-950 border border-slate-850 rounded text-[10px] text-white focus:outline-none w-10"
+                                        title="Splice Type"
+                                      >
+                                        <option value="Fusion">F</option>
+                                        <option value="Mechanical">M</option>
+                                        <option value="Pass Through">PT</option>
+                                      </select>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+
+                        <button
+                          onClick={handleSaveSplices}
+                          className="w-full py-2 bg-emerald-650 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition-all mt-2"
+                        >
+                          Apply Splicing Changes
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )
+            })()}
 
             {/* TABS 3: Camera Fiber Assignment Tab */}
             {activeTab === 'cameras' && (
