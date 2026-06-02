@@ -29,6 +29,11 @@ interface FiberMapCanvasProps {
     cameras: any[]
     spliceRecords?: any[]
     assignmentStrands?: any[]
+    cabinets?: any[]
+    fdus?: any[]
+    fpps?: any[]
+    patchCords?: any[]
+    networkDevices?: any[]
   }
   fiberCatalog: any[]
   defaultLatitude: number
@@ -410,6 +415,79 @@ export default function FiberMapCanvas({
 
       markersRef.current.push(marker)
     })
+
+    // Draw Cabinets
+    if (initialData.cabinets) {
+      initialData.cabinets.forEach((cab: any) => {
+        const position = { lat: cab.latitude, lng: cab.longitude }
+
+        const hostedSwitches = (initialData.networkDevices || []).filter((d: any) => d.cabinet_id === cab.id)
+        const hostedFdus = (initialData.fdus || []).filter((f: any) => f.cabinet_id === cab.id)
+        const hostedFpps = (initialData.fpps || []).filter((f: any) => f.cabinet_id === cab.id)
+        
+        const fduIds = hostedFdus.map((f: any) => f.id)
+        const fppIds = hostedFpps.map((f: any) => f.id)
+        const hostedPatchCords = (initialData.patchCords || []).filter((pc: any) => 
+          (pc.from_fdu_id && fduIds.includes(pc.from_fdu_id)) ||
+          (pc.from_fpp_id && fppIds.includes(pc.from_fpp_id)) ||
+          (pc.to_fpp_id && fppIds.includes(pc.to_fpp_id))
+        )
+
+        const switchNames = hostedSwitches.map((s: any) => s.name).join(', ') || 'None'
+        const fduTags = hostedFdus.map((f: any) => f.fdu_tag).join(', ') || 'None'
+        const fppTags = hostedFpps.map((f: any) => f.fpp_tag).join(', ') || 'None'
+        const patchCordCount = hostedPatchCords.length
+
+        const tooltipContent = `
+          <div style="padding: 10px; color: #0f172a; font-family: sans-serif; font-size: 11px; line-height: 1.5; min-width: 180px;">
+            <strong style="color: #4f46e5; font-size: 12px; display: block; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-bottom: 5px;">
+              Cabinet: ${cab.cabinet_tag}
+            </strong>
+            <div style="margin-bottom: 3px;"><strong>Type:</strong> ${cab.cabinet_type}</div>
+            <div style="margin-bottom: 5px;"><strong>Status:</strong> ${cab.status}</div>
+            <div style="margin-top: 5px; border-top: 1px dashed #cbd5e1; padding-top: 5px;">
+              <strong>Switches:</strong> ${switchNames}<br/>
+              <strong>FDUs:</strong> ${fduTags}<br/>
+              <strong>FPPs:</strong> ${fppTags}<br/>
+              <strong>Patch Cords:</strong> ${patchCordCount} active
+            </div>
+            ${cab.notes ? `<div style="margin-top: 5px; font-style: italic; color: #64748b;">${cab.notes}</div>` : ''}
+          </div>
+        `
+
+        const svgPin = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24">
+            <rect x="2" y="2" width="20" height="20" rx="3" fill="#64748b" stroke="#ffffff" stroke-width="2"/>
+            <rect x="6" y="6" width="12" height="12" rx="1" fill="#1e293b"/>
+          </svg>
+        `
+
+        const marker = new google.maps.Marker({
+          position,
+          map: map,
+          draggable: false,
+          title: cab.cabinet_tag,
+          icon: {
+            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svgPin),
+            scaledSize: new google.maps.Size(20, 20),
+            anchor: new google.maps.Point(10, 10)
+          }
+        })
+
+        marker.addListener('mouseover', () => {
+          if (infoWindow) {
+            infoWindow.setContent(tooltipContent)
+            infoWindow.open(map, marker)
+          }
+        })
+
+        marker.addListener('mouseout', () => {
+          if (infoWindow) infoWindow.close()
+        })
+
+        markersRef.current.push(marker)
+      })
+    }
 
     // Draw Drop Cables
     initialData.assignments.forEach(assignment => {
