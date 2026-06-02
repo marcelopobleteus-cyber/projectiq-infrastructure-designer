@@ -195,6 +195,25 @@ export async function createFiberNode(params: {
 
   if (nodeErr) return { error: `Failed to create fiber node: ${nodeErr.message}` }
 
+  // If the node type is Cabinet, auto-create a cabinet record
+  if (params.nodeType === 'Cabinet') {
+    const { error: cabErr } = await supabase
+      .from('cabinets')
+      .insert({
+        project_id: params.projectId,
+        organization_id: '00000000-0000-0000-0000-000000000000', // trigger overrides
+        cabinet_tag: params.nodeTag,
+        cabinet_type: 'Fiber Cabinet',
+        latitude: params.latitude,
+        longitude: params.longitude,
+        status: params.status ?? 'Planned',
+        notes: params.notes,
+      })
+    if (cabErr) {
+      console.error('Failed to auto-create cabinet for node:', cabErr.message)
+    }
+  }
+
   // Auto BOM by node type
   const bomByType: Record<string, { part_number: string; description: string; unit_cost: number }> = {
     'Handhole': { part_number: 'HH-BOX', description: `Handhole Box (${params.sizeDescription ?? '24x36x36'})`, unit_cost: 850.00 },
@@ -265,8 +284,26 @@ export async function updateFiberNode(params: {
 
 export async function deleteFiberNode(params: { id: string; projectId: string }) {
   const supabase = await createClient()
+
+  // Find node first to check type and tag
+  const { data: node } = await supabase
+    .from('fiber_nodes')
+    .select('node_type, node_tag')
+    .eq('id', params.id)
+    .single()
+
   const { error } = await supabase.from('fiber_nodes').delete().eq('id', params.id)
   if (error) return { error: `Failed to delete node: ${error.message}` }
+
+  // Clean up cabinet if type was Cabinet
+  if (node && node.node_type === 'Cabinet') {
+    await supabase
+      .from('cabinets')
+      .delete()
+      .eq('project_id', params.projectId)
+      .eq('cabinet_tag', node.node_tag)
+  }
+
   revalidatePath(`/projects/${params.projectId}/fiber`)
   revalidatePath(`/projects/${params.projectId}/bom`)
   return { success: true }

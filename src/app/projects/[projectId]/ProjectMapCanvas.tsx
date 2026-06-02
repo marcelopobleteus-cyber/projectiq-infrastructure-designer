@@ -764,22 +764,71 @@ export default function ProjectMapCanvas({
     if (showFiberNodes) {
       fiberNodes.forEach(node => {
         const statusColor = getStatusColor(node.status)
-        let svgShape = `<circle cx="12" cy="12" r="10" fill="${statusColor}" stroke="#ffffff" stroke-width="2"/>`
-        
+        let svgShape = ''
         const typeLower = node.node_type ? node.node_type.toLowerCase() : ''
-        if (typeLower === 'cabinet') {
-          svgShape = `<rect x="3" y="3" width="18" height="18" rx="2" fill="${statusColor}" stroke="#ffffff" stroke-width="2"/>`
+        
+        if (typeLower === 'manhole') {
+          // circular underground access icon
+          svgShape = `
+            <circle cx="12" cy="12" r="10" fill="${statusColor}" stroke="#ffffff" stroke-width="2"/>
+            <circle cx="12" cy="12" r="6" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="2"/>
+            <line x1="12" y1="2" x2="12" y2="22" stroke="#ffffff" stroke-width="1"/>
+            <line x1="2" y1="12" x2="22" y2="12" stroke="#ffffff" stroke-width="1"/>
+          `
+        } else if (typeLower === 'handhole') {
+          // small rectangular handhole icon
+          svgShape = `
+            <rect x="4" y="6" width="16" height="12" rx="1.5" fill="${statusColor}" stroke="#ffffff" stroke-width="2"/>
+            <rect x="8" y="9" width="8" height="6" fill="none" stroke="#ffffff" stroke-width="1" stroke-dasharray="1.5"/>
+          `
+        } else if (typeLower === 'pull box') {
+          // pull box icon
+          svgShape = `
+            <rect x="6" y="4" width="12" height="16" rx="2" fill="${statusColor}" stroke="#ffffff" stroke-width="2"/>
+            <circle cx="12" cy="12" r="2.5" fill="#ffffff"/>
+          `
+        } else if (typeLower === 'cabinet') {
+          // cabinet icon
+          svgShape = `
+            <rect x="3" y="3" width="18" height="18" rx="2" fill="${statusColor}" stroke="#ffffff" stroke-width="2"/>
+            <rect x="6" y="6" width="12" height="12" fill="none" stroke="#ffffff" stroke-width="1.5"/>
+            <line x1="6" y1="6" x2="18" y2="18" stroke="#ffffff" stroke-width="1"/>
+            <line x1="18" y1="6" x2="6" y2="18" stroke="#ffffff" stroke-width="1"/>
+          `
         } else if (typeLower === 'pole') {
-          svgShape = `<polygon points="12,2 22,20 2,20" fill="${statusColor}" stroke="#ffffff" stroke-width="2"/>`
-        } else if (typeLower === 'building' || typeLower === 'existing fiber source') {
-          svgShape = `<polygon points="12,2 21,7 21,17 12,22 3,17 3,7" fill="${statusColor}" stroke="#ffffff" stroke-width="2"/>`
+          // utility pole icon
+          svgShape = `
+            <rect x="10" y="2" width="4" height="20" fill="${statusColor}" stroke="#ffffff" stroke-width="1"/>
+            <line x1="4" y1="6" x2="20" y2="6" stroke="#ffffff" stroke-width="2"/>
+            <line x1="6" y1="11" x2="18" y2="11" stroke="#ffffff" stroke-width="2"/>
+          `
+        } else if (typeLower === 'building') {
+          // building icon
+          svgShape = `
+            <polygon points="12,2 2,10 5,10 5,20 19,20 19,10 22,10" fill="${statusColor}" stroke="#ffffff" stroke-width="2"/>
+            <rect x="9" y="13" width="6" height="7" fill="#ffffff"/>
+          `
+        } else if (typeLower === 'existing fiber source') {
+          // fiber source star icon
+          svgShape = `
+            <polygon points="12,2 15,9 22,9 17,14 19,21 12,17 5,21 7,14 2,9 9,9" fill="${statusColor}" stroke="#ffffff" stroke-width="1.5"/>
+          `
+        } else {
+          // Fallback / Camera Location
+          svgShape = `
+            <circle cx="12" cy="12" r="10" fill="${statusColor}" stroke="#ffffff" stroke-width="2"/>
+            <circle cx="12" cy="12" r="4" fill="#ffffff"/>
+          `
         }
 
         const svgPin = `
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
-            ${svgShape}
-            <text x="12" y="15" fill="#ffffff" font-size="8" font-family="sans-serif" font-weight="bold" text-anchor="middle">
-              ${node.node_tag.substring(0, 3)}
+          <svg xmlns="http://www.w3.org/2000/svg" width="30" height="42" viewBox="0 0 24 34">
+            <g transform="translate(0, 0)">
+              ${svgShape}
+            </g>
+            <rect x="0" y="25" width="24" height="8" rx="1.5" fill="#0f172a" opacity="0.85"/>
+            <text x="12" y="31" fill="#ffffff" font-size="6" font-family="sans-serif" font-weight="bold" text-anchor="middle">
+              ${node.node_tag}
             </text>
           </svg>
         `
@@ -791,8 +840,8 @@ export default function ProjectMapCanvas({
           title: `${node.node_tag} (${node.node_type})`,
           icon: {
             url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svgPin),
-            scaledSize: new google.maps.Size(24, 24),
-            anchor: new google.maps.Point(12, 12)
+            scaledSize: new google.maps.Size(30, 42),
+            anchor: new google.maps.Point(15, 15)
           }
         })
 
