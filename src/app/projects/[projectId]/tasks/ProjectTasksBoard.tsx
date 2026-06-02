@@ -45,6 +45,7 @@ export default function ProjectTasksBoard({
   const router = useRouter()
   const [tasks, setTasks] = useState<TaskWithCamera[]>(initialTasks)
   const [isPending, setIsPending] = useState(false)
+  const [density, setDensity] = useState<'comfortable' | 'compact'>('comfortable')
 
   // Modals state
   const [isAddOpen, setIsAddOpen] = useState(false)
@@ -249,25 +250,51 @@ export default function ProjectTasksBoard({
   ]
 
   return (
-    <div className="space-y-6 relative z-10 w-full max-w-7xl mx-auto px-6 py-4 font-sans text-slate-300 flex-1 flex flex-col overflow-hidden">
+    <div className="space-y-6 relative z-10 w-full max-w-full px-8 py-4 font-sans text-slate-300 flex-1 flex flex-col overflow-hidden">
       {/* Page Header */}
       <div className="border-b border-slate-900 pb-4 shrink-0 flex items-center justify-between">
         <div>
           <h2 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
             <span>Installation Tasks</span>
             <span className="text-[10px] uppercase font-mono px-2 py-0.5 bg-slate-900 border border-slate-800 rounded-md text-indigo-400 font-bold">
-              Sprint 5.2
+              Sprint 5.2.1
             </span>
           </h2>
           <p className="text-xs text-slate-400 mt-1 font-medium">Bidirectional synchronization with CCTV Camera checklists</p>
         </div>
-        <button
-          onClick={() => setIsAddOpen(true)}
-          className="px-3.5 py-2 bg-indigo-650 hover:bg-indigo-600 active:scale-97 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-md shadow-indigo-900/10 transition-all cursor-pointer"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Add General Task
-        </button>
+        <div className="flex items-center gap-3">
+          {/* Density Toggles */}
+          <div className="flex items-center bg-slate-950 border border-slate-850 p-1 rounded-xl shrink-0">
+            <button
+              onClick={() => setDensity('comfortable')}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                density === 'comfortable'
+                  ? 'bg-slate-800 text-white shadow-sm'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              Comfortable
+            </button>
+            <button
+              onClick={() => setDensity('compact')}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                density === 'compact'
+                  ? 'bg-slate-800 text-white shadow-sm'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              Compact
+            </button>
+          </div>
+
+          <button
+            onClick={() => setIsAddOpen(true)}
+            className="px-3.5 py-2 bg-indigo-650 hover:bg-indigo-600 active:scale-97 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-md shadow-indigo-900/10 transition-all cursor-pointer whitespace-nowrap"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add General Task
+          </button>
+        </div>
       </div>
 
       {/* Kanban Board Grid */}
@@ -300,7 +327,11 @@ export default function ProjectTasksBoard({
                       draggable
                       onDragStart={e => handleDragStart(e, task.id)}
                       onClick={() => openEditModal(task)}
-                      className="bg-slate-900 border border-slate-850/80 p-3.5 rounded-xl hover:border-slate-700 transition-all space-y-2.5 group cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md hover:translate-y-[-1px]"
+                      className={`bg-slate-900 border transition-all group cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md hover:translate-y-[-1px] ${
+                        density === 'compact'
+                          ? 'p-2 rounded-lg border-slate-850/50 space-y-1.5'
+                          : 'p-3.5 rounded-xl border-slate-850/80 space-y-2.5'
+                      } hover:border-slate-700`}
                     >
                       <div className="flex justify-between items-start gap-1.5">
                         <div className="flex flex-wrap gap-1 items-center">
@@ -328,17 +359,23 @@ export default function ProjectTasksBoard({
                         <span className="w-1.5 h-1.5 rounded-full bg-slate-850 group-hover:bg-indigo-500 transition-colors shrink-0 mt-1" />
                       </div>
 
-                      <h4 className="font-bold text-xs text-slate-200 group-hover:text-white transition-colors leading-snug">
+                      <h4 className={`font-bold text-slate-200 group-hover:text-white transition-colors leading-snug ${
+                        density === 'compact' ? 'text-[11px]' : 'text-xs'
+                      }`}>
                         {cleanTitle}
                       </h4>
 
                       {task.description && (
-                        <p className="text-[10px] text-slate-500 leading-normal line-clamp-2">
+                        <p className={`text-slate-500 leading-normal ${
+                          density === 'compact' ? 'text-[9.5px] line-clamp-1' : 'text-[10px] line-clamp-2'
+                        }`}>
                           {task.description}
                         </p>
                       )}
 
-                      <div className="flex justify-between items-center pt-2.5 border-t border-slate-850/40 text-[9.5px] font-mono text-slate-500">
+                      <div className={`flex justify-between items-center border-t border-slate-850/40 font-mono text-slate-500 ${
+                        density === 'compact' ? 'pt-1.5 text-[8.5px]' : 'pt-2.5 text-[9.5px]'
+                      }`}>
                         <span className="flex items-center gap-1">
                           <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                           {assigneeName}

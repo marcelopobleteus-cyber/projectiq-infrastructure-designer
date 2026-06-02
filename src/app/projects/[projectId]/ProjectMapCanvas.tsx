@@ -14,7 +14,9 @@ import {
   updateCameraTaskStatus,
   deleteCameraTask,
   generateScopeTemplateTasks,
-  getProjectCameraTasks
+  getProjectCameraTasks,
+  getProfiles,
+  generateMissingProjectChecklists
 } from '../actions-sprint2'
 import {
   createNetworkDevice,
@@ -114,6 +116,17 @@ export default function ProjectMapCanvas({
   const [newTaskPriority, setNewTaskPriority] = useState('Medium')
   const [isCreatingTask, setIsCreatingTask] = useState(false)
   const [isInitializingChecklist, setIsInitializingChecklist] = useState(false)
+  const [profiles, setProfiles] = useState<any[]>([])
+
+  // Full Checklist Modal state
+  const [isFullChecklistOpen, setIsFullChecklistOpen] = useState(false)
+  const [activeModalTaskId, setActiveModalTaskId] = useState<string | null>(null)
+
+  // Backfill states
+  const [isBackfillPreviewOpen, setIsBackfillPreviewOpen] = useState(false)
+  const [isBackfilling, setIsBackfilling] = useState(false)
+  const [backfillPreviewData, setBackfillPreviewData] = useState<any>(null)
+  const [backfillLog, setBackfillLog] = useState<any>(null)
 
   // Hover info card state
   const [hoveredCamera, setHoveredCamera] = useState<CameraLocation | null>(null)
@@ -147,6 +160,14 @@ export default function ProjectMapCanvas({
   useEffect(() => {
     setNetworkDevices(initialNetworkDevices)
   }, [initialNetworkDevices])
+
+  useEffect(() => {
+    getProfiles().then(data => {
+      setProfiles(data)
+    }).catch(err => {
+      console.error('Failed to load profiles:', err)
+    })
+  }, [])
 
   // Load all camera tasks for the project to display stats in hover cards
   useEffect(() => {
@@ -186,7 +207,9 @@ export default function ProjectMapCanvas({
 
     const complete = tasks.filter(t => t.status === 'Complete').length
     const blocked = tasks.filter(t => t.status === 'Blocked').length
-    const open = total - complete
+    const failedQa = tasks.filter(t => t.status === 'Failed QA').length
+    const needsRework = tasks.filter(t => t.status === 'Needs Rework').length
+    const open = tasks.filter(t => t.status === 'Not Started' || t.status === 'In Progress' || !t.status).length
     const ratio = Math.round((complete / total) * 100)
 
     const completedTasks = tasks
@@ -194,7 +217,7 @@ export default function ProjectMapCanvas({
       .sort((a, b) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime())
     const lastCompleted = completedTasks.length > 0 ? completedTasks[0].title : null
 
-    return { total, complete, blocked, open, ratio, lastCompleted }
+    return { total, complete, blocked, failedQa, needsRework, open, ratio, lastCompleted }
   }
 
   // Fetch switch ports helper
@@ -868,6 +891,118 @@ export default function ProjectMapCanvas({
     }
   }
 
+  const handleNormalizeCameraStatus = async () => {
+    if (!selectedCamera) return
+    if (cameraTasks.length === 0) {
+      alert("No checklist generated for this camera. Please initialize the checklist first.")
+      return
+    }
+
+    // Recommended status logic
+    let recommendedStatus: 'planned' | 'in_progress' | 'complete' | 'issue' = 'planned'
+    const hasIssue = cameraTasks.some(t => t.status === 'Blocked' || t.status === 'Failed QA' || t.status === 'Needs Rework')
+    const completeCount = cameraTasks.filter(t => t.status === 'Complete').length
+    const totalCount = cameraTasks.length
+
+    if (hasIssue) {
+      recommendedStatus = 'issue'
+    } else if (completeCount === totalCount) {
+      recommendedStatus = 'complete'
+    } else if (completeCount > 0) {
+      recommendedStatus = 'in_progress'
+    } else {
+      recommendedStatus = 'planned'
+    }
+
+    const recommendedLabel = recommendedStatus === 'in_progress' ? 'In Progress' :
+                            recommendedStatus === 'complete' ? 'Complete' :
+                            recommendedStatus === 'issue' ? 'Issue' : 'Planned'
+
+    const confirmMsg = `${selectedCamera.camera_id_tag} is marked Complete but checklist progress is ${completeCount}/${totalCount}.\n\nRecommended status: ${recommendedLabel}.\n\nProceed with status change?`
+    
+    if (!window.confirm(confirmMsg)) {
+      return
+    }
+
+    setCameraStatus(recommendedStatus)
+
+    const details = {
+      camera_id_tag: cameraTag,
+      camera_model_id: cameraModelId,
+      status: recommendedStatus,
+      communication_type: cameraCommType,
+      power_type: cameraPowerType,
+      address_reference: cameraAddressRef || null,
+      structure_reference: cameraStructureRef || null,
+      notes: cameraNotes || null,
+    }
+
+    startTransition(async () => {
+      const result = await updateCameraDetails({
+        id: selectedCamera.id,
+        projectId,
+        details
+      })
+
+      if (result.error) {
+        setCameraPanelMessage({ type: 'error', text: result.error })
+      } else {
+        setCameras(prev => prev.map(c => c.id === selectedCamera.id ? { 
+          ...c, 
+          status: recommendedStatus
+        } : c))
+        setSelectedCamera(prev => prev ? { 
+          ...prev, 
+          status: recommendedStatus
+        } : null)
+        setCameraPanelMessage({ type: 'success', text: `Camera status normalized to ${recommendedLabel}!` })
+      }
+    })
+  }
+
+  const handleBackfillPreview = async () => {
+    setIsBackfilling(true)
+    setBackfillLog(null)
+    try {
+      const res = await generateMissingProjectChecklists(projectId, true)
+      if (res.error) {
+        alert(res.error)
+      } else {
+        setBackfillPreviewData(res)
+        setIsBackfillPreviewOpen(true)
+      }
+    } catch (err) {
+      console.error('Error running backfill preview:', err)
+      alert('Error running backfill preview.')
+    } finally {
+      setIsBackfilling(false)
+    }
+  }
+
+  const handleBackfillConfirm = async () => {
+    setIsBackfilling(true)
+    try {
+      const res = await generateMissingProjectChecklists(projectId, false)
+      if (res.error) {
+        alert(res.error)
+      } else {
+        setBackfillLog(res)
+        // Refresh project camera tasks to update all hover states
+        const updatedTasks = await getProjectCameraTasks(projectId)
+        setAllCameraTasks(updatedTasks)
+        // If a camera is currently selected, reload its tasks too
+        if (selectedCamera) {
+          await loadCameraTasksAndHistory(selectedCamera.id)
+        }
+      }
+    } catch (err) {
+      console.error('Error executing backfill:', err)
+      alert('Error executing backfill.')
+    } finally {
+      setIsBackfilling(false)
+    }
+  }
+
   // Network device settings form save
   const handleSaveDevice = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -968,8 +1103,13 @@ export default function ProjectMapCanvas({
     return count
   }
 
+  const completeCount = cameraTasks.filter(t => t.status === 'Complete').length
+  const totalCount = cameraTasks.length
+  const isCompleteButTasksOpen = cameraStatus === 'complete' && (totalCount === 0 || completeCount < totalCount)
+
   return (
-    <div className="flex-1 flex overflow-hidden h-full w-full">
+    <>
+      <div className="flex-1 flex overflow-hidden h-full w-full">
       {/* 1. Contextual Sidebar */}
       <ContextSidebar
         view="map"
@@ -1069,6 +1209,14 @@ export default function ProjectMapCanvas({
               }`}
             >
               {addDeviceMode ? 'Exit Add Device' : 'Add Network Device'}
+            </button>
+
+            <button
+              onClick={handleBackfillPreview}
+              disabled={isBackfilling}
+              className="flex items-center gap-2 px-3.5 py-2 bg-slate-950 border border-slate-800 hover:border-indigo-500/50 hover:text-indigo-400 disabled:opacity-50 text-slate-300 rounded-xl font-semibold text-[11px] tracking-wide transition-all"
+            >
+              {isBackfilling ? 'Analyzing...' : 'Preview Missing Checklists'}
             </button>
 
             <button
@@ -1210,18 +1358,14 @@ export default function ProjectMapCanvas({
                     <div className="w-full bg-slate-950 rounded-full h-1">
                       <div className="bg-indigo-500 h-1 rounded-full" style={{ width: `${stats.ratio}%` }} />
                     </div>
-                    <div className="flex gap-2 text-[9px] text-slate-405 font-mono mt-1">
+                    <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[9px] text-slate-400 font-mono mt-1 leading-snug">
                       <span>Open: <span className="text-white font-bold">{stats.open}</span></span>
                       <span>•</span>
                       <span>Blocked: <span className="text-red-400 font-bold">{stats.blocked}</span></span>
-                      {stats.lastCompleted && (
-                        <>
-                          <span>•</span>
-                          <span className="truncate max-w-[100px]" title={`Last completed: ${stats.lastCompleted}`}>
-                            Done: <span className="text-emerald-400 font-bold">{stats.lastCompleted}</span>
-                          </span>
-                        </>
-                      )}
+                      <span>•</span>
+                      <span>QA Fail: <span className="text-amber-500 font-bold">{stats.failedQa}</span></span>
+                      <span>•</span>
+                      <span>Rework: <span className="text-orange-400 font-bold">{stats.needsRework}</span></span>
                     </div>
                   </div>
                 )}
@@ -1431,13 +1575,49 @@ export default function ProjectMapCanvas({
                 </div>
 
                 {/* Tasks Section */}
-                <div className="border-t border-slate-805 pt-4 space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="block text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Camera Checklist</span>
+                <div className="border-t border-slate-800 pt-4 space-y-4">
+                  {/* Status Conflict Warning */}
+                  {isCompleteButTasksOpen && (
+                    <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 p-3 rounded-xl text-[11px] space-y-2 mt-2">
+                      <div className="flex items-start gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="shrink-0 mt-0.5"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        <span>Camera is marked Complete but checklist has open or missing tasks.</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleNormalizeCameraStatus}
+                        className="w-full py-1.5 px-3 bg-amber-600/20 hover:bg-amber-600/35 border border-amber-600/30 text-amber-300 rounded-lg text-[10px] font-bold transition"
+                      >
+                        Normalize Status
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="block text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Camera Checklist</span>
+                      {cameraTasks.length > 0 && (
+                        <div className="text-[9.5px] text-slate-400 font-semibold font-mono mt-1 leading-snug">
+                          Open: {cameraTasks.filter(t => t.status === 'Not Started' || t.status === 'In Progress' || !t.status).length} | 
+                          Blocked: {cameraTasks.filter(t => t.status === 'Blocked').length} | 
+                          QA Fail: {cameraTasks.filter(t => t.status === 'Failed QA').length} | 
+                          Rework: {cameraTasks.filter(t => t.status === 'Needs Rework').length}
+                        </div>
+                      )}
+                    </div>
                     {cameraTasks.length > 0 && (
-                      <span className="text-[10px] text-slate-400 font-semibold bg-slate-950 px-2 py-0.5 rounded-full">
-                        {cameraTasks.filter(t => t.status === 'Complete').length}/{cameraTasks.length} Done
-                      </span>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <span className="text-[10px] text-slate-200 font-bold bg-slate-950 border border-slate-850 px-2 py-0.5 rounded-full">
+                          {completeCount}/{totalCount} Done
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsFullChecklistOpen(true)}
+                          className="text-[9.5px] text-indigo-400 hover:text-indigo-300 font-bold transition underline mt-0.5"
+                        >
+                          Open Full Checklist
+                        </button>
+                      </div>
                     )}
                   </div>
 
@@ -1456,32 +1636,30 @@ export default function ProjectMapCanvas({
                       </button>
                     </div>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       {/* Progress Bar */}
                       <div className="w-full bg-slate-950 rounded-full h-1.5">
                         <div
                           className="bg-indigo-500 h-1.5 rounded-full transition-all duration-300"
                           style={{
-                            width: `${Math.round(
-                              (cameraTasks.filter(t => t.status === 'Complete').length / cameraTasks.length) * 100
-                            )}%`
+                            width: `${Math.round((completeCount / totalCount) * 100)}%`
                           }}
                         />
                       </div>
 
-                      {/* Task List */}
-                      <div className="space-y-2.5 max-h-60 overflow-y-auto scrollbar-thin pr-1 bg-slate-950/20 p-2 rounded-xl border border-slate-850">
+                      {/* Task List (flows naturally in drawer scroll) */}
+                      <div className="space-y-3 bg-slate-950/20 p-2 rounded-xl border border-slate-850">
                         {cameraTasks.map(task => (
-                          <div key={task.id} className="group border border-slate-800/80 bg-slate-950/30 p-2 rounded-lg flex flex-col gap-1.5">
-                            <div className="flex items-start gap-2 justify-between">
-                              <label className="flex items-start gap-2 cursor-pointer select-none grow">
+                          <div key={task.id} className="group border border-slate-800/80 bg-slate-950/40 p-3 rounded-xl flex flex-col gap-2 hover:border-slate-700/60 transition-all">
+                            <div className="flex items-start gap-2.5 justify-between">
+                              <label className="flex items-start gap-2.5 cursor-pointer select-none grow">
                                 <input
                                   type="checkbox"
                                   checked={task.status === 'Complete'}
                                   onChange={() => handleToggleTaskStatus(task)}
-                                  className="mt-0.5 rounded border-slate-800 bg-slate-950 text-indigo-600 focus:ring-indigo-500"
+                                  className="mt-0.5 rounded border-slate-800 bg-slate-950 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 shrink-0"
                                 />
-                                <span className={`text-[11px] font-medium text-slate-200 ${task.status === 'Complete' ? 'line-through text-slate-500' : ''}`}>
+                                <span className={`text-[12px] font-bold text-slate-200 leading-snug group-hover:text-white transition-colors ${task.status === 'Complete' ? 'line-through text-slate-500 group-hover:text-slate-500 font-medium' : ''}`}>
                                   {task.title}
                                 </span>
                               </label>
@@ -1489,47 +1667,48 @@ export default function ProjectMapCanvas({
                               <button
                                 type="button"
                                 onClick={() => handleDeleteTask(task.id)}
-                                className="text-slate-500 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity p-0.5"
+                                className="text-slate-500 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 shrink-0"
                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                               </button>
                             </div>
 
-                            <div className="flex items-center gap-1.5 justify-end">
-                              <span className="text-[9px] font-semibold text-slate-500 uppercase tracking-wider">{task.task_type}</span>
-                              <span className="text-[9px] text-slate-600">•</span>
+                            <div className="flex items-center justify-between border-t border-slate-900/60 pt-2.5 mt-0.5">
+                              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider bg-slate-950 border border-slate-850 px-1.5 py-0.5 rounded shrink-0">{task.task_type}</span>
                               
-                              {/* Status Select */}
-                              <select
-                                value={task.status}
-                                onChange={e => handleTaskStatusChange(task.id, e.target.value)}
-                                className="bg-slate-950 border border-slate-850 text-slate-300 rounded px-1 py-0.5 text-[9px] focus:outline-none"
-                              >
-                                <option value="Not Started">Not Started</option>
-                                <option value="In Progress">In Progress</option>
-                                <option value="Blocked">Blocked</option>
-                                <option value="Complete">Complete</option>
-                                <option value="Failed QA">Failed QA</option>
-                                <option value="Needs Rework">Needs Rework</option>
-                                <option value="Cancelled">Cancelled</option>
-                              </select>
+                              <div className="flex items-center gap-2 shrink-0">
+                                {/* Status Select */}
+                                <select
+                                  value={task.status}
+                                  onChange={e => handleTaskStatusChange(task.id, e.target.value)}
+                                  className="bg-slate-950 border border-slate-800 text-slate-300 rounded px-2 py-0.75 text-[10px] focus:outline-none focus:border-indigo-500"
+                                >
+                                  <option value="Not Started">Not Started</option>
+                                  <option value="In Progress">In Progress</option>
+                                  <option value="Blocked">Blocked</option>
+                                  <option value="Complete">Complete</option>
+                                  <option value="Failed QA">Failed QA</option>
+                                  <option value="Needs Rework">Needs Rework</option>
+                                  <option value="Cancelled">Cancelled</option>
+                                </select>
 
-                              {/* Priority Select */}
-                              <select
-                                value={task.priority}
-                                onChange={e => handleTaskPriorityChange(task.id, e.target.value)}
-                                className={`rounded px-1 py-0.5 text-[9px] font-bold focus:outline-none border border-slate-850 ${
-                                  task.priority === 'Critical' ? 'bg-red-500/10 text-red-400' :
-                                  task.priority === 'High' ? 'bg-amber-500/10 text-amber-400' :
-                                  task.priority === 'Medium' ? 'bg-indigo-500/10 text-indigo-400' :
-                                  'bg-slate-500/10 text-slate-400'
-                                }`}
-                              >
-                                <option value="Low" className="bg-slate-950 text-white">Low</option>
-                                <option value="Medium" className="bg-slate-950 text-white">Medium</option>
-                                <option value="High" className="bg-slate-950 text-white">High</option>
-                                <option value="Critical" className="bg-slate-950 text-white">Critical</option>
-                              </select>
+                                {/* Priority Select */}
+                                <select
+                                  value={task.priority}
+                                  onChange={e => handleTaskPriorityChange(task.id, e.target.value)}
+                                  className={`rounded px-2 py-0.75 text-[10px] font-extrabold focus:outline-none border border-slate-800 ${
+                                    task.priority === 'Critical' ? 'bg-red-500/10 text-red-400' :
+                                    task.priority === 'High' ? 'bg-amber-500/10 text-amber-400' :
+                                    task.priority === 'Medium' ? 'bg-indigo-500/10 text-indigo-400' :
+                                    'bg-slate-500/10 text-slate-400'
+                                  }`}
+                                >
+                                  <option value="Low" className="bg-slate-950 text-white">Low</option>
+                                  <option value="Medium" className="bg-slate-950 text-white">Medium</option>
+                                  <option value="High" className="bg-slate-950 text-white">High</option>
+                                  <option value="Critical" className="bg-slate-950 text-white">Critical</option>
+                                </select>
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -1814,5 +1993,396 @@ export default function ProjectMapCanvas({
         </div>
       )}
     </div>
+
+    {/* Backfill Preview Modal */}
+    {isBackfillPreviewOpen && backfillPreviewData && (
+      <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+          {/* Header */}
+          <div className="p-5 border-b border-slate-850 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider">Checklist Backfill Preview</h3>
+              <p className="text-[10px] text-slate-400 mt-0.5">Dry-run summary of legacy project upgrade actions</p>
+            </div>
+            <button
+              onClick={() => setIsBackfillPreviewOpen(false)}
+              className="p-1 rounded bg-slate-950 hover:bg-slate-850 text-slate-400 hover:text-white"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="p-6 overflow-y-auto space-y-4 text-xs">
+            {!backfillLog ? (
+              <div className="space-y-3.5">
+                <div className="grid grid-cols-2 gap-3.5">
+                  <div className="bg-slate-950/40 border border-slate-850 p-3 rounded-xl">
+                    <span className="block text-[9px] text-slate-500 font-bold uppercase tracking-wider">Cameras Scanned</span>
+                    <span className="text-base font-bold text-white font-mono">{backfillPreviewData.cameras_scanned}</span>
+                  </div>
+                  <div className="bg-slate-950/40 border border-slate-850 p-3 rounded-xl">
+                    <span className="block text-[9px] text-slate-500 font-bold uppercase tracking-wider">Missing Checklists</span>
+                    <span className="text-base font-bold text-white font-mono">{backfillPreviewData.cameras_missing_checklists}</span>
+                  </div>
+                </div>
+
+                <div className="border border-slate-850 p-4 rounded-xl bg-slate-950/20 space-y-2.5">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Existing checklist tasks:</span>
+                    <span className="font-mono text-slate-200">{backfillPreviewData.existing_tasks_found}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Template tasks to create:</span>
+                    <span className="font-mono text-emerald-400 font-bold">+{backfillPreviewData.tasks_to_create}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Tasks skipped (already exist):</span>
+                    <span className="font-mono text-slate-500">{backfillPreviewData.tasks_skipped}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Sync repairs to perform:</span>
+                    <span className="font-mono text-amber-400 font-bold">{backfillPreviewData.sync_repairs_required}</span>
+                  </div>
+                  <div className="border-t border-slate-800 pt-2.5 flex justify-between font-bold">
+                    <span className="text-slate-200">Est. Project Tasks added:</span>
+                    <span className="font-mono text-indigo-400">+{backfillPreviewData.estimated_project_tasks_added}</span>
+                  </div>
+                </div>
+
+                <div className="text-[10px] text-slate-400 bg-slate-950/50 p-3 rounded-xl border border-slate-850/60 leading-normal">
+                  <p className="font-bold text-slate-300 mb-1">Preview/Dry Run Mode</p>
+                  Confirming this action will safely generate missing checklist items and link unlinked tasks. No changes are applied yet.
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3.5">
+                <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-center space-y-1">
+                  <div className="text-emerald-400 font-bold text-sm">Checklist Generation Successful!</div>
+                  <p className="text-[10px] text-slate-400">The project checklist upgrade is complete.</p>
+                </div>
+
+                <div className="border border-slate-850 p-4 rounded-xl bg-slate-950/20 space-y-2.5">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Cameras Processed:</span>
+                    <span className="font-mono text-slate-200 font-bold">{backfillLog.cameras_scanned}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Tasks Created:</span>
+                    <span className="font-mono text-emerald-400 font-bold">+{backfillLog.tasks_created}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Sync repairs resolved:</span>
+                    <span className="font-mono text-amber-400 font-bold">{backfillLog.sync_repaired}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Skipped (duplicates):</span>
+                    <span className="font-mono text-slate-500">{backfillLog.tasks_skipped}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Execution time:</span>
+                    <span className="font-mono text-indigo-400 font-bold">{backfillLog.duration_ms}ms</span>
+                  </div>
+                </div>
+
+                {backfillLog.errors && backfillLog.errors.length > 0 && (
+                  <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl space-y-1">
+                    <div className="font-bold text-[10px] uppercase">Errors Encountered:</div>
+                    <ul className="list-disc list-inside text-[9.5px] space-y-0.5">
+                      {backfillLog.errors.map((e: string, i: number) => (
+                        <li key={i}>{e}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="p-4 border-t border-slate-850 bg-slate-950/20 flex gap-3">
+            {!backfillLog ? (
+              <>
+                <button
+                  onClick={() => setIsBackfillPreviewOpen(false)}
+                  className="flex-1 py-2 px-4 bg-slate-950 hover:bg-slate-850 border border-slate-800 text-slate-400 font-bold rounded-xl text-xs transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleBackfillConfirm}
+                  disabled={isBackfilling}
+                  className="flex-[2] py-2 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-700 text-white font-bold rounded-xl text-xs transition flex items-center justify-center gap-1.5"
+                >
+                  {isBackfilling ? 'Processing...' : 'Confirm Generate Missing Checklists'}
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => {
+                  setIsBackfillPreviewOpen(false)
+                  window.location.reload()
+                }}
+                className="w-full py-2 px-4 bg-indigo-650 hover:bg-indigo-600 text-white font-bold rounded-xl text-xs transition"
+              >
+                Reload Page & Apply
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Fullscreen Split-Pane Checklist Modal */}
+    {isFullChecklistOpen && selectedCamera && (
+      <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+        <div className="w-full max-w-5xl h-[80vh] bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden relative">
+          
+          {/* Modal Header */}
+          <div className="p-5 border-b border-slate-850 flex items-center justify-between shrink-0">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2.5">
+                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getCameraStatusColor(cameraStatus) }} />
+                <h3 className="text-base font-black text-white tracking-tight">{selectedCamera.camera_id_tag} Full Checklist</h3>
+                <span className="text-[10px] text-slate-400 font-semibold font-mono bg-slate-950 border border-slate-850 px-2 py-0.5 rounded-full uppercase">{cameraCommType}</span>
+              </div>
+              <p className="text-[11px] text-slate-400">Detailed task controls, due dates, assignee configuration, and audit logs.</p>
+            </div>
+            <button
+              onClick={() => setIsFullChecklistOpen(false)}
+              className="p-2 rounded-xl bg-slate-950 border border-slate-850 hover:border-slate-700 text-slate-400 hover:text-white transition"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+
+          {/* Modal Split-Pane Content */}
+          <div className="flex-1 flex overflow-hidden min-h-0">
+            {/* Left Pane: Tasks Sidebar */}
+            <div className="w-2/5 border-r border-slate-800/60 overflow-y-auto p-4 space-y-2.5 bg-slate-950/10">
+              <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Tasks Checklist</span>
+              {cameraTasks.length === 0 ? (
+                <div className="text-center p-8 italic text-slate-500 text-xs">No tasks found.</div>
+              ) : (
+                cameraTasks.map(task => {
+                  const isActive = task.id === (activeModalTaskId || cameraTasks[0]?.id)
+                  return (
+                    <button
+                      key={task.id}
+                      onClick={() => setActiveModalTaskId(task.id)}
+                      className={`w-full flex items-center justify-between text-left p-3 rounded-xl border transition-all ${
+                        isActive
+                          ? 'bg-indigo-600/10 border-indigo-500/40 text-white shadow-sm'
+                          : 'bg-slate-900/40 border-slate-850 text-slate-400 hover:border-slate-800 hover:text-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <input
+                          type="checkbox"
+                          checked={task.status === 'Complete'}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            handleToggleTaskStatus(task)
+                          }}
+                          className="rounded border-slate-800 bg-slate-950 text-indigo-650 focus:ring-indigo-500 w-3.5 h-3.5 shrink-0"
+                        />
+                        <span className={`text-[12px] font-bold truncate leading-snug ${task.status === 'Complete' ? 'line-through text-slate-500' : ''}`}>
+                          {task.title}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                          task.priority === 'Critical' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                          task.priority === 'High' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                          task.priority === 'Medium' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
+                          'bg-slate-500/10 text-slate-400 border border-slate-800/30'
+                        }`}>
+                          {task.priority[0]}
+                        </span>
+                        <span className={`w-1.5 h-1.5 rounded-full ${
+                          task.status === 'Complete' ? 'bg-emerald-500' :
+                          task.status === 'In Progress' ? 'bg-blue-500' :
+                          task.status === 'Blocked' ? 'bg-rose-500' :
+                          task.status === 'Failed QA' ? 'bg-amber-500' :
+                          task.status === 'Needs Rework' ? 'bg-orange-500' : 'bg-slate-500'
+                        }`} />
+                      </div>
+                    </button>
+                  )
+                })
+              )}
+            </div>
+
+            {/* Right Pane: Selected Task Form details & History */}
+            <div className="w-3/5 overflow-y-auto p-6 bg-slate-900/30 flex flex-col justify-between">
+              {(() => {
+                const activeTask = cameraTasks.find(t => t.id === (activeModalTaskId || cameraTasks[0]?.id))
+                if (!activeTask) {
+                  return (
+                    <div className="flex-1 flex items-center justify-center text-slate-500 italic text-xs">
+                      Select a task from the sidebar to view details.
+                    </div>
+                  )
+                }
+
+                const taskHistory = cameraTaskHistory.filter(h => h.camera_task_id === activeTask.id)
+
+                return (
+                  <div className="space-y-5 flex-1 flex flex-col justify-between">
+                    <div className="space-y-4">
+                      {/* Title & Type */}
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="space-y-1">
+                          <h4 className="text-base font-bold text-white leading-tight">{activeTask.title}</h4>
+                          <span className="inline-block text-[9px] font-bold text-slate-400 uppercase tracking-wider bg-slate-950 border border-slate-800 px-2 py-0.5 rounded">
+                            {activeTask.task_type}
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          <label className="flex items-center gap-1.5 text-xs text-slate-300 font-bold bg-slate-950 px-2.5 py-1 rounded-xl border border-slate-850 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={activeTask.status === 'Complete'}
+                              onChange={() => handleToggleTaskStatus(activeTask)}
+                              className="rounded border-slate-800 bg-slate-950 text-indigo-650 focus:ring-indigo-500 w-3.5 h-3.5"
+                            />
+                            <span>Complete</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Controls Grid */}
+                      <div className="grid grid-cols-2 gap-4 border-t border-b border-slate-850/60 py-4 mt-2">
+                        <div className="space-y-1.5">
+                          <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Status</label>
+                          <select
+                            value={activeTask.status}
+                            onChange={(e) => handleTaskStatusChange(activeTask.id, e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                          >
+                            <option value="Not Started">Not Started</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Blocked">Blocked</option>
+                            <option value="Complete">Complete</option>
+                            <option value="Failed QA">Failed QA</option>
+                            <option value="Needs Rework">Needs Rework</option>
+                            <option value="Cancelled">Cancelled</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Priority</label>
+                          <select
+                            value={activeTask.priority}
+                            onChange={(e) => handleTaskPriorityChange(activeTask.id, e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                          >
+                            <option value="Low">Low</option>
+                            <option value="Medium">Medium</option>
+                            <option value="High">High</option>
+                            <option value="Critical">Critical</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Assigned To</label>
+                          <select
+                            value={activeTask.assigned_to || ''}
+                            onChange={async (e) => {
+                              const val = e.target.value || null
+                              startTransition(async () => {
+                                await updateCameraTaskStatus({
+                                  projectId,
+                                  taskId: activeTask.id,
+                                  assignedTo: val
+                                })
+                                await loadCameraTasksAndHistory(selectedCamera.id)
+                              })
+                            }}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                          >
+                            <option value="">Unassigned</option>
+                            {profiles.map(p => (
+                              <option key={p.id} value={p.id}>{p.full_name || 'Generic Profile'}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Due Date</label>
+                          <input
+                            type="date"
+                            value={activeTask.due_date ? activeTask.due_date.substring(0, 10) : ''}
+                            onChange={async (e) => {
+                              const val = e.target.value ? new Date(e.target.value).toISOString() : null
+                              startTransition(async () => {
+                                await updateCameraTaskStatus({
+                                  projectId,
+                                  taskId: activeTask.id,
+                                  dueDate: val
+                                })
+                                await loadCameraTasksAndHistory(selectedCamera.id)
+                              })
+                            }}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Notes */}
+                      <div className="space-y-1.5">
+                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Task Notes</label>
+                        <textarea
+                          rows={3}
+                          placeholder="Add task description or remarks..."
+                          defaultValue={activeTask.notes || ''}
+                          onBlur={async (e) => {
+                            const val = e.target.value.trim() || null
+                            if (val !== activeTask.notes) {
+                              startTransition(async () => {
+                                await updateCameraTaskStatus({
+                                  projectId,
+                                  taskId: activeTask.id,
+                                  notes: val
+                                })
+                                await loadCameraTasksAndHistory(selectedCamera.id)
+                              })
+                            }
+                          }}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white resize-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Task History Timeline */}
+                    <div className="border-t border-slate-850 pt-4 mt-2">
+                      <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Task Activity Log</span>
+                      {taskHistory.length === 0 ? (
+                        <div className="text-[10px] text-slate-500 italic">No activity logged for this task yet.</div>
+                      ) : (
+                        <div className="space-y-3 max-h-[150px] overflow-y-auto scrollbar-thin pr-1 text-[10px]">
+                          {taskHistory.map(h => (
+                            <div key={h.id} className="border-l-2 border-slate-800 pl-3.5 py-0.5 space-y-0.5 relative">
+                              <div className="absolute left-[-5px] top-[6px] w-2.5 h-2.5 rounded-full bg-slate-900 border border-slate-800" />
+                              <div className="flex justify-between items-center text-slate-400">
+                                <span className="font-bold text-slate-300 uppercase text-[9px] tracking-wide">{h.event_type.replace('_', ' ')}</span>
+                                <span>{new Date(h.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>
+                              </div>
+                              <p className="text-slate-400 text-[10px] leading-snug">{h.note}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }

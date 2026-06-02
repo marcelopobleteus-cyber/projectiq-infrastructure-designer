@@ -116,32 +116,46 @@ DECLARE
     v_field_task_id uuid;
     v_task_status public.task_status;
     v_title text;
+    v_camera_tag text;
 BEGIN
     IF pg_trigger_depth() > 1 THEN
         RETURN NEW;
     END IF;
 
-    -- Strip any existing status prefixes (e.g. [Failed QA] or [Cancelled])
-    v_title := regexp_replace(NEW.title, '^\[[^\]]+\]\s*', '');
+    -- Fetch the camera tag prefix
+    SELECT camera_id_tag INTO v_camera_tag
+    FROM public.camera_locations
+    WHERE id = NEW.camera_id;
 
-    -- Map status and prepend prefix for advanced statuses
+    IF v_camera_tag IS NULL THEN
+        v_camera_tag := 'CAM-???';
+    END IF;
+
+    -- Strip any existing bracketed prefixes (e.g. [CAM-020] or [Failed QA])
+    v_title := regexp_replace(NEW.title, '^(\[[^\]]+\]\s*)+', '');
+
+    -- Map status and prepend prefixes
     IF NEW.status = 'Failed QA' THEN
         v_task_status := 'pending'::public.task_status;
-        v_title := '[Failed QA] ' || v_title;
+        v_title := '[' || v_camera_tag || '][Failed QA] ' || v_title;
     ELSIF NEW.status = 'Needs Rework' THEN
         v_task_status := 'pending'::public.task_status;
-        v_title := '[Needs Rework] ' || v_title;
+        v_title := '[' || v_camera_tag || '][Needs Rework] ' || v_title;
     ELSIF NEW.status = 'Cancelled' THEN
         v_task_status := 'pending'::public.task_status;
-        v_title := '[Cancelled] ' || v_title;
+        v_title := '[' || v_camera_tag || '][Cancelled] ' || v_title;
     ELSIF NEW.status = 'In Progress' THEN
         v_task_status := 'in_progress'::public.task_status;
+        v_title := '[' || v_camera_tag || '] ' || v_title;
     ELSIF NEW.status = 'Blocked' THEN
         v_task_status := 'blocked'::public.task_status;
+        v_title := '[' || v_camera_tag || '] ' || v_title;
     ELSIF NEW.status = 'Complete' THEN
         v_task_status := 'completed'::public.task_status;
+        v_title := '[' || v_camera_tag || '] ' || v_title;
     ELSE
         v_task_status := 'pending'::public.task_status;
+        v_title := '[' || v_camera_tag || '] ' || v_title;
     END IF;
 
     IF TG_OP = 'INSERT' THEN
@@ -227,8 +241,8 @@ BEGIN
         RETURN NEW;
     END IF;
 
-    -- Strip prefixes to clean the base title
-    v_clean_title := regexp_replace(NEW.title, '^\[[^\]]+\]\s*', '');
+    -- Strip all leading bracketed prefixes (including CAM-XXX tag and status prefixes)
+    v_clean_title := regexp_replace(NEW.title, '^(\[[^\]]+\]\s*)+', '');
 
     -- Map status back, checking status enum first, then title prefixes for pending
     IF NEW.status = 'completed' THEN
@@ -238,12 +252,12 @@ BEGIN
     ELSIF NEW.status = 'blocked' THEN
         v_cam_status := 'Blocked';
     ELSE
-        -- For pending status, check the title prefix to resolve advanced status
-        IF NEW.title LIKE '[Failed QA]%' THEN
+        -- For pending status, check the title for advanced status prefixes
+        IF NEW.title LIKE '%[Failed QA]%' THEN
             v_cam_status := 'Failed QA';
-        ELSIF NEW.title LIKE '[Needs Rework]%' THEN
+        ELSIF NEW.title LIKE '%[Needs Rework]%' THEN
             v_cam_status := 'Needs Rework';
-        ELSIF NEW.title LIKE '[Cancelled]%' THEN
+        ELSIF NEW.title LIKE '%[Cancelled]%' THEN
             v_cam_status := 'Cancelled';
         ELSE
             v_cam_status := 'Not Started';
