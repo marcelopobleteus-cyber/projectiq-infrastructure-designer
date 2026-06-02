@@ -71,6 +71,7 @@ export default function ProjectMapCanvas({
   googleMapsApiKey
 }: ProjectMapCanvasProps) {
   const mapRef = useRef<HTMLDivElement>(null)
+  const mapRectRef = useRef<DOMRect | null>(null)
   const [map, setMap] = useState<google.maps.Map | null>(null)
   const [activeLayer, setActiveLayer] = useState<'hybrid' | 'roadmap' | 'satellite'>('hybrid')
   
@@ -456,7 +457,11 @@ export default function ProjectMapCanvas({
         marker.addListener('mouseover', (e: google.maps.MapMouseEvent) => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const domEvent = (e as any).domEvent as MouseEvent
-          const rect = mapRef.current?.getBoundingClientRect()
+          let rect = mapRectRef.current
+          if (!rect && mapRef.current) {
+            rect = mapRef.current.getBoundingClientRect()
+            mapRectRef.current = rect
+          }
           if (rect) {
             setHoverPosition({ x: domEvent.clientX - rect.left, y: domEvent.clientY - rect.top })
           }
@@ -1246,7 +1251,15 @@ export default function ProjectMapCanvas({
 
         {/* Map Canvas Viewport */}
         <div className="flex-1 relative bg-slate-950 flex items-center justify-center overflow-hidden">
-          <div ref={mapRef} className="absolute inset-0 w-full h-full" />
+          <div
+            ref={mapRef}
+            className="absolute inset-0 w-full h-full"
+            onMouseEnter={() => {
+              if (mapRef.current) {
+                mapRectRef.current = mapRef.current.getBoundingClientRect()
+              }
+            }}
+          />
 
           {/* ── Camera Hover Info Card ── */}
           {hoveredCamera && hoverPosition && (() => {
