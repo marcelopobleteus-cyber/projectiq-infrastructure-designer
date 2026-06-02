@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ProjectIQ Infrastructure Designer",
+  title: "NextQ Infrastructure Designer",
   description: "Spatial planner for CCTV, networking, power, BOM, and infrastructure deployments.",
 };
 

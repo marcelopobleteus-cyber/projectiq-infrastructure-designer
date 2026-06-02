@@ -74,8 +74,8 @@ export default function MainSidebar({ userEmail, userName, onSignOut }: MainSide
     <aside className="w-16 bg-slate-900 border-r border-slate-800 flex flex-col justify-between shrink-0 h-full py-4 relative z-20">
       {/* Top Section / Logo */}
       <div className="flex flex-col items-center gap-6">
-        <Link href="/design-review/projects" title="ProjectIQ" className="w-10 h-10 rounded-xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 font-black text-sm tracking-wider hover:bg-indigo-600/25 transition-all">
-          IQ
+        <Link href="/design-review/projects" title="NextQ" className="w-10 h-10 rounded-xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 font-black text-sm tracking-wider hover:bg-indigo-600/25 transition-all">
+          NQ
         </Link>
 
         {/* Navigation Items */}

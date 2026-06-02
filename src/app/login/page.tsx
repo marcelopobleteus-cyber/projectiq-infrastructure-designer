@@ -30,10 +30,10 @@ export default function LoginPage() {
       <div className="w-full max-w-md bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl relative z-10">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 mb-4 font-bold text-xl tracking-wider">
-            IQ
+            NQ
           </div>
           <h1 className="text-2xl font-bold text-white tracking-tight">Welcome Back</h1>
-          <p className="text-sm text-slate-400 mt-2">Sign in to your ProjectIQ workspace</p>
+          <p className="text-sm text-slate-400 mt-2">Sign in to your NextQ workspace</p>
         </div>
 
         {error && (
