@@ -148,6 +148,8 @@ export default function ProjectMapCanvas({
   // Map markers dictionaries
   const cameraMarkersRef = useRef<{ [id: string]: google.maps.Marker }>({})
   const deviceMarkersRef = useRef<{ [id: string]: google.maps.Marker }>({})
+  const cameraMarkerStateRef = useRef<{ [id: string]: { isSelected: boolean; status: string; tag: string } }>({})
+  const deviceMarkerStateRef = useRef<{ [id: string]: { isSelected: boolean; deviceType: string; name: string } }>({})
   const clickListenerRef = useRef<google.maps.MapsEventListener | null>(null)
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isHoveringCardRef = useRef(false)
@@ -433,14 +435,24 @@ export default function ProjectMapCanvas({
     cameras.forEach(cam => {
       const isSelected = selectedCamera?.id === cam.id
       const position = { lat: cam.latitude, lng: cam.longitude }
-      const icon = createCameraMarkerIcon(cam.status, cam.camera_id_tag, isSelected)
+
+      const prevState = cameraMarkerStateRef.current[cam.id]
+      const needsIconUpdate = !prevState ||
+        prevState.isSelected !== isSelected ||
+        prevState.status !== cam.status ||
+        prevState.tag !== cam.camera_id_tag
 
       if (cameraMarkersRef.current[cam.id]) {
         const marker = cameraMarkersRef.current[cam.id]
         marker.setPosition(position)
-        marker.setIcon(icon)
-        marker.setTitle(`${cam.camera_id_tag} (${cam.status})`)
+        if (needsIconUpdate) {
+          const icon = createCameraMarkerIcon(cam.status, cam.camera_id_tag, isSelected)
+          marker.setIcon(icon)
+          marker.setTitle(`${cam.camera_id_tag} (${cam.status})`)
+          cameraMarkerStateRef.current[cam.id] = { isSelected, status: cam.status, tag: cam.camera_id_tag }
+        }
       } else {
+        const icon = createCameraMarkerIcon(cam.status, cam.camera_id_tag, isSelected)
         const marker = new google.maps.Marker({
           position,
           map,
@@ -448,6 +460,8 @@ export default function ProjectMapCanvas({
           icon,
           title: `${cam.camera_id_tag} (${cam.status})`,
         })
+
+        cameraMarkerStateRef.current[cam.id] = { isSelected, status: cam.status, tag: cam.camera_id_tag }
 
         marker.addListener('click', () => {
           setSelectedCamera(cam)
@@ -499,7 +513,6 @@ export default function ProjectMapCanvas({
           })
 
           if (result.error) {
-
             alert(result.error)
             setCameras(cameras) // Rollback
           }
@@ -532,14 +545,24 @@ export default function ProjectMapCanvas({
       
       const isSelected = selectedDevice?.id === dev.id
       const position = { lat: dev.latitude, lng: dev.longitude }
-      const icon = getNetworkMarkerIcon(dev.device_type, isSelected)
+
+      const prevState = deviceMarkerStateRef.current[dev.id]
+      const needsIconUpdate = !prevState ||
+        prevState.isSelected !== isSelected ||
+        prevState.deviceType !== dev.device_type ||
+        prevState.name !== dev.name
 
       if (deviceMarkersRef.current[dev.id]) {
         const marker = deviceMarkersRef.current[dev.id]
         marker.setPosition(position)
-        marker.setIcon(icon)
-        marker.setTitle(`${dev.name} (${dev.device_type})`)
+        if (needsIconUpdate) {
+          const icon = getNetworkMarkerIcon(dev.device_type, isSelected)
+          marker.setIcon(icon)
+          marker.setTitle(`${dev.name} (${dev.device_type})`)
+          deviceMarkerStateRef.current[dev.id] = { isSelected, deviceType: dev.device_type, name: dev.name }
+        }
       } else {
+        const icon = getNetworkMarkerIcon(dev.device_type, isSelected)
         const marker = new google.maps.Marker({
           position,
           map,
@@ -547,6 +570,8 @@ export default function ProjectMapCanvas({
           icon,
           title: `${dev.name} (${dev.device_type})`,
         })
+
+        deviceMarkerStateRef.current[dev.id] = { isSelected, deviceType: dev.device_type, name: dev.name }
 
         marker.addListener('click', () => {
           setSelectedDevice(dev)
