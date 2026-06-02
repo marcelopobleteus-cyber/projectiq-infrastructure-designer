@@ -177,7 +177,7 @@ export async function createFiberNode(params: {
     .insert({
       project_id: params.projectId,
       // organization_id filled by trigger
-      organization_id: '', // placeholder — trigger will override via set_fiber_organization_id_from_project
+      organization_id: '00000000-0000-0000-0000-000000000000', // placeholder — trigger will override via set_fiber_organization_id_from_project
       node_tag: params.nodeTag,
       node_type: params.nodeType,
       latitude: params.latitude,
@@ -325,7 +325,7 @@ export async function createFiberEnclosure(params: {
     .from('fiber_enclosures')
     .insert({
       project_id: params.projectId,
-      organization_id: '', // trigger fills
+      organization_id: '00000000-0000-0000-0000-000000000000', // trigger fills
       enclosure_tag: params.enclosureTag,
       node_id: params.nodeId,
       enclosure_type: params.enclosureType,
@@ -414,7 +414,7 @@ export async function createFiberRoute(params: {
     .from('fiber_routes')
     .insert({
       project_id: params.projectId,
-      organization_id: '', // trigger fills
+      organization_id: '00000000-0000-0000-0000-000000000000', // trigger fills
       route_id_tag: params.routeIdTag,
       measured_length_feet: Number(measuredLength.toFixed(2)),
       slack_percentage: slackPct,
@@ -434,7 +434,7 @@ export async function createFiberRoute(params: {
   const finalSegments = segmentInserts.map(s => ({
     ...s,
     project_id: params.projectId,
-    organization_id: '', // trigger fills
+    organization_id: '00000000-0000-0000-0000-000000000000', // trigger fills
     route_id: newRoute.id,
   }))
 
@@ -462,7 +462,7 @@ export async function createFiberRoute(params: {
         .from('fiber_cables')
         .insert({
           project_id: params.projectId,
-          organization_id: '', // trigger fills
+          organization_id: '00000000-0000-0000-0000-000000000000', // trigger fills
           route_id: newRoute.id,
           cable_tag: cableTag,
           cable_type: 'Backbone',
@@ -586,7 +586,7 @@ export async function createDropCable(params: {
     .from('fiber_cables')
     .insert({
       project_id: params.projectId,
-      organization_id: '', // trigger fills
+      organization_id: '00000000-0000-0000-0000-000000000000', // trigger fills
       cable_tag: cableTag,
       cable_type: 'Drop',
       fiber_count: params.fiberCount,
@@ -709,7 +709,7 @@ export async function confirmBulkFiberDrops(params: {
       .from('fiber_nodes')
       .insert({
         project_id: params.projectId,
-        organization_id: '', // trigger fills
+        organization_id: '00000000-0000-0000-0000-000000000000', // trigger fills
         node_tag: drop.nodeTag,
         node_type: 'Camera Location',
         latitude: 0, // will be updated from camera coords below
@@ -765,7 +765,7 @@ export async function confirmBulkFiberDrops(params: {
       .from('fiber_cables')
       .insert({
         project_id: params.projectId,
-        organization_id: '', // trigger fills
+        organization_id: '00000000-0000-0000-0000-000000000000', // trigger fills
         cable_tag: drop.cableTag,
         cable_type: 'Drop',
         fiber_count: drop.fiberCount,
@@ -788,7 +788,7 @@ export async function confirmBulkFiberDrops(params: {
       .from('camera_fiber_assignments')
       .upsert({
         project_id: params.projectId,
-        organization_id: '', // trigger fills
+        organization_id: '00000000-0000-0000-0000-000000000000', // trigger fills
         camera_id: drop.cameraId,
         source_node_id: params.sourceNodeId,
         enclosure_id: params.enclosureId,
@@ -829,7 +829,7 @@ export async function createSpliceRecord(params: {
     .from('fiber_splice_records')
     .insert({
       project_id: params.projectId,
-      organization_id: '', // trigger fills
+      organization_id: '00000000-0000-0000-0000-000000000000', // trigger fills
       enclosure_id: params.enclosureId,
       from_cable_id: params.fromCableId,
       from_strand_id: params.fromStrandId,
@@ -1005,7 +1005,7 @@ export async function assignStrandToCamera(params: {
     .from('camera_fiber_assignment_strands')
     .upsert({
       project_id: params.projectId,
-      organization_id: '', // trigger fills
+      organization_id: '00000000-0000-0000-0000-000000000000', // trigger fills
       camera_fiber_assignment_id: params.cameraFiberAssignmentId,
       camera_id: params.cameraId,
       strand_id: params.strandId,
