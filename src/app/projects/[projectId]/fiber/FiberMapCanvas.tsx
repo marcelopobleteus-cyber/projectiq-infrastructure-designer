@@ -713,8 +713,18 @@ export default function FiberMapCanvas({
       : toolMode === 'Camera Location' ? 'CAM'
       : 'NODE'
 
-    const matchCount = initialData.nodes.filter((n: any) => n.node_type === toolMode).length + 1
-    const tag = `${typeLabel}-${String(matchCount).padStart(3, '0')}`
+    // Find the maximum index suffix among existing nodes of the same type/prefix to prevent collisions after deletions
+    let maxNodeNum = 0
+    initialData.nodes.forEach((n: any) => {
+      if (n.node_type === toolMode && n.node_tag && n.node_tag.startsWith(`${typeLabel}-`)) {
+        const parts = n.node_tag.split('-')
+        const numPart = parseInt(parts[parts.length - 1], 10)
+        if (!isNaN(numPart) && numPart > maxNodeNum) {
+          maxNodeNum = numPart
+        }
+      }
+    })
+    const tag = `${typeLabel}-${String(maxNodeNum + 1).padStart(3, '0')}`
 
     const defaultSlack =
       toolMode === 'Handhole' || toolMode === 'Cabinet' ? 20.0
@@ -760,8 +770,18 @@ export default function FiberMapCanvas({
       return
     }
 
-    const routeCount = initialData.routes.length + 1
-    const tag = `R-${String(routeCount).padStart(3, '0')}`
+    // Find the maximum index suffix among existing routes to prevent collisions after deletions
+    let maxRouteNum = 0
+    initialData.routes.forEach((r: any) => {
+      if (r.route_id_tag && r.route_id_tag.startsWith('R-')) {
+        const parts = r.route_id_tag.split('-')
+        const numPart = parseInt(parts[parts.length - 1], 10)
+        if (!isNaN(numPart) && numPart > maxRouteNum) {
+          maxRouteNum = numPart
+        }
+      }
+    })
+    const tag = `R-${String(maxRouteNum + 1).padStart(3, '0')}`
 
     // Construct segment lines
     const segments: any[] = []
