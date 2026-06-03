@@ -15,7 +15,8 @@ import {
   createFiberEnclosure,
   deleteSpliceRecord,
   clearSplicesForCables,
-  createSpliceTray
+  createSpliceTray,
+  getFiberDesignData
 } from '../../actions-fiber'
 
 interface FiberMapCanvasProps {
@@ -52,7 +53,7 @@ interface FiberMapCanvasProps {
 
 export default function FiberMapCanvas({
   projectId,
-  initialData,
+  initialData: propInitialData,
   fiberCatalog,
   defaultLatitude,
   defaultLongitude,
@@ -60,6 +61,28 @@ export default function FiberMapCanvas({
   googleMapsApiKey
 }: FiberMapCanvasProps) {
   const router = useRouter()
+  const [initialData, setInitialData] = useState(propInitialData)
+
+  useEffect(() => {
+    setInitialData(propInitialData)
+  }, [propInitialData])
+
+  const loadDesignData = async () => {
+    try {
+      const data = await getFiberDesignData(projectId)
+      setInitialData(data)
+      setSelectedNode((currNode: any) => {
+        if (!currNode) return null
+        return data.nodes.find((n: any) => n.id === currNode.id) || null
+      })
+      setSelectedRoute((currRoute: any) => {
+        if (!currRoute) return null
+        return data.routes.find((r: any) => r.id === currRoute.id) || null
+      })
+    } catch (err) {
+      console.error('Failed to load fiber design data:', err)
+    }
+  }
   const mapRef = useRef<HTMLDivElement>(null)
   const [map, setMap] = useState<google.maps.Map | null>(null)
   const [googleLoaded, setGoogleLoaded] = useState(false)
@@ -496,7 +519,7 @@ export default function FiberMapCanvas({
             showNotification('error', `Failed to move node: ${error.message}`)
           } else {
             showNotification('success', `Moved node ${node.node_tag}`)
-            router.refresh()
+            await loadDesignData()
           }
         } catch (err) {
           console.error(err)
@@ -721,7 +744,7 @@ export default function FiberMapCanvas({
     } else {
       showNotification('success', `Created OSP Node ${tag}`)
       setToolMode('select')
-      router.refresh()
+      await loadDesignData()
     }
   }
 
@@ -769,7 +792,7 @@ export default function FiberMapCanvas({
       showNotification('success', `Installed Conduit & Fiber route ${tag}`)
       setTempRoutePoints([])
       setToolMode('select')
-      router.refresh()
+      await loadDesignData()
     }
   }
 
@@ -783,7 +806,7 @@ export default function FiberMapCanvas({
     } else {
       showNotification('success', `Deleted node ${tag}`)
       setSelectedNode(null)
-      router.refresh()
+      await loadDesignData()
     }
   }
 
@@ -797,7 +820,7 @@ export default function FiberMapCanvas({
     } else {
       showNotification('success', `Deleted route ${tag}`)
       setSelectedRoute(null)
-      router.refresh()
+      await loadDesignData()
     }
   }
 
@@ -862,7 +885,7 @@ export default function FiberMapCanvas({
       }
 
       showNotification('success', 'Node specifications saved!')
-      router.refresh()
+      await loadDesignData()
     } catch (err) {
       console.error(err)
     }
@@ -884,7 +907,7 @@ export default function FiberMapCanvas({
       showNotification('error', res.error)
     } else {
       showNotification('success', 'Pathway specifications saved!')
-      router.refresh()
+      await loadDesignData()
     }
   }
 
@@ -924,10 +947,10 @@ export default function FiberMapCanvas({
     setSpliceTypes(types)
   }
 
-  // Triggers splice configuration load on dropdown change
+  // Triggers splice configuration load on dropdown change or data update
   useEffect(() => {
     handleLoadSpliceConfig()
-  }, [spliceCableA, spliceCableB])
+  }, [spliceCableA, spliceCableB, initialData])
 
   const handleSaveSplices = async () => {
     if (!selectedNode || !spliceCableA || !spliceCableB) return
@@ -1000,7 +1023,7 @@ export default function FiberMapCanvas({
       }
 
       showNotification('success', `Applied ${successCount} splices inside ${enclosure.enclosure_tag}`)
-      router.refresh()
+      await loadDesignData()
     } catch (err) {
       console.error(err)
       showNotification('error', 'An unexpected error occurred while saving splices.')
@@ -1032,7 +1055,7 @@ export default function FiberMapCanvas({
       showNotification('error', res.error)
     } else {
       showNotification('success', `Camera fiber assignment updated`)
-      router.refresh()
+      await loadDesignData()
     }
   }
 
@@ -1049,7 +1072,7 @@ export default function FiberMapCanvas({
       showNotification('error', res.error)
     } else {
       showNotification('success', 'Fiber assignment cleared.')
-      router.refresh()
+      await loadDesignData()
     }
   }
 
@@ -1632,7 +1655,7 @@ export default function FiberMapCanvas({
                                   showNotification('error', res.error)
                                 } else {
                                   showNotification('success', `Splice Tray ${newTrayNumber} created!`)
-                                  router.refresh()
+                                  await loadDesignData()
                                 }
                               }}
                               className="w-full py-1.5 bg-slate-800 hover:bg-slate-750 text-white rounded-lg text-[9px] font-bold transition-all"
