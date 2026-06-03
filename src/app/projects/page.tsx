@@ -31,7 +31,7 @@ export default async function ProjectsPage() {
   }
 
   return (
-    <div className="space-y-8 relative z-10">
+    <div className="space-y-8 relative z-10 w-full px-6 py-8 flex-1 overflow-y-auto h-full scrollbar-thin">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-white tracking-tight">Projects</h2>

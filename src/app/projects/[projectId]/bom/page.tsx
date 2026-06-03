@@ -211,7 +211,7 @@ export default async function ProjectBOMPage({ params }: PageProps) {
 
 
   return (
-    <div className="space-y-6 relative z-10 w-full max-w-7xl mx-auto px-6 py-4 font-sans text-slate-300 flex-1 flex flex-col overflow-hidden">
+    <div className="space-y-6 relative z-10 w-full px-6 py-4 font-sans text-slate-300 flex-1 flex flex-col overflow-hidden">
       {/* Page Header */}
       <div className="border-b border-slate-900 pb-4 shrink-0">
         <h2 className="text-xl font-black text-white tracking-tight">Bill of Materials (BOM)</h2>

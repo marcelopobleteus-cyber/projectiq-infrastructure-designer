@@ -33,7 +33,7 @@ export default async function ProjectLocationsPage({ params }: PageProps) {
   const coordinatesStr = `${Number(project.default_latitude).toFixed(6)}, ${Number(project.default_longitude).toFixed(6)}`
 
   return (
-    <div className="space-y-6 relative z-10 w-full max-w-7xl mx-auto px-6 py-4 font-sans text-slate-300">
+    <div className="space-y-6 relative z-10 w-full px-6 py-4 font-sans text-slate-300">
       {/* Page Header */}
       <div className="border-b border-slate-900 pb-4 flex items-center justify-between">
         <div>

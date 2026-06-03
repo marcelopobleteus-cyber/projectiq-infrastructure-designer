@@ -124,7 +124,7 @@ export default async function ProjectMapsPage({ params }: PageProps) {
   ]
 
   return (
-    <div className="space-y-6 relative z-10 w-full max-w-7xl mx-auto px-6 py-4 flex-1 flex flex-col overflow-hidden">
+    <div className="space-y-4 relative z-10 w-full h-full px-6 py-4 flex-1 flex flex-col overflow-hidden">
       {/* Metrics Banner */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 shrink-0">
         {metrics.map((m, idx) => (
