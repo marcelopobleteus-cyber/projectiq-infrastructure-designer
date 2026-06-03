@@ -39,7 +39,7 @@ export default async function DesignReviewLayout({
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-slate-950">
+      <div className="flex-1 flex flex-col overflow-y-auto bg-slate-950">
         {children}
       </div>
     </AppShell>

@@ -3,6 +3,7 @@ import { createClient } from '@/utils/supabase/server'
 import { logout } from '../auth/actions'
 import AppShell from '@/components/layout/AppShell'
 import MainSidebar from '@/components/layout/MainSidebar'
+import ProjectsContentArea from '@/components/layout/ProjectsContentArea'
 
 export default async function ProjectsLayout({
   children,
@@ -39,9 +40,9 @@ export default async function ProjectsLayout({
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-slate-950">
+      <ProjectsContentArea>
         {children}
-      </div>
+      </ProjectsContentArea>
     </AppShell>
   )
 }
