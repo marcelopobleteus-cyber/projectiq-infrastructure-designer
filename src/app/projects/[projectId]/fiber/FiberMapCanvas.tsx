@@ -195,6 +195,99 @@ export default function FiberMapCanvas({
       })
   }, [googleMapsApiKey])
 
+  // Handle selectedNodeId / selectedRouteId from query parameters on load
+  useEffect(() => {
+    if (typeof window === 'undefined' || !googleLoaded) return
+    const params = new URLSearchParams(window.location.search)
+    const nodeId = params.get('selectedNodeId')
+    const routeId = params.get('selectedRouteId')
+
+    if (nodeId && initialData.nodes.length > 0) {
+      const node = initialData.nodes.find((n: any) => n.id === nodeId)
+      if (node) {
+        setSelectedNode(node)
+        setSelectedRoute(null)
+        setActiveTab('properties')
+        setNodeIdTag(node.node_tag)
+        setNodeSize(node.size_description || '24x36x36')
+        setNodeElevation(Number(node.elevation_ft || 0))
+        setNodeSlack(Number(node.slack_loop_ft || 0))
+        setNodeNotes(node.notes || '')
+        const enclosure = initialData.enclosures.find((e: any) => e.node_id === node.id)
+        if (enclosure) {
+          setNodeClosureType(enclosure.enclosure_type)
+          setNodeCapacity(enclosure.capacity || 12)
+        }
+        if (map) {
+          map.panTo({ lat: Number(node.latitude), lng: Number(node.longitude) })
+          map.setZoom(18)
+        }
+      }
+    } else if (routeId && initialData.routes.length > 0) {
+      const route = initialData.routes.find((r: any) => r.id === routeId)
+      if (route) {
+        setSelectedRoute(route)
+        setSelectedNode(null)
+        setActiveTab('properties')
+        setRouteIdTag(route.route_id_tag || '')
+        setConduitDiameter(Number(route.conduit_diameter_inches || 2.0))
+        setRouteSlackPercentage(Number(route.slack_percentage || 10.0))
+        setInstallationType(route.installation_type || 'underground')
+        const seg = initialData.segments.find((s: any) => s.route_id === route.id)
+        if (seg && map) {
+          map.panTo({ lat: Number(seg.start_latitude), lng: Number(seg.start_longitude) })
+          map.setZoom(18)
+        }
+      }
+    }
+  }, [map, initialData, googleLoaded])
+
+  // Register global select functions for InfoWindow clicks
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    (window as any).selectNodeForEditing = (nodeId: string) => {
+      const node = initialData.nodes.find((n: any) => n.id === nodeId)
+      if (node) {
+        setSelectedNode(node)
+        setSelectedRoute(null)
+        setActiveTab('properties')
+        setNodeIdTag(node.node_tag)
+        setNodeSize(node.size_description || '24x36x36')
+        setNodeElevation(Number(node.elevation_ft || 0))
+        setNodeSlack(Number(node.slack_loop_ft || 0))
+        setNodeNotes(node.notes || '')
+        const enclosure = initialData.enclosures.find((e: any) => e.node_id === node.id)
+        if (enclosure) {
+          setNodeClosureType(enclosure.enclosure_type)
+          setNodeCapacity(enclosure.capacity || 12)
+        }
+        const iw = (window as any)._mapInfoWindow
+        if (iw) iw.close()
+      }
+    };
+
+    (window as any).selectRouteForEditing = (routeId: string) => {
+      const route = initialData.routes.find((r: any) => r.id === routeId)
+      if (route) {
+        setSelectedRoute(route)
+        setSelectedNode(null)
+        setActiveTab('properties')
+        setRouteIdTag(route.route_id_tag || '')
+        setConduitDiameter(Number(route.conduit_diameter_inches || 2.0))
+        setRouteSlackPercentage(Number(route.slack_percentage || 10.0))
+        setInstallationType(route.installation_type || 'underground')
+        const iw = (window as any)._mapInfoWindow
+        if (iw) iw.close()
+      }
+    };
+
+    return () => {
+      delete (window as any).selectNodeForEditing
+      delete (window as any).selectRouteForEditing
+    }
+  }, [initialData])
+
   // 2. Initialize Google Map instance
   useEffect(() => {
     if (!googleLoaded || !mapRef.current || map) return
@@ -215,6 +308,9 @@ export default function FiberMapCanvas({
 
       // Clicking the map in node creation / route drawing mode
       gMap.addListener('click', (e: google.maps.MapMouseEvent) => {
+        const iw = (window as any)._mapInfoWindow
+        if (iw) iw.close()
+
         if (!e.latLng) return
         const lat = e.latLng.lat()
         const lng = e.latLng.lng()
@@ -321,43 +417,42 @@ export default function FiberMapCanvas({
         setInstallationType(route.installation_type || 'underground')
       })
 
-      poly.addListener('mouseover', (e: google.maps.PolyMouseEvent) => {
-        const cable = initialData.cables.find(c => c.route_id === route.id)
-        const fromNode = initialData.nodes.find(n => n.id === cable?.from_node_id)
-        const toNode = initialData.nodes.find(n => n.id === cable?.to_node_id)
+        poly.addListener('mouseover', (e: google.maps.PolyMouseEvent) => {
+          const cable = initialData.cables.find(c => c.route_id === route.id)
+          const fromNode = initialData.nodes.find(n => n.id === cable?.from_node_id)
+          const toNode = initialData.nodes.find(n => n.id === cable?.to_node_id)
 
-        const contentString = `
-          <div style="padding: 8px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a; max-width: 220px;">
-            <div style="font-weight: bold; font-size: 12px; margin-bottom: 4px; border-b: 1px solid #e2e8f0; padding-bottom: 2px;">
-              Route: ${route.route_id_tag}
-            </div>
-            <div><strong>Measured Length:</strong> ${route.measured_length_feet} ft</div>
-            <div><strong>Installed Length:</strong> ${route.installed_length_feet} ft</div>
-            <div><strong>Type:</strong> ${route.installation_type}</div>
-            <div><strong>Conduit Size:</strong> ${route.conduit_diameter_inches} in</div>
-            <div><strong>Fill:</strong> ${route.fill_percentage}%</div>
-            ${cable ? `
-              <div style="margin-top: 6px; border-t: 1px dashed #cbd5e1; padding-top: 4px;">
-                <strong>Cable:</strong> ${cable.cable_tag} (${cable.fiber_count}F)<br/>
-                <strong>Install Status:</strong> ${cable.install_status}<br/>
-                <strong>Test Status:</strong> ${cable.test_status}<br/>
-                <strong>From:</strong> ${fromNode ? fromNode.node_tag : 'Start'}<br/>
-                <strong>To:</strong> ${toNode ? toNode.node_tag : 'End'}
+          const contentString = `
+            <div style="padding: 8px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a; max-width: 220px;">
+              <div style="font-weight: bold; font-size: 12px; margin-bottom: 4px; border-b: 1px solid #e2e8f0; padding-bottom: 2px;">
+                Route: ${route.route_id_tag}
               </div>
-            ` : '<div><em>No Cable Installed</em></div>'}
-          </div>
-        `
+              <div><strong>Measured Length:</strong> ${route.measured_length_feet} ft</div>
+              <div><strong>Installed Length:</strong> ${route.installed_length_feet} ft</div>
+              <div><strong>Type:</strong> ${route.installation_type}</div>
+              <div><strong>Conduit Size:</strong> ${route.conduit_diameter_inches} in</div>
+              <div><strong>Fill:</strong> ${route.fill_percentage}%</div>
+              ${cable ? `
+                <div style="margin-top: 6px; border-t: 1px dashed #cbd5e1; padding-top: 4px;">
+                  <strong>Cable:</strong> ${cable.cable_tag} (${cable.fiber_count}F)<br/>
+                  <strong>Install Status:</strong> ${cable.install_status}<br/>
+                  <strong>Test Status:</strong> ${cable.test_status}<br/>
+                  <strong>From:</strong> ${fromNode ? fromNode.node_tag : 'Start'}<br/>
+                  <strong>To:</strong> ${toNode ? toNode.node_tag : 'End'}
+                </div>
+              ` : '<div><em>No Cable Installed</em></div>'}
+              <div style="margin-top: 8px; padding-top: 6px; border-t: 1px solid #e2e8f0; display: flex;">
+                <button onclick="window.selectRouteForEditing('${route.id}')" style="display: inline-block; padding: 4px 8px; background-color: #4f46e5; color: white; border-radius: 6px; border: none; font-weight: bold; font-size: 9px; text-align: center; flex: 1; cursor: pointer;">Editar Ruta</button>
+              </div>
+            </div>
+          `
 
-        if (infoWindow && e.latLng) {
-          infoWindow.setContent(contentString)
-          infoWindow.setPosition(e.latLng)
-          infoWindow.open(map)
-        }
-      })
-
-      poly.addListener('mouseout', () => {
-        if (infoWindow) infoWindow.close()
-      })
+          if (infoWindow && e.latLng) {
+            infoWindow.setContent(contentString)
+            infoWindow.setPosition(e.latLng)
+            infoWindow.open(map)
+          }
+        })
 
       polylinesRef.current.push(poly)
     })
@@ -487,6 +582,9 @@ export default function FiberMapCanvas({
             <div><strong>Cables:</strong> ${nodeCables.length > 0 ? nodeCables.map((c: any) => c.cable_tag).join(', ') : 'None'}</div>
             <div><strong>Enclosures:</strong> ${nodeEnclosures.length}</div>
             <div><strong>Served Cameras:</strong> ${servedCamTags || 'None'}</div>
+            <div style="margin-top: 8px; padding-top: 6px; border-t: 1px solid #e2e8f0; display: flex;">
+              <button onclick="window.selectNodeForEditing('${node.id}')" style="display: inline-block; padding: 4px 8px; background-color: #4f46e5; color: white; border-radius: 6px; border: none; font-weight: bold; font-size: 9px; text-align: center; flex: 1; cursor: pointer;">Editar Nodo</button>
+            </div>
           </div>
         `
         
@@ -494,10 +592,6 @@ export default function FiberMapCanvas({
           infoWindow.setContent(contentString)
           infoWindow.open(map, marker)
         }
-      })
-
-      marker.addListener('mouseout', () => {
-        if (infoWindow) infoWindow.close()
       })
 
       // Drag node coordinates persist

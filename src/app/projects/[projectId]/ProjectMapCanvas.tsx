@@ -524,6 +524,11 @@ export default function ProjectMapCanvas({
         fullscreenControl: true,
       })
 
+      newMap.addListener('click', () => {
+        const iw = (window as any)._mapInfoWindow
+        if (iw) iw.close()
+      })
+
       setMap(newMap)
     }).catch(err => {
       console.error('Failed to load Google Maps API:', err)
@@ -864,16 +869,15 @@ export default function ProjectMapCanvas({
               <div><strong>Status:</strong> <span style="color: ${statusColor}; font-weight: bold;">${node.status}</span></div>
               <div><strong>Cables:</strong> ${cables.length > 0 ? cables.map((c: any) => c.cable_tag).join(', ') : 'None'}</div>
               <div><strong>Served Cams:</strong> ${servedTags || 'None'}</div>
+              <div style="margin-top: 8px; padding-top: 6px; border-t: 1px solid #e2e8f0; display: flex;">
+                <a href="/projects/${projectId}/fiber?selectedNodeId=${node.id}" style="display: inline-block; padding: 4px 8px; background-color: #4f46e5; color: white; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 9px; text-align: center; flex: 1;">Editar Nodo</a>
+              </div>
             </div>
           `
           if (infoWindow) {
             infoWindow.setContent(content)
             infoWindow.open(map, marker)
           }
-        })
-
-        marker.addListener('mouseout', () => {
-          if (infoWindow) infoWindow.close()
         })
 
         fiberNodeMarkersRef.current[node.id] = marker
@@ -906,11 +910,16 @@ export default function ProjectMapCanvas({
         poly.addListener('mouseover', (e: google.maps.PolyMouseEvent) => {
           const cable = fiberCables.find(c => c.route_id === route.id)
           const content = `
-            <div style="padding: 8px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a;">
-              <strong>Route: ${route.route_id_tag}</strong><br/>
-              Length: ${route.measured_length_feet} ft<br/>
-              Conduit Size: ${route.conduit_diameter_inches} in<br/>
-              ${cable ? `Cable: ${cable.cable_tag} (${cable.fiber_count}F)` : 'No cable'}
+            <div style="padding: 8px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a; min-width: 150px;">
+              <div style="font-weight: bold; font-size: 12px; margin-bottom: 4px; border-b: 1px solid #e2e8f0; padding-bottom: 2px;">
+                Route: ${route.route_id_tag}
+              </div>
+              <div><strong>Length:</strong> ${route.measured_length_feet} ft</div>
+              <div><strong>Conduit Size:</strong> ${route.conduit_diameter_inches} in</div>
+              <div><strong>Cable:</strong> ${cable ? `${cable.cable_tag} (${cable.fiber_count}F)` : 'No cable'}</div>
+              <div style="margin-top: 8px; padding-top: 6px; border-t: 1px solid #e2e8f0; display: flex;">
+                <a href="/projects/${projectId}/fiber?selectedRouteId=${route.id}" style="display: inline-block; padding: 4px 8px; background-color: #4f46e5; color: white; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 9px; text-align: center; flex: 1;">Editar Ruta</a>
+              </div>
             </div>
           `
           if (infoWindow && e.latLng) {
@@ -918,10 +927,6 @@ export default function ProjectMapCanvas({
             infoWindow.setPosition(e.latLng)
             infoWindow.open(map)
           }
-        })
-
-        poly.addListener('mouseout', () => {
-          if (infoWindow) infoWindow.close()
         })
 
         fiberRoutePolylinesRef.current.push(poly)
