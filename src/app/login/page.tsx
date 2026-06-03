@@ -52,6 +52,7 @@ export default function LoginPage() {
               name="email"
               type="email"
               required
+              defaultValue="marcelopoblete.us+test654@gmail.com"
               placeholder="you@example.com"
               className="w-full px-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
             />
@@ -66,6 +67,7 @@ export default function LoginPage() {
               name="password"
               type="password"
               required
+              defaultValue="Password123!"
               placeholder="••••••••"
               className="w-full px-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
             />
