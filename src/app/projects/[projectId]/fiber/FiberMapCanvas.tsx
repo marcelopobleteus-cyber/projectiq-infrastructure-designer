@@ -18,7 +18,9 @@ import {
   createSpliceTray,
   getFiberDesignData,
   clearStrandAssignmentsForCamera,
-  assignStrandToCamera
+  assignStrandToCamera,
+  assignCameraFiberTechnicianMode,
+  completeCameraFiberSplices
 } from '../../actions-fiber'
 
 interface FiberMapCanvasProps {
@@ -146,6 +148,18 @@ export default function FiberMapCanvas({
   const [assignTxCore, setAssignTxCore] = useState(1)
   const [assignRxCore, setAssignRxCore] = useState(2)
   const [assignLinkRole, setAssignLinkRole] = useState<'primary' | 'backup'>('primary')
+
+  // Field Technician Mode Wizard States
+  const [techMode, setTechMode] = useState<boolean>(true)
+  const [wizardStep, setWizardStep] = useState<number>(1)
+  const [techSourceNodeId, setTechSourceNodeId] = useState('')
+  const [techEnclosureId, setTechEnclosureId] = useState('')
+  const [techBackboneCableId, setTechBackboneCableId] = useState('')
+  const [techBufferTubeId, setTechBufferTubeId] = useState('') // selected fiber_buffer_tubes.id
+  const [techTxStrandId, setTechTxStrandId] = useState('')
+  const [techRxStrandId, setTechRxStrandId] = useState('')
+  const [techCabinetId, setTechCabinetId] = useState('')
+  const [techLoading, setTechLoading] = useState(false)
 
   // Notification Messages
   const [notifyMessage, setNotifyMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -1244,6 +1258,88 @@ export default function FiberMapCanvas({
     }
   }
 
+  // Field Technician Mode Event Handlers
+  const handleSaveTechAssignment = async () => {
+    if (!selectedCameraId || !techSourceNodeId || !techEnclosureId || !techBackboneCableId || !techTxStrandId || !techRxStrandId || !techCabinetId) {
+      showNotification('error', 'Please complete all steps in the wizard first.')
+      return
+    }
+
+    setTechLoading(true)
+    try {
+      const res = await assignCameraFiberTechnicianMode({
+        projectId,
+        cameraId: selectedCameraId,
+        sourceNodeId: techSourceNodeId,
+        enclosureId: techEnclosureId,
+        backboneCableId: techBackboneCableId,
+        txStrandId: techTxStrandId,
+        rxStrandId: techRxStrandId,
+        cabinetId: techCabinetId
+      })
+
+      if (res.error) {
+        showNotification('error', res.error)
+      } else {
+        showNotification('success', 'Camera assignment created and planned splices generated!')
+        await loadDesignData()
+        // Reset wizard
+        setWizardStep(1)
+        setTechSourceNodeId('')
+        setTechEnclosureId('')
+        setTechBackboneCableId('')
+        setTechBufferTubeId('')
+        setTechTxStrandId('')
+        setTechRxStrandId('')
+        setTechCabinetId('')
+      }
+    } catch (err: any) {
+      showNotification('error', `An unexpected error occurred: ${err.message}`)
+    } finally {
+      setTechLoading(false)
+    }
+  }
+
+  const handleCompleteSplices = async (location: 'mainhole' | 'cabinet') => {
+    if (!selectedCameraId) return
+    setTechLoading(true)
+    try {
+      const res = await completeCameraFiberSplices({
+        projectId,
+        cameraId: selectedCameraId,
+        location
+      })
+
+      if (res.error) {
+        showNotification('error', res.error)
+      } else {
+        showNotification('success', `${location === 'mainhole' ? 'Mainhole' : 'Cabinet'} splices marked as completed!`)
+        await loadDesignData()
+      }
+    } catch (err: any) {
+      showNotification('error', `An unexpected error occurred: ${err.message}`)
+    } finally {
+      setTechLoading(false)
+    }
+  }
+
+  const handleRemoveTechAssignment = async (camId: string) => {
+    if (!confirm('Are you sure you want to remove this camera fiber assignment and clear all OSP splices?')) return
+    setTechLoading(true)
+    try {
+      const supabase = createClient()
+      await supabase.from('fiber_splice_records').delete().eq('assigned_camera_id', camId)
+      await clearStrandAssignmentsForCamera({ projectId, cameraId: camId })
+      await supabase.from('camera_fiber_assignments').delete().eq('camera_id', camId)
+      showNotification('success', 'Camera assignment and splices cleared.')
+      await loadDesignData()
+    } catch (err: any) {
+      showNotification('error', `Failed to remove assignment: ${err.message}`)
+    } finally {
+      setTechLoading(false)
+    }
+  }
+
   return (
     <div className="flex-1 flex overflow-hidden h-full w-full font-sans relative">
       
@@ -1985,124 +2081,800 @@ export default function FiberMapCanvas({
                   <p className="text-[10px] text-slate-400 mt-0.5">Patch camera channels to OSP fiber transmission cores</p>
                 </div>
 
-                {/* Form to assign camera */}
-                <div className="space-y-3.5 text-xs border border-slate-850 p-3.5 rounded-xl bg-slate-950/20">
-                  <h5 className="font-bold text-white text-[10px] uppercase tracking-wide border-b border-slate-850 pb-1.5 mb-2">New Core Patch</h5>
-                  
-                  <div>
-                    <label className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px] mb-1">Target Camera</label>
-                    <select
-                      value={selectedCameraId}
-                      onChange={e => setSelectedCameraId(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
-                    >
-                      <option value="">Select Camera...</option>
-                      {initialData.cameras.map(cam => (
-                        <option key={cam.id} value={cam.id}>{cam.camera_id_tag} ({cam.status})</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px] mb-1">Installed Fiber Cable</label>
-                    <select
-                      value={selectedAssignCableId}
-                      onChange={e => setSelectedAssignCableId(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
-                    >
-                      <option value="">Select Cable...</option>
-                      {initialData.cables.map(cab => (
-                        <option key={cab.id} value={cab.id}>{cab.cable_id_tag} ({cab.fiber_count} Cores)</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px] mb-1">TX Core</label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={assignTxCore}
-                        onChange={e => setAssignTxCore(Number(e.target.value))}
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px] mb-1">RX Core</label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={assignRxCore}
-                        onChange={e => setAssignRxCore(Number(e.target.value))}
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px] mb-1">Link Role (Redundancy)</label>
-                    <select
-                      value={assignLinkRole}
-                      onChange={e => setAssignLinkRole(e.target.value as any)}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
-                    >
-                      <option value="primary">Primary Route Link</option>
-                      <option value="backup">Backup Redundant Link</option>
-                    </select>
-                  </div>
-
+                {/* Mode Selector Toggle */}
+                <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-850 text-xs font-semibold">
                   <button
-                    onClick={handleAssignCameraFiber}
-                    className="w-full py-2 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-xs font-bold transition-all shadow-md"
+                    onClick={() => {
+                      setTechMode(true)
+                      setWizardStep(1)
+                    }}
+                    className={`flex-1 py-1.5 rounded-lg text-center transition-all ${
+                      techMode 
+                        ? 'bg-indigo-600 text-white font-bold shadow-md' 
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
                   >
-                    Patch Core Assignment
+                    Field Tech Mode
+                  </button>
+                  <button
+                    onClick={() => setTechMode(false)}
+                    className={`flex-1 py-1.5 rounded-lg text-center transition-all ${
+                      !techMode 
+                        ? 'bg-indigo-600 text-white font-bold shadow-md' 
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Advanced Mode
                   </button>
                 </div>
 
-                {/* Assignments List */}
-                <div className="space-y-2 pt-2">
-                  <h5 className="font-bold text-slate-400 text-[10px] uppercase tracking-wide">Active Patch Connections</h5>
-                  {initialData.assignments.length === 0 ? (
-                    <p className="text-[10px] text-slate-500 italic">No camera fiber patched yet.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {initialData.assignments.map(ass => {
-                        const camera = initialData.cameras.find(c => c.id === ass.camera_id)
-                        const cableId = ass.drop_cable_id || ass.backbone_cable_id
-                        const cable = initialData.cables.find(c => c.id === cableId)
-                        
-                        const assignmentStrands = initialData.assignmentStrands || []
-                        const txStrandJoin = assignmentStrands.find((js: any) => js.camera_fiber_assignment_id === ass.id && js.strand_role === 'TX')
-                        const rxStrandJoin = assignmentStrands.find((js: any) => js.camera_fiber_assignment_id === ass.id && js.strand_role === 'RX')
-                        const txStrand = txStrandJoin ? initialData.strands.find((s: any) => s.id === txStrandJoin.strand_id) : null
-                        const rxStrand = rxStrandJoin ? initialData.strands.find((s: any) => s.id === rxStrandJoin.strand_id) : null
-                        
-                        return (
-                          <div key={ass.id} className="border border-slate-850 bg-slate-950/40 p-2.5 rounded-xl flex items-center justify-between text-[10px] leading-relaxed">
-                            <div>
-                              <p className="font-bold text-white">
-                                {camera?.camera_id_tag || 'Unknown'} 
-                                <span className="ml-1.5 px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wider font-bold bg-indigo-950 text-indigo-400">
-                                  Patched
+                {techMode ? (
+                  // FIELD TECHNICIAN WIZARD OR ACTIVE SUMMARY
+                  (() => {
+                    const activeAssignment = (initialData.assignments || []).find(
+                      (ass: any) => ass.camera_id === selectedCameraId
+                    )
+
+                    if (activeAssignment) {
+                      const camera = initialData.cameras.find(c => c.id === selectedCameraId)
+                      const sourceNode = initialData.nodes.find(n => n.id === activeAssignment.source_node_id)
+                      const enclosure = initialData.enclosures.find(e => e.id === activeAssignment.enclosure_id)
+                      const backboneCable = initialData.cables.find(c => c.id === activeAssignment.backbone_cable_id)
+                      const dropCable = initialData.cables.find(c => c.id === activeAssignment.drop_cable_id)
+                      const cabinet = (initialData.cabinets || []).find((c: any) => c.id === activeAssignment.assigned_cabinet_id)
+
+                      // Find strands assigned to this camera
+                      const assStrands = (initialData.assignmentStrands || []).filter(
+                        (s: any) => s.camera_fiber_assignment_id === activeAssignment.id
+                      )
+
+                      // Find Backbone TX / RX strands
+                      const txStrandJoin = assStrands.find((s: any) => s.strand_role === 'TX')
+                      const rxStrandJoin = assStrands.find((s: any) => s.strand_role === 'RX')
+                      const txStrand = txStrandJoin ? initialData.strands.find((s: any) => s.id === txStrandJoin.strand_id) : null
+                      const rxStrand = rxStrandJoin ? initialData.strands.find((s: any) => s.id === rxStrandJoin.strand_id) : null
+
+                      // Find Buffer Tube of Backbone TX/RX
+                      const txTube = txStrand ? (initialData.bufferTubes || []).find((t: any) => t.id === txStrand.buffer_tube_id) : null
+
+                      // Query splice statuses for this camera
+                      const mhSplices = (initialData.splices || []).filter(
+                        (s: any) => s.enclosure_id === activeAssignment.enclosure_id && s.assigned_camera_id === selectedCameraId
+                      )
+                      const mhComplete = mhSplices.length > 0 && mhSplices.every((s: any) => s.splice_status === 'Completed')
+
+                      const cabinetEnclosure = cabinet ? (initialData.enclosures || []).find((e: any) => e.cabinet_id === cabinet.id) : null
+                      const cabSplices = cabinetEnclosure 
+                        ? (initialData.splices || []).filter((s: any) => s.enclosure_id === cabinetEnclosure.id && s.assigned_camera_id === selectedCameraId)
+                        : []
+                      const cabComplete = cabSplices.length > 0 && cabSplices.every((s: any) => s.splice_status === 'Completed')
+
+                      return (
+                        <div className="space-y-4">
+                          <div>
+                            <label className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px] mb-1">Target Camera</label>
+                            <select
+                              value={selectedCameraId}
+                              onChange={e => {
+                                setSelectedCameraId(e.target.value)
+                                setWizardStep(1)
+                              }}
+                              className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                            >
+                              <option value="">Select Camera...</option>
+                              {initialData.cameras.map(cam => (
+                                <option key={cam.id} value={cam.id}>{cam.camera_id_tag} ({cam.status})</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div className="bg-slate-950/40 p-4 border border-slate-850 rounded-xl space-y-3.5 text-xs text-slate-350">
+                            <div className="flex items-center justify-between border-b border-slate-850 pb-2 mb-1">
+                              <span className="font-bold text-white text-[10px] uppercase tracking-wider">{camera?.camera_id_tag} Fiber Summary</span>
+                              <span className={`px-2 py-0.5 rounded text-[8px] uppercase tracking-wider font-bold ${
+                                activeAssignment.fiber_path_status === 'Fiber Pair Complete' 
+                                  ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/20' 
+                                  : 'bg-amber-950/80 text-amber-400 border border-amber-500/20'
+                              }`}>
+                                {activeAssignment.fiber_path_status || 'Fiber Pair Assigned'}
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 text-[10px]">
+                              <div>
+                                <span className="block text-slate-500 font-semibold uppercase text-[8px]">Backbone Cable</span>
+                                <span className="font-mono text-white font-bold">{backboneCable?.cable_tag || 'N/A'}</span>
+                              </div>
+                              <div>
+                                <span className="block text-slate-500 font-semibold uppercase text-[8px]">Buffer Tube</span>
+                                <span className="text-white font-semibold">
+                                  {txTube ? `Tube ${String(txTube.tube_number).padStart(2, '0')} - ${txTube.tube_color}` : 'N/A'}
                                 </span>
-                              </p>
-                              <p className="text-slate-450 mt-0.5">
-                                Cable: {cable?.cable_id_tag || 'CAB-N/A'} | Cores: TX-{txStrand ? txStrand.strand_number : 'N/A'} / RX-{rxStrand ? rxStrand.strand_number : 'N/A'}
-                              </p>
+                              </div>
+                              <div>
+                                <span className="block text-slate-500 font-semibold uppercase text-[8px]">TX Fiber (Backbone)</span>
+                                <span className="text-white font-semibold inline-flex items-center gap-1.5 mt-0.5">
+                                  {txStrand ? (
+                                    <>
+                                      <span className="w-2 h-2 rounded-full border border-slate-800" style={{ backgroundColor: getFiberColor(txStrand.strand_number).hex }} />
+                                      Fiber {txStrand.strand_number} - {getFiberColor(txStrand.strand_number).name}
+                                    </>
+                                  ) : 'N/A'}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="block text-slate-500 font-semibold uppercase text-[8px]">RX Fiber (Backbone)</span>
+                                <span className="text-white font-semibold inline-flex items-center gap-1.5 mt-0.5">
+                                  {rxStrand ? (
+                                    <>
+                                      <span className="w-2 h-2 rounded-full border border-slate-800" style={{ backgroundColor: getFiberColor(rxStrand.strand_number).hex }} />
+                                      Fiber {rxStrand.strand_number} - {getFiberColor(rxStrand.strand_number).name}
+                                    </>
+                                  ) : 'N/A'}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="block text-slate-500 font-semibold uppercase text-[8px]">Drop Cable</span>
+                                <span className="font-mono text-white font-bold">{dropCable?.cable_tag || 'N/A'}</span>
+                              </div>
+                              <div>
+                                <span className="block text-slate-500 font-semibold uppercase text-[8px]">CCTV Cabinet</span>
+                                <span className="text-white font-semibold">{cabinet?.cabinet_tag || 'N/A'}</span>
+                              </div>
+                            </div>
+
+                            <div className="border-t border-slate-850 pt-3 space-y-2.5">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <span className="block font-bold text-white text-[9px] uppercase tracking-wider">Mainhole Splices</span>
+                                  <span className="text-[9px] text-slate-400 font-medium">Splice at MH Enclosure: {enclosure?.enclosure_tag || sourceNode?.node_tag}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className={`px-2 py-0.5 rounded text-[8px] uppercase tracking-wider font-bold ${
+                                    mhComplete 
+                                      ? 'bg-emerald-950 text-emerald-450 border border-emerald-500/20' 
+                                      : 'bg-amber-950 text-amber-450 border border-amber-500/20'
+                                  }`}>
+                                    {mhComplete ? 'Complete' : 'Pending'}
+                                  </span>
+                                  {!mhComplete && (
+                                    <button
+                                      onClick={() => handleCompleteSplices('mainhole')}
+                                      disabled={techLoading}
+                                      className="px-2 py-1 bg-indigo-650 hover:bg-indigo-600 text-white rounded text-[8px] font-bold transition-all"
+                                    >
+                                      Complete
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between border-t border-slate-900 pt-2.5">
+                                <div>
+                                  <span className="block font-bold text-white text-[9px] uppercase tracking-wider">Cabinet Splices</span>
+                                  <span className="text-[9px] text-slate-400 font-medium">Splice at Cabinet: {cabinet?.cabinet_tag}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className={`px-2 py-0.5 rounded text-[8px] uppercase tracking-wider font-bold ${
+                                    cabComplete 
+                                      ? 'bg-emerald-950 text-emerald-450 border border-emerald-500/20' 
+                                      : 'bg-amber-950 text-amber-450 border border-amber-500/20'
+                                  }`}>
+                                    {cabComplete ? 'Complete' : 'Pending'}
+                                  </span>
+                                  {!cabComplete && (
+                                    <button
+                                      onClick={() => handleCompleteSplices('cabinet')}
+                                      disabled={techLoading}
+                                      className="px-2 py-1 bg-indigo-650 hover:bg-indigo-600 text-white rounded text-[8px] font-bold transition-all"
+                                    >
+                                      Complete
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="pt-2">
+                              <button
+                                onClick={() => handleRemoveTechAssignment(selectedCameraId)}
+                                disabled={techLoading}
+                                className="w-full py-2 bg-rose-950/20 hover:bg-rose-950/50 text-rose-400 border border-rose-900/20 hover:border-rose-900/40 rounded-xl text-xs font-bold transition-all"
+                              >
+                                Clear Assignment & Splices
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    }
+
+                    // WIZARD FLOW
+                    return (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between border-b border-slate-850 pb-2">
+                          <span className="font-bold text-white text-xs uppercase tracking-wider">
+                            Step {wizardStep} of 8: {
+                              wizardStep === 1 ? 'Select Camera' :
+                              wizardStep === 2 ? 'Select Source Node' :
+                              wizardStep === 3 ? 'Select Enclosure' :
+                              wizardStep === 4 ? 'Select Backbone Cable' :
+                              wizardStep === 5 ? 'Select Buffer Tube' :
+                              wizardStep === 6 ? 'Select TX/RX Fiber Pair' :
+                              wizardStep === 7 ? 'Select Cabinet' :
+                              'Save Assignment'
+                            }
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Tech Guide</span>
+                        </div>
+
+                        <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden">
+                          <div 
+                            className="bg-indigo-600 h-full transition-all duration-300" 
+                            style={{ width: `${(wizardStep / 8) * 100}%` }}
+                          />
+                        </div>
+
+                        {/* STEP 1: Select Camera */}
+                        {wizardStep === 1 && (
+                          <div className="space-y-3.5 text-xs">
+                            <div>
+                              <label className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px] mb-1">Target Camera</label>
+                              <select
+                                value={selectedCameraId}
+                                onChange={e => setSelectedCameraId(e.target.value)}
+                                className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                              >
+                                <option value="">Select Camera...</option>
+                                {initialData.cameras.map(cam => (
+                                  <option key={cam.id} value={cam.id}>{cam.camera_id_tag} ({cam.status})</option>
+                                ))}
+                              </select>
                             </div>
                             <button
-                              onClick={() => handleRemoveCameraFiber(ass.camera_id, '')}
-                              className="text-rose-450 hover:underline font-bold"
+                              onClick={() => {
+                                if (!selectedCameraId) {
+                                  showNotification('error', 'Select a camera to continue.')
+                                  return
+                                }
+                                setWizardStep(2)
+                              }}
+                              className="w-full py-2 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-xs font-bold transition-all shadow-md"
                             >
-                              Unpatch
+                              Next Step: Source Node →
                             </button>
                           </div>
-                        )
-                      })}
+                        )}
+
+                        {/* STEP 2: Select Mainhole / Source Node */}
+                        {wizardStep === 2 && (
+                          <div className="space-y-3.5 text-xs">
+                            <div>
+                              <label className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px] mb-1">Source Node / Manhole / Handhole</label>
+                              <select
+                                value={techSourceNodeId}
+                                onChange={e => {
+                                  setTechSourceNodeId(e.target.value)
+                                  setTechEnclosureId('')
+                                  setTechBackboneCableId('')
+                                  setTechBufferTubeId('')
+                                  setTechTxStrandId('')
+                                  setTechRxStrandId('')
+                                }}
+                                className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                              >
+                                <option value="">Select Source Node...</option>
+                                {initialData.nodes
+                                  .filter((n: any) => ['Manhole', 'Handhole', 'Pull Box', 'Existing Fiber Source'].includes(n.node_type))
+                                  .map((n: any) => (
+                                    <option key={n.id} value={n.id}>{n.node_tag} ({n.node_type})</option>
+                                  ))}
+                              </select>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => setWizardStep(1)}
+                                className="flex-1 py-2 bg-slate-800 hover:bg-slate-750 text-white rounded-xl text-xs font-bold transition-all"
+                              >
+                                ← Back
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (!techSourceNodeId) {
+                                    showNotification('error', 'Select a source node to continue.')
+                                    return
+                                  }
+                                  setWizardStep(3)
+                                }}
+                                className="flex-1 py-2 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-xs font-bold transition-all shadow-md"
+                              >
+                                Next Step →
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* STEP 3: Select Mainhole Enclosure */}
+                        {wizardStep === 3 && (
+                          <div className="space-y-3.5 text-xs">
+                            <div>
+                              <label className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px] mb-1">Select splice enclosure</label>
+                              <select
+                                value={techEnclosureId}
+                                onChange={e => setTechEnclosureId(e.target.value)}
+                                className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                              >
+                                <option value="">Select Enclosure...</option>
+                                {initialData.enclosures
+                                  .filter((e: any) => e.node_id === techSourceNodeId)
+                                  .map((e: any) => (
+                                    <option key={e.id} value={e.id}>{e.enclosure_tag} ({e.enclosure_type})</option>
+                                  ))}
+                              </select>
+                              {initialData.enclosures.filter((e: any) => e.node_id === techSourceNodeId).length === 0 && (
+                                <p className="text-[9px] text-rose-400 mt-1 font-semibold">No enclosures found at the selected node.</p>
+                              )}
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => setWizardStep(2)}
+                                className="flex-1 py-2 bg-slate-800 hover:bg-slate-750 text-white rounded-xl text-xs font-bold transition-all"
+                              >
+                                ← Back
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (!techEnclosureId) {
+                                    showNotification('error', 'Select an enclosure to continue.')
+                                    return
+                                  }
+                                  setWizardStep(4)
+                                }}
+                                className="flex-1 py-2 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-xs font-bold transition-all shadow-md"
+                              >
+                                Next Step →
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* STEP 4: Select Backbone Cable */}
+                        {wizardStep === 4 && (
+                          <div className="space-y-3.5 text-xs">
+                            <div>
+                              <label className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px] mb-1">Backbone Cable</label>
+                              <select
+                                value={techBackboneCableId}
+                                onChange={e => {
+                                  setTechBackboneCableId(e.target.value)
+                                  setTechBufferTubeId('')
+                                  setTechTxStrandId('')
+                                  setTechRxStrandId('')
+                                }}
+                                className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                              >
+                                <option value="">Select Backbone Cable...</option>
+                                {initialData.cables
+                                  .filter((c: any) => c.cable_type === 'Backbone')
+                                  .map((c: any) => (
+                                    <option key={c.id} value={c.id}>{c.cable_tag} ({c.fiber_count} Strands)</option>
+                                  ))}
+                              </select>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => setWizardStep(3)}
+                                className="flex-1 py-2 bg-slate-800 hover:bg-slate-750 text-white rounded-xl text-xs font-bold transition-all"
+                              >
+                                ← Back
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (!techBackboneCableId) {
+                                    showNotification('error', 'Select a backbone cable to continue.')
+                                    return
+                                  }
+                                  setWizardStep(5)
+                                }}
+                                className="flex-1 py-2 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-xs font-bold transition-all shadow-md"
+                              >
+                                Next Step →
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* STEP 5: Select Buffer Tube */}
+                        {wizardStep === 5 && (
+                          <div className="space-y-3.5 text-xs">
+                            <div>
+                              <label className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px] mb-2">Select Buffer Tube</label>
+                              <div className="grid grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1">
+                                {(initialData.bufferTubes || [])
+                                  .filter((t: any) => t.cable_id === techBackboneCableId)
+                                  .map((t: any) => {
+                                    const count = (initialData.strands || []).filter((s: any) => s.buffer_tube_id === t.id && s.assigned_camera_id).length
+                                    const total = (initialData.strands || []).filter((s: any) => s.buffer_tube_id === t.id).length
+                                    return (
+                                      <button
+                                        key={t.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setTechBufferTubeId(t.id)
+                                          setTechTxStrandId('')
+                                          setTechRxStrandId('')
+                                        }}
+                                        className={`p-2.5 rounded-xl border text-left text-[10px] leading-relaxed transition-all flex flex-col justify-between ${
+                                          techBufferTubeId === t.id
+                                            ? 'border-indigo-500 bg-indigo-950/20 text-white shadow-md font-semibold'
+                                            : 'border-slate-850 bg-slate-950/40 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                                        }`}
+                                      >
+                                        <span className="font-bold flex items-center gap-1.5">
+                                          <span className="w-2 h-2 rounded border border-slate-800" style={{ backgroundColor: getFiberColor(t.tube_number).hex }} />
+                                          Tube {String(t.tube_number).padStart(2, '0')} - {t.tube_color}
+                                        </span>
+                                        <span className="text-[8px] text-slate-500 mt-1 font-semibold block">
+                                          Util: {count} / {total} Cores Assigned
+                                        </span>
+                                      </button>
+                                    )
+                                  })}
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => setWizardStep(4)}
+                                className="flex-1 py-2 bg-slate-800 hover:bg-slate-750 text-white rounded-xl text-xs font-bold transition-all"
+                              >
+                                ← Back
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (!techBufferTubeId) {
+                                    showNotification('error', 'Select a buffer tube to continue.')
+                                    return
+                                  }
+                                  setWizardStep(6)
+                                }}
+                                className="flex-1 py-2 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-xs font-bold transition-all shadow-md"
+                              >
+                                Next Step →
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* STEP 6: Select TX/RX Fiber Pair */}
+                        {wizardStep === 6 && (
+                          <div className="space-y-4 text-xs">
+                            <div className="space-y-3">
+                              <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Cores in Selected Tube</span>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px] mb-1">TX Core (Transmit)</label>
+                                  <select
+                                    value={techTxStrandId}
+                                    onChange={e => setTechTxStrandId(e.target.value)}
+                                    className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none text-[10px]"
+                                  >
+                                    <option value="">Select TX Core...</option>
+                                    {initialData.strands
+                                      .filter((s: any) => s.buffer_tube_id === techBufferTubeId)
+                                      .map((s: any) => {
+                                        const color = getFiberColor(s.strand_number)
+                                        const isAssigned = s.assigned_camera_id && s.assigned_camera_id !== selectedCameraId
+                                        const camName = isAssigned ? initialData.cameras.find(c => c.id === s.assigned_camera_id)?.camera_id_tag : ''
+                                        return (
+                                          <option key={s.id} value={s.id} disabled={!!isAssigned}>
+                                            Fiber {s.strand_number} - {color.name} {isAssigned ? `(Assigned: ${camName})` : '(Available)'}
+                                          </option>
+                                        )
+                                      })}
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px] mb-1">RX Core (Receive)</label>
+                                  <select
+                                    value={techRxStrandId}
+                                    onChange={e => setTechRxStrandId(e.target.value)}
+                                    className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none text-[10px]"
+                                  >
+                                    <option value="">Select RX Core...</option>
+                                    {initialData.strands
+                                      .filter((s: any) => s.buffer_tube_id === techBufferTubeId)
+                                      .map((s: any) => {
+                                        const color = getFiberColor(s.strand_number)
+                                        const isAssigned = s.assigned_camera_id && s.assigned_camera_id !== selectedCameraId
+                                        const camName = isAssigned ? initialData.cameras.find(c => c.id === s.assigned_camera_id)?.camera_id_tag : ''
+                                        return (
+                                          <option key={s.id} value={s.id} disabled={!!isAssigned}>
+                                            Fiber {s.strand_number} - {color.name} {isAssigned ? `(Assigned: ${camName})` : '(Available)'}
+                                          </option>
+                                        )
+                                      })}
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => setWizardStep(5)}
+                                className="flex-1 py-2 bg-slate-800 hover:bg-slate-750 text-white rounded-xl text-xs font-bold transition-all"
+                              >
+                                ← Back
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (!techTxStrandId || !techRxStrandId) {
+                                    showNotification('error', 'Select both TX and RX cores.')
+                                    return
+                                  }
+                                  if (techTxStrandId === techRxStrandId) {
+                                    showNotification('error', 'TX and RX cores must be different strands.')
+                                    return
+                                  }
+                                  setWizardStep(7)
+                                }}
+                                className="flex-1 py-2 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-xs font-bold transition-all shadow-md"
+                              >
+                                Next Step →
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* STEP 7: Select Cabinet */}
+                        {wizardStep === 7 && (
+                          <div className="space-y-3.5 text-xs">
+                            <div>
+                              <label className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px] mb-1">Select Target CCTV Cabinet</label>
+                              <select
+                                value={techCabinetId}
+                                onChange={e => setTechCabinetId(e.target.value)}
+                                className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                              >
+                                <option value="">Select Cabinet...</option>
+                                {(initialData.cabinets || []).map((cab: any) => (
+                                  <option key={cab.id} value={cab.id}>{cab.cabinet_tag} ({cab.cabinet_type})</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => setWizardStep(6)}
+                                className="flex-1 py-2 bg-slate-800 hover:bg-slate-750 text-white rounded-xl text-xs font-bold transition-all"
+                              >
+                                ← Back
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (!techCabinetId) {
+                                    showNotification('error', 'Select a cabinet to continue.')
+                                    return
+                                  }
+                                  setWizardStep(8)
+                                }}
+                                className="flex-1 py-2 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-xs font-bold transition-all shadow-md"
+                              >
+                                Next Step →
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* STEP 8: Save Assignment Summary */}
+                        {wizardStep === 8 && (() => {
+                          const cam = initialData.cameras.find(c => c.id === selectedCameraId)
+                          const node = initialData.nodes.find(n => n.id === techSourceNodeId)
+                          const enclosure = initialData.enclosures.find(e => e.id === techEnclosureId)
+                          const cable = initialData.cables.find(c => c.id === techBackboneCableId)
+                          const txS = initialData.strands.find(s => s.id === techTxStrandId)
+                          const rxS = initialData.strands.find(s => s.id === techRxStrandId)
+                          const cab = (initialData.cabinets || []).find((c: any) => c.id === techCabinetId)
+                          const tube = txS ? (initialData.bufferTubes || []).find((t: any) => t.id === txS.buffer_tube_id) : null
+
+                          return (
+                            <div className="space-y-4 text-xs">
+                              <div className="bg-slate-950/40 p-4 border border-slate-850 rounded-xl space-y-3 text-[11px] text-slate-350">
+                                <span className="block font-bold text-white uppercase text-[9px] tracking-wider border-b border-slate-850 pb-1.5">
+                                  Assignment Summary
+                                </span>
+
+                                <div className="grid grid-cols-2 gap-x-2 gap-y-3">
+                                  <div>
+                                    <span className="block text-slate-500 font-semibold uppercase text-[8px]">Camera</span>
+                                    <span className="text-white font-bold">{cam?.camera_id_tag}</span>
+                                  </div>
+                                  <div>
+                                    <span className="block text-slate-500 font-semibold uppercase text-[8px]">Cabinet</span>
+                                    <span className="text-white font-bold">{cab?.cabinet_tag}</span>
+                                  </div>
+                                  <div>
+                                    <span className="block text-slate-500 font-semibold uppercase text-[8px]">Mainhole Node</span>
+                                    <span className="text-white font-semibold">{node?.node_tag}</span>
+                                  </div>
+                                  <div>
+                                    <span className="block text-slate-500 font-semibold uppercase text-[8px]">Mainhole Enclosure</span>
+                                    <span className="text-white font-semibold">{enclosure?.enclosure_tag}</span>
+                                  </div>
+                                  <div className="col-span-2 font-mono">
+                                    <span className="block text-slate-500 font-semibold uppercase text-[8px] font-sans">Backbone Cable</span>
+                                    <span className="text-white font-semibold">{cable?.cable_tag}</span>
+                                  </div>
+                                  <div>
+                                    <span className="block text-slate-500 font-semibold uppercase text-[8px]">Buffer Tube</span>
+                                    <span className="text-white font-semibold">
+                                      {tube ? `Tube ${String(tube.tube_number).padStart(2, '0')} - ${tube.tube_color}` : ''}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="block text-slate-500 font-semibold uppercase text-[8px]">Fiber Core Pairs</span>
+                                    <span className="text-white font-semibold block mt-0.5">
+                                      TX: Fiber {txS?.strand_number} ({getFiberColor(txS?.strand_number || 1).name})
+                                    </span>
+                                    <span className="text-white font-semibold block">
+                                      RX: Fiber {rxS?.strand_number} ({getFiberColor(rxS?.strand_number || 2).name})
+                                    </span>
+                                  </div>
+                                  <div className="col-span-2 border-t border-slate-900 pt-2 text-[10px] leading-normal text-slate-400">
+                                    * Creates Drop Cable: <strong className="text-white font-mono">DROP-{cam?.camera_id_tag}-6F</strong><br />
+                                    * Creates Jumper: <strong className="text-white font-mono">PIGTAIL-{cam?.camera_id_tag}</strong><br />
+                                    * Creates 4 planned splice records (2 at mainhole, 2 at cabinet)
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setWizardStep(7)}
+                                  disabled={techLoading}
+                                  className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-750 text-white rounded-xl text-xs font-bold transition-all"
+                                >
+                                  ← Back
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleSaveTechAssignment}
+                                  disabled={techLoading}
+                                  className="flex-1 py-2.5 bg-emerald-650 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all shadow-lg flex items-center justify-center gap-1.5"
+                                >
+                                  {techLoading ? (
+                                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                  ) : 'Save Assignment ✓'}
+                                </button>
+                              </div>
+                            </div>
+                          )
+                        })()}
+                      </div>
+                    )
+                  })()
+                ) : (
+                  // ORIGINAL ADVANCED MODE
+                  <>
+                    {/* Form to assign camera */}
+                    <div className="space-y-3.5 text-xs border border-slate-850 p-3.5 rounded-xl bg-slate-950/20">
+                      <h5 className="font-bold text-white text-[10px] uppercase tracking-wide border-b border-slate-850 pb-1.5 mb-2">New Core Patch</h5>
+                      
+                      <div>
+                        <label className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px] mb-1">Target Camera</label>
+                        <select
+                          value={selectedCameraId}
+                          onChange={e => setSelectedCameraId(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                        >
+                          <option value="">Select Camera...</option>
+                          {initialData.cameras.map(cam => (
+                            <option key={cam.id} value={cam.id}>{cam.camera_id_tag} ({cam.status})</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px] mb-1">Installed Fiber Cable</label>
+                        <select
+                          value={selectedAssignCableId}
+                          onChange={e => setSelectedAssignCableId(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                        >
+                          <option value="">Select Cable...</option>
+                          {initialData.cables.map(cab => (
+                            <option key={cab.id} value={cab.id}>{cab.cable_id_tag} ({cab.fiber_count} Cores)</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px] mb-1">TX Core</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={assignTxCore}
+                            onChange={e => setAssignTxCore(Number(e.target.value))}
+                            className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px] mb-1">RX Core</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={assignRxCore}
+                            onChange={e => setAssignRxCore(Number(e.target.value))}
+                            className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-slate-500 block font-semibold uppercase tracking-wide text-[9px] mb-1">Link Role (Redundancy)</label>
+                        <select
+                          value={assignLinkRole}
+                          onChange={e => setAssignLinkRole(e.target.value as any)}
+                          className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                        >
+                          <option value="primary">Primary Route Link</option>
+                          <option value="backup">Backup Redundant Link</option>
+                        </select>
+                      </div>
+
+                      <button
+                        onClick={handleAssignCameraFiber}
+                        className="w-full py-2 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-xs font-bold transition-all shadow-md"
+                      >
+                        Patch Core Assignment
+                      </button>
                     </div>
-                  )}
-                </div>
+
+                    {/* Assignments List */}
+                    <div className="space-y-2 pt-2">
+                      <h5 className="font-bold text-slate-400 text-[10px] uppercase tracking-wide">Active Patch Connections</h5>
+                      {initialData.assignments.length === 0 ? (
+                        <p className="text-[10px] text-slate-500 italic">No camera fiber patched yet.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {initialData.assignments.map(ass => {
+                            const camera = initialData.cameras.find(c => c.id === ass.camera_id)
+                            const cableId = ass.drop_cable_id || ass.backbone_cable_id
+                            const cable = initialData.cables.find(c => c.id === cableId)
+                            
+                            const assignmentStrands = initialData.assignmentStrands || []
+                            const txStrandJoin = assignmentStrands.find((js: any) => js.camera_fiber_assignment_id === ass.id && js.strand_role === 'TX')
+                            const rxStrandJoin = assignmentStrands.find((js: any) => js.camera_fiber_assignment_id === ass.id && js.strand_role === 'RX')
+                            const txStrand = txStrandJoin ? initialData.strands.find((s: any) => s.id === txStrandJoin.strand_id) : null
+                            const rxStrand = rxStrandJoin ? initialData.strands.find((s: any) => s.id === rxStrandJoin.strand_id) : null
+                            
+                            return (
+                              <div key={ass.id} className="border border-slate-850 bg-slate-950/40 p-2.5 rounded-xl flex items-center justify-between text-[10px] leading-relaxed">
+                                <div>
+                                  <p className="font-bold text-white">
+                                    {camera?.camera_id_tag || 'Unknown'} 
+                                    <span className="ml-1.5 px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wider font-bold bg-indigo-950 text-indigo-400">
+                                      Patched
+                                    </span>
+                                  </p>
+                                  <p className="text-slate-450 mt-0.5">
+                                    Cable: {cable?.cable_id_tag || 'CAB-N/A'} | Cores: TX-{txStrand ? txStrand.strand_number : 'N/A'} / RX-{rxStrand ? rxStrand.strand_number : 'N/A'}
+                                  </p>
+                                </div>
+                                <button
+                                  onClick={() => handleRemoveCameraFiber(ass.camera_id, '')}
+                                  className="text-rose-450 hover:underline font-bold"
+                                >
+                                  Unpatch
+                                </button>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             )}
 

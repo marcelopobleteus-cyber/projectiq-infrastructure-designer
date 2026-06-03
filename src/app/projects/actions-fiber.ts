@@ -31,6 +31,12 @@ export type FiberPathStatus =
   | 'Connected'
   | 'Complete'
   | 'Blocked'
+  | 'Fiber Pair Assigned'
+  | 'Mainhole Splicing Pending'
+  | 'Cabinet Splicing Pending'
+  | 'Mainhole Splices Complete'
+  | 'Cabinet Splices Complete'
+  | 'Fiber Pair Complete'
 export type EnclosureType =
   | 'Splice Enclosure'
   | 'Patch Panel'
@@ -1664,6 +1670,535 @@ export async function createCablePassThrough(params: {
   revalidatePath(`/projects/${params.projectId}/fiber`)
   return { success: true, data }
 }
+
+// ─── 20. Field Technician Mode Splicing and Assignment Actions ───────────────
+
+export async function assignCameraFiberTechnicianMode(params: {
+  projectId: string
+  cameraId: string
+  sourceNodeId: string
+  enclosureId: string // mainhole enclosure ID
+  backboneCableId: string
+  txStrandId: string // backbone TX strand ID
+  rxStrandId: string // backbone RX strand ID
+  cabinetId: string // selected cabinet ID
+}) {
+  const supabase = await createClient()
+
+  // 1. Fetch camera details
+  const { data: camera, error: cameraErr } = await supabase
+    .from('camera_locations')
+    .select('camera_id_tag, latitude, longitude')
+    .eq('id', params.cameraId)
+    .single()
+
+  if (cameraErr || !camera) {
+    return { error: `Failed to find camera: ${cameraErr?.message || 'Not found'}` }
+  }
+
+  // 2. Fetch cabinet details
+  const { data: cabinet, error: cabinetErr } = await supabase
+    .from('cabinets')
+    .select('cabinet_tag, latitude, longitude')
+    .eq('id', params.cabinetId)
+    .single()
+
+  if (cabinetErr || !cabinet) {
+    return { error: `Failed to find cabinet: ${cabinetErr?.message || 'Not found'}` }
+  }
+
+  // 3. Resolve Cabinet Node
+  let cabinetNode = null
+  const { data: existingNode } = await supabase
+    .from('fiber_nodes')
+    .select('*')
+    .eq('project_id', params.projectId)
+    .eq('node_tag', cabinet.cabinet_tag)
+    .eq('node_type', 'Cabinet')
+    .maybeSingle()
+
+  if (existingNode) {
+    cabinetNode = existingNode
+  } else {
+    const { data: newNode, error: nodeErr } = await supabase
+      .from('fiber_nodes')
+      .insert({
+        project_id: params.projectId,
+        organization_id: '00000000-0000-0000-0000-000000000000',
+        node_tag: cabinet.cabinet_tag,
+        node_type: 'Cabinet',
+        latitude: cabinet.latitude,
+        longitude: cabinet.longitude,
+        status: 'Planned',
+        size_description: 'Cabinet Mount Transition',
+        slack_loop_ft: 10.0,
+        notes: `Cabinet node for ${cabinet.cabinet_tag}`
+      })
+      .select()
+      .single()
+
+    if (nodeErr) return { error: `Failed to create cabinet node: ${nodeErr.message}` }
+    cabinetNode = newNode
+  }
+
+  // 4. Resolve Drop Cable
+  const dropCableTag = `DROP-${camera.camera_id_tag}-6F`
+  let dropCable = null
+  const { data: existingDrop } = await supabase
+    .from('fiber_cables')
+    .select('*')
+    .eq('project_id', params.projectId)
+    .eq('cable_tag', dropCableTag)
+    .maybeSingle()
+
+  if (existingDrop) {
+    dropCable = existingDrop
+  } else {
+    const { data: newCable, error: cableErr } = await supabase
+      .from('fiber_cables')
+      .insert({
+        project_id: params.projectId,
+        organization_id: '00000000-0000-0000-0000-000000000000',
+        cable_tag: dropCableTag,
+        cable_type: 'Drop',
+        fiber_count: 6,
+        from_node_id: params.sourceNodeId,
+        to_node_id: cabinetNode.id,
+        length_ft: 150.0,
+        install_status: 'Planned',
+        test_status: 'Not Tested',
+        notes: `Drop cable for camera ${camera.camera_id_tag}`
+      })
+      .select()
+      .single()
+
+    if (cableErr) return { error: `Failed to create drop cable: ${cableErr.message}` }
+    dropCable = newCable
+
+    // Insert BOM item for this Drop Cable
+    await supabase.from('bom_items').insert({
+      project_id: params.projectId,
+      category: 'Fiber',
+      part_number: 'DROP-CBL-SM',
+      description: `SM Drop Cable 6F (${camera.camera_id_tag})`,
+      quantity: 150,
+      unit: 'ft',
+      unit_cost: 0.45,
+      source: 'catalog',
+      manufacturer: 'Generic',
+      status: 'Planned',
+    })
+  }
+
+  // 5. Resolve Cabinet Splice Enclosure
+  const cabinetEnclosureTag = `ENC-${cabinet.cabinet_tag}`
+  let cabinetEnclosure = null
+  const { data: existingEnclosure } = await supabase
+    .from('fiber_enclosures')
+    .select('*')
+    .eq('project_id', params.projectId)
+    .eq('enclosure_tag', cabinetEnclosureTag)
+    .maybeSingle()
+
+  if (existingEnclosure) {
+    cabinetEnclosure = existingEnclosure
+  } else {
+    const { data: newEnclosure, error: enclosureErr } = await supabase
+      .from('fiber_enclosures')
+      .insert({
+        project_id: params.projectId,
+        organization_id: '00000000-0000-0000-0000-000000000000',
+        enclosure_tag: cabinetEnclosureTag,
+        enclosure_type: 'Splice Enclosure',
+        node_id: cabinetNode.id,
+        cabinet_id: params.cabinetId,
+        capacity: 12,
+        installed_status: 'Planned'
+      })
+      .select()
+      .single()
+
+    if (enclosureErr) return { error: `Failed to create cabinet enclosure: ${enclosureErr.message}` }
+    cabinetEnclosure = newEnclosure
+  }
+
+  // 6. Ensure Splice Trays exist
+  let mainholeTray = null
+  const { data: existingMhTray } = await supabase
+    .from('splice_trays')
+    .select('*')
+    .eq('enclosure_id', params.enclosureId)
+    .eq('tray_number', 1)
+    .maybeSingle()
+
+  if (existingMhTray) {
+    mainholeTray = existingMhTray
+  } else {
+    const { data: newTray, error: trayErr } = await supabase
+      .from('splice_trays')
+      .insert({
+        project_id: params.projectId,
+        organization_id: '00000000-0000-0000-0000-000000000000',
+        enclosure_id: params.enclosureId,
+        tray_number: 1,
+        capacity: 12
+      })
+      .select()
+      .single()
+
+    if (trayErr) return { error: `Failed to create Mainhole Splice Tray: ${trayErr.message}` }
+    mainholeTray = newTray
+  }
+
+  let cabinetTray = null
+  const { data: existingCabTray } = await supabase
+    .from('splice_trays')
+    .select('*')
+    .eq('enclosure_id', cabinetEnclosure.id)
+    .eq('tray_number', 1)
+    .maybeSingle()
+
+  if (existingCabTray) {
+    cabinetTray = existingCabTray
+  } else {
+    const { data: newTray, error: trayErr } = await supabase
+      .from('splice_trays')
+      .insert({
+        project_id: params.projectId,
+        organization_id: '00000000-0000-0000-0000-000000000000',
+        enclosure_id: cabinetEnclosure.id,
+        tray_number: 1,
+        capacity: 12
+      })
+      .select()
+      .single()
+
+    if (trayErr) return { error: `Failed to create Cabinet Splice Tray: ${trayErr.message}` }
+    cabinetTray = newTray
+  }
+
+  // 7. Resolve Cabinet Pigtail Cable
+  const pigtailCableTag = `PIGTAIL-${camera.camera_id_tag}`
+  let pigtailCable = null
+  const { data: existingPigtail } = await supabase
+    .from('fiber_cables')
+    .select('*')
+    .eq('project_id', params.projectId)
+    .eq('cable_tag', pigtailCableTag)
+    .maybeSingle()
+
+  if (existingPigtail) {
+    pigtailCable = existingPigtail
+  } else {
+    const { data: newPigtail, error: pigtailErr } = await supabase
+      .from('fiber_cables')
+      .insert({
+        project_id: params.projectId,
+        organization_id: '00000000-0000-0000-0000-000000000000',
+        cable_tag: pigtailCableTag,
+        cable_type: 'Custom',
+        fiber_count: 2,
+        from_node_id: cabinetNode.id,
+        to_node_id: cabinetNode.id,
+        length_ft: 10.0,
+        install_status: 'Planned',
+        test_status: 'Not Tested',
+        notes: `Cabinet pigtail for camera ${camera.camera_id_tag}`
+      })
+      .select()
+      .single()
+
+    if (pigtailErr) return { error: `Failed to create cabinet pigtail cable: ${pigtailErr.message}` }
+    pigtailCable = newPigtail
+  }
+
+  // 8. Fetch strands for drop and pigtail cables
+  const { data: dropStrands, error: dropStrandsErr } = await supabase
+    .from('fiber_strands')
+    .select('*')
+    .eq('cable_id', dropCable.id)
+    .order('strand_number')
+
+  if (dropStrandsErr || !dropStrands || dropStrands.length < 2) {
+    return { error: 'Failed to retrieve drop cable strands' }
+  }
+
+  const { data: pigtailStrands, error: pigtailStrandsErr } = await supabase
+    .from('fiber_strands')
+    .select('*')
+    .eq('cable_id', pigtailCable.id)
+    .order('strand_number')
+
+  if (pigtailStrandsErr || !pigtailStrands || pigtailStrands.length < 2) {
+    return { error: 'Failed to retrieve cabinet pigtail strands' }
+  }
+
+  // 9. Save Camera Fiber Assignment
+  // Clear any existing assignments first
+  await clearStrandAssignmentsForCamera({
+    projectId: params.projectId,
+    cameraId: params.cameraId
+  })
+
+  // Upsert camera fiber assignment
+  const { data: assignment, error: assignErr } = await supabase
+    .from('camera_fiber_assignments')
+    .upsert({
+      project_id: params.projectId,
+      organization_id: '00000000-0000-0000-0000-000000000000',
+      camera_id: params.cameraId,
+      source_node_id: params.sourceNodeId,
+      enclosure_id: params.enclosureId,
+      backbone_cable_id: params.backboneCableId,
+      drop_cable_id: dropCable.id,
+      assigned_cabinet_id: params.cabinetId,
+      fiber_path_status: 'Fiber Pair Assigned',
+      splice_status: 'Not Spliced',
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'camera_id' })
+    .select()
+    .single()
+
+  if (assignErr) return { error: `Failed to save camera fiber assignment: ${assignErr.message}` }
+
+  // Insert unified fiber assignment
+  const { data: unifiedAssignment, error: unifiedErr } = await supabase
+    .from('fiber_assignments')
+    .insert({
+      project_id: params.projectId,
+      organization_id: '00000000-0000-0000-0000-000000000000',
+      camera_id: params.cameraId,
+      cabinet_id: params.cabinetId,
+      purpose: 'Camera',
+      notes: `Field tech mode assignment for camera ${camera.camera_id_tag}`
+    })
+    .select()
+    .single()
+
+  if (unifiedErr) return { error: `Failed to create unified assignment: ${unifiedErr.message}` }
+
+  // Link the 6 strands
+  const strandLinks = [
+    { id: params.txStrandId, role: 'TX' },
+    { id: params.rxStrandId, role: 'RX' },
+    { id: dropStrands[0].id, role: 'TX' },
+    { id: dropStrands[1].id, role: 'RX' },
+    { id: pigtailStrands[0].id, role: 'TX' },
+    { id: pigtailStrands[1].id, role: 'RX' }
+  ]
+
+  for (const link of strandLinks) {
+    // Legacy join table
+    await supabase
+      .from('camera_fiber_assignment_strands')
+      .upsert({
+        project_id: params.projectId,
+        organization_id: '00000000-0000-0000-0000-000000000000',
+        camera_fiber_assignment_id: assignment.id,
+        camera_id: params.cameraId,
+        strand_id: link.id,
+        strand_role: link.role
+      }, { onConflict: 'strand_id' })
+
+    // Normalized join table
+    await supabase
+      .from('fiber_assignment_strands')
+      .upsert({
+        project_id: params.projectId,
+        organization_id: '00000000-0000-0000-0000-000000000000',
+        assignment_id: unifiedAssignment.id,
+        strand_id: link.id,
+        strand_role: link.role
+      }, { onConflict: 'strand_id' })
+
+    // Update strand's assigned camera
+    await supabase
+      .from('fiber_strands')
+      .update({
+        assigned_camera_id: params.cameraId,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', link.id)
+  }
+
+  // 10. Clear any old splices for this camera to prevent duplicates
+  await supabase
+    .from('fiber_splice_records')
+    .delete()
+    .eq('project_id', params.projectId)
+    .eq('assigned_camera_id', params.cameraId)
+
+  // 11. Create the 4 Planned splices
+  const splicesPayload = [
+    // Mainhole Splice 1: Backbone TX -> Drop TX
+    {
+      project_id: params.projectId,
+      organization_id: '00000000-0000-0000-0000-000000000000',
+      enclosure_id: params.enclosureId,
+      from_cable_id: params.backboneCableId,
+      from_strand_id: params.txStrandId,
+      to_cable_id: dropCable.id,
+      to_strand_id: dropStrands[0].id,
+      assigned_camera_id: params.cameraId,
+      splice_status: 'Planned',
+      tray_id: mainholeTray.id,
+      splice_type: 'Fusion'
+    },
+    // Mainhole Splice 2: Backbone RX -> Drop RX
+    {
+      project_id: params.projectId,
+      organization_id: '00000000-0000-0000-0000-000000000000',
+      enclosure_id: params.enclosureId,
+      from_cable_id: params.backboneCableId,
+      from_strand_id: params.rxStrandId,
+      to_cable_id: dropCable.id,
+      to_strand_id: dropStrands[1].id,
+      assigned_camera_id: params.cameraId,
+      splice_status: 'Planned',
+      tray_id: mainholeTray.id,
+      splice_type: 'Fusion'
+    },
+    // Cabinet Splice 1: Drop TX -> Pigtail TX
+    {
+      project_id: params.projectId,
+      organization_id: '00000000-0000-0000-0000-000000000000',
+      enclosure_id: cabinetEnclosure.id,
+      from_cable_id: dropCable.id,
+      from_strand_id: dropStrands[0].id,
+      to_cable_id: pigtailCable.id,
+      to_strand_id: pigtailStrands[0].id,
+      assigned_camera_id: params.cameraId,
+      splice_status: 'Planned',
+      tray_id: cabinetTray.id,
+      splice_type: 'Fusion'
+    },
+    // Cabinet Splice 2: Drop RX -> Pigtail RX
+    {
+      project_id: params.projectId,
+      organization_id: '00000000-0000-0000-0000-000000000000',
+      enclosure_id: cabinetEnclosure.id,
+      from_cable_id: dropCable.id,
+      from_strand_id: dropStrands[1].id,
+      to_cable_id: pigtailCable.id,
+      to_strand_id: pigtailStrands[1].id,
+      assigned_camera_id: params.cameraId,
+      splice_status: 'Planned',
+      tray_id: cabinetTray.id,
+      splice_type: 'Fusion'
+    }
+  ]
+
+  const { error: spliceErr } = await supabase
+    .from('fiber_splice_records')
+    .insert(splicesPayload)
+
+  if (spliceErr) {
+    return { error: `Failed to create splices: ${spliceErr.message}` }
+  }
+
+  revalidatePath(`/projects/${params.projectId}/fiber`)
+  revalidatePath(`/projects/${params.projectId}/cameras`)
+  revalidatePath(`/projects/${params.projectId}/bom`)
+
+  return { success: true, data: assignment }
+}
+
+export async function completeCameraFiberSplices(params: {
+  projectId: string
+  cameraId: string
+  location: 'mainhole' | 'cabinet'
+}) {
+  const supabase = await createClient()
+
+  // 1. Get current assignment
+  const { data: assignment, error: assignErr } = await supabase
+    .from('camera_fiber_assignments')
+    .select('*')
+    .eq('camera_id', params.cameraId)
+    .single()
+
+  if (assignErr || !assignment) {
+    return { error: `Failed to find assignment: ${assignErr?.message || 'Not found'}` }
+  }
+
+  // 2. Resolve target enclosure
+  if (!assignment.enclosure_id) {
+    return { error: 'Mainhole enclosure is not assigned to this camera' }
+  }
+
+  let targetEnclosureId: string = assignment.enclosure_id
+  if (params.location === 'cabinet') {
+    if (!assignment.assigned_cabinet_id) {
+      return { error: 'Cabinet is not assigned to this camera' }
+    }
+    const { data: cabEnclosure } = await supabase
+      .from('fiber_enclosures')
+      .select('id')
+      .eq('cabinet_id', assignment.assigned_cabinet_id)
+      .eq('project_id', params.projectId)
+      .maybeSingle()
+
+    if (!cabEnclosure) return { error: 'Cabinet enclosure not found' }
+    targetEnclosureId = cabEnclosure.id
+  }
+
+  // 3. Update splice records in target enclosure for this camera to 'Completed'
+  const { error: updateSpliceErr } = await supabase
+    .from('fiber_splice_records')
+    .update({
+      splice_status: 'Completed',
+      completed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    .eq('enclosure_id', targetEnclosureId)
+    .eq('assigned_camera_id', params.cameraId)
+
+  if (updateSpliceErr) {
+    return { error: `Failed to complete splices: ${updateSpliceErr.message}` }
+  }
+
+  // 4. Retrieve all splices for this camera to compute overall status
+  const { data: cameraSplices } = await supabase
+    .from('fiber_splice_records')
+    .select('*')
+    .eq('assigned_camera_id', params.cameraId)
+    .eq('project_id', params.projectId)
+
+  const mainholeSplices = (cameraSplices || []).filter(s => s.enclosure_id === assignment.enclosure_id)
+  const cabinetSplices = (cameraSplices || []).filter(s => s.enclosure_id !== assignment.enclosure_id)
+
+  const mainholeDone = mainholeSplices.length > 0 && mainholeSplices.every(s => s.splice_status === 'Completed')
+  const cabinetDone = cabinetSplices.length > 0 && cabinetSplices.every(s => s.splice_status === 'Completed')
+
+  let newPathStatus: FiberPathStatus = 'Fiber Pair Assigned'
+  if (mainholeDone && cabinetDone) {
+    newPathStatus = 'Fiber Pair Complete'
+  } else if (mainholeDone) {
+    newPathStatus = 'Mainhole Splices Complete'
+  } else if (cabinetDone) {
+    newPathStatus = 'Cabinet Splices Complete'
+  }
+
+  // Update assignment status
+  const { error: updateAssignErr } = await supabase
+    .from('camera_fiber_assignments')
+    .update({
+      fiber_path_status: newPathStatus,
+      splice_status: (mainholeDone && cabinetDone) ? 'Spliced' : 'Not Spliced',
+      updated_at: new Date().toISOString()
+    })
+    .eq('camera_id', params.cameraId)
+
+  if (updateAssignErr) {
+    return { error: `Failed to update assignment status: ${updateAssignErr.message}` }
+  }
+
+  revalidatePath(`/projects/${params.projectId}/fiber`)
+  revalidatePath(`/projects/${params.projectId}/cameras`)
+
+  return { success: true }
+}
+
 
 
 
