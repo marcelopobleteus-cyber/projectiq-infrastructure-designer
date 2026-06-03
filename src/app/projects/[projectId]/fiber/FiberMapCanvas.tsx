@@ -16,7 +16,9 @@ import {
   deleteSpliceRecord,
   clearSplicesForCables,
   createSpliceTray,
-  getFiberDesignData
+  getFiberDesignData,
+  clearStrandAssignmentsForCamera,
+  assignStrandToCamera
 } from '../../actions-fiber'
 
 interface FiberMapCanvasProps {
@@ -1156,21 +1158,73 @@ export default function FiberMapCanvas({
       return
     }
 
+    // Find the enclosure in selected node (if any)
+    const nodeEnclosure = initialData.enclosures.find((e: any) => e.node_id === selectedNode.id)
+
+    // Find if the selected cable is drop or backbone
+    const selectedCable = initialData.cables.find(c => c.id === selectedAssignCableId)
+    const isDrop = selectedCable?.cable_type === 'Drop'
+
     const res = await updateCameraFiberAssignment({
       cameraId: selectedCameraId,
       projectId,
       sourceNodeId: selectedNode.id,
-      enclosureId: selectedNode.id,
-      backboneCableId: selectedAssignCableId,
+      enclosureId: nodeEnclosure ? nodeEnclosure.id : null,
+      backboneCableId: isDrop ? null : selectedAssignCableId,
+      dropCableId: isDrop ? selectedAssignCableId : null,
       fiberPathStatus: 'Planned'
     })
 
     if (res.error) {
       showNotification('error', res.error)
-    } else {
-      showNotification('success', `Camera fiber assignment updated`)
-      await loadDesignData()
+      return
     }
+
+    // Clear previous strand assignments first
+    await clearStrandAssignmentsForCamera({
+      projectId,
+      cameraId: selectedCameraId
+    })
+
+    // Assign selected strands if cores are provided and valid
+    if (res.data) {
+      const assignmentId = res.data.id
+
+      // Find the TX strand matching selected cable and core number
+      const txStrand = initialData.strands.find(s => s.cable_id === selectedAssignCableId && s.strand_number === assignTxCore)
+      if (txStrand) {
+        const txRes = await assignStrandToCamera({
+          projectId,
+          cameraFiberAssignmentId: assignmentId,
+          cameraId: selectedCameraId,
+          strandId: txStrand.id,
+          strandRole: 'TX'
+        })
+        if (txRes.error) {
+          showNotification('error', `Saved assignment but failed to assign TX strand: ${txRes.error}`)
+          return
+        }
+      }
+
+      // Find the RX strand matching selected cable and core number
+      const rxStrand = initialData.strands.find(s => s.cable_id === selectedAssignCableId && s.strand_number === assignRxCore)
+      if (rxStrand) {
+        const rxRes = await assignStrandToCamera({
+          projectId,
+          cameraFiberAssignmentId: assignmentId,
+          cameraId: selectedCameraId,
+          strandId: rxStrand.id,
+          strandRole: 'RX'
+        })
+        if (rxRes.error) {
+          showNotification('error', `Saved assignment but failed to assign RX strand: ${rxRes.error}`)
+          return
+        }
+      }
+    }
+
+    showNotification('success', `Camera fiber assignment and strand patching updated`)
+    await loadDesignData()
   }
 
   const handleRemoveCameraFiber = async (camId: string, _linkRole: string) => {
