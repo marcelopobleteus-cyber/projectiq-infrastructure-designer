@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { setOptions, importLibrary } from '@googlemaps/js-api-loader'
 import { createClient } from '@/utils/supabase/client'
 import { 
@@ -58,6 +59,7 @@ export default function FiberMapCanvas({
   defaultZoom,
   googleMapsApiKey
 }: FiberMapCanvasProps) {
+  const router = useRouter()
   const mapRef = useRef<HTMLDivElement>(null)
   const [map, setMap] = useState<google.maps.Map | null>(null)
   const [googleLoaded, setGoogleLoaded] = useState(false)
@@ -494,7 +496,7 @@ export default function FiberMapCanvas({
             showNotification('error', `Failed to move node: ${error.message}`)
           } else {
             showNotification('success', `Moved node ${node.node_tag}`)
-            window.location.reload()
+            router.refresh()
           }
         } catch (err) {
           console.error(err)
@@ -719,7 +721,7 @@ export default function FiberMapCanvas({
     } else {
       showNotification('success', `Created OSP Node ${tag}`)
       setToolMode('select')
-      window.location.reload()
+      router.refresh()
     }
   }
 
@@ -767,7 +769,7 @@ export default function FiberMapCanvas({
       showNotification('success', `Installed Conduit & Fiber route ${tag}`)
       setTempRoutePoints([])
       setToolMode('select')
-      window.location.reload()
+      router.refresh()
     }
   }
 
@@ -781,7 +783,7 @@ export default function FiberMapCanvas({
     } else {
       showNotification('success', `Deleted node ${tag}`)
       setSelectedNode(null)
-      window.location.reload()
+      router.refresh()
     }
   }
 
@@ -795,7 +797,7 @@ export default function FiberMapCanvas({
     } else {
       showNotification('success', `Deleted route ${tag}`)
       setSelectedRoute(null)
-      window.location.reload()
+      router.refresh()
     }
   }
 
@@ -860,7 +862,7 @@ export default function FiberMapCanvas({
       }
 
       showNotification('success', 'Node specifications saved!')
-      window.location.reload()
+      router.refresh()
     } catch (err) {
       console.error(err)
     }
@@ -882,7 +884,7 @@ export default function FiberMapCanvas({
       showNotification('error', res.error)
     } else {
       showNotification('success', 'Pathway specifications saved!')
-      window.location.reload()
+      router.refresh()
     }
   }
 
@@ -998,7 +1000,7 @@ export default function FiberMapCanvas({
       }
 
       showNotification('success', `Applied ${successCount} splices inside ${enclosure.enclosure_tag}`)
-      window.location.reload()
+      router.refresh()
     } catch (err) {
       console.error(err)
       showNotification('error', 'An unexpected error occurred while saving splices.')
@@ -1030,7 +1032,7 @@ export default function FiberMapCanvas({
       showNotification('error', res.error)
     } else {
       showNotification('success', `Camera fiber assignment updated`)
-      window.location.reload()
+      router.refresh()
     }
   }
 
@@ -1047,7 +1049,7 @@ export default function FiberMapCanvas({
       showNotification('error', res.error)
     } else {
       showNotification('success', 'Fiber assignment cleared.')
-      window.location.reload()
+      router.refresh()
     }
   }
 
@@ -1630,7 +1632,7 @@ export default function FiberMapCanvas({
                                   showNotification('error', res.error)
                                 } else {
                                   showNotification('success', `Splice Tray ${newTrayNumber} created!`)
-                                  window.location.reload()
+                                  router.refresh()
                                 }
                               }}
                               className="w-full py-1.5 bg-slate-800 hover:bg-slate-750 text-white rounded-lg text-[9px] font-bold transition-all"
