@@ -1,0 +1,6 @@
+<svg viewBox="0 0 180 30" xmlns="http://www.w3.org/2000/svg">
+  <text x="0" y="21" font-family="Inter, system-ui, -apple-system, sans-serif" font-weight="900" font-size="18" fill="#1E293B" letter-spacing="0.05em">AXIS</text>
+  <circle cx="56" cy="14" r="5" fill="#FFB800" />
+  <circle cx="56" cy="14" r="3" fill="#D91C24" />
+  <text x="68" y="20" font-family="Inter, system-ui, -apple-system, sans-serif" font-weight="800" font-size="7.5" fill="#64748B" letter-spacing="0.05em">COMMUNICATIONS</text>
+</svg>
