@@ -35,7 +35,7 @@ export default async function Home() {
       {/* 3. Footer */}
       <footer className="bg-white border-t border-[#E5EAF0] py-8 text-center text-xs text-[#64748B] font-semibold">
         <div className="max-w-7xl mx-auto px-4">
-          <p>© {new Date().getFullYear()} ProjectIQ. All rights reserved. Built for modern GIS and network grid design.</p>
+          <p>© {new Date().getFullYear()} NextQ Technology. ProjectIQ Infrastructure Designer.</p>
         </div>
       </footer>
     </div>

@@ -88,8 +88,16 @@ export default function ProductMockup() {
 
         {/* 3. Map Viewport Canvas */}
         <div className="flex-1 relative bg-[#F7F9FB] overflow-hidden flex">
-          {/* Visual SVG Map Backdrop (Streets & Water Mock) */}
+          {/* Visual SVG Map Backdrop (Streets & Water Mock with engineering grid) */}
           <svg className="absolute inset-0 w-full h-full opacity-60 pointer-events-none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern id="eng-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+                <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#E2E8F0" strokeWidth="0.75" />
+              </pattern>
+            </defs>
+            {/* Background Grid */}
+            <rect width="100%" height="100%" fill="url(#eng-grid)" opacity="0.4" />
+
             {/* Water Body */}
             <path d="M-50,300 C150,250 200,380 400,320 C600,260 700,420 900,360 L900,600 L-50,600 Z" fill="#E6EEF8" />
             
@@ -195,6 +203,37 @@ export default function ProductMockup() {
               </div>
               <span className="mt-1 px-1.5 py-0.5 rounded bg-[#0A1F44] text-white text-[8px] font-black tracking-tight shadow-sm font-mono uppercase">
                 Cam 04D
+              </span>
+            </div>
+          </div>
+
+          {/* Base Station BS-01 - Telecom Tower */}
+          <div className="absolute top-[68px] left-[528px]" title="BS-01 Telecom Tower">
+            <div className="relative group cursor-pointer flex flex-col items-center">
+              <div className="w-8 h-8 rounded-full bg-white border border-[#E5EAF0] shadow-md flex items-center justify-center text-[#8B5CF6] relative">
+                <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+                <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-[#8B5CF6]/50 animate-ping" />
+                <span className="absolute top-0 right-0 w-1.5 h-1.5 rounded-full bg-[#8B5CF6]" />
+              </div>
+              <span className="mt-1 px-1.5 py-0.5 rounded bg-[#8B5CF6] text-white text-[8px] font-black tracking-tight shadow-sm font-mono uppercase">
+                BS-01 Tower
+              </span>
+            </div>
+          </div>
+
+          {/* Smart Hub SH-01 - Connected via dotted orange line */}
+          <div className="absolute top-[188px] left-[528px]" title="SH-01 Smart Hub">
+            <div className="relative group cursor-pointer flex flex-col items-center">
+              <div className="w-8 h-8 rounded-full bg-white border border-[#E5EAF0] shadow-md flex items-center justify-center text-[#3B82F6] relative">
+                <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-[#3B82F6] border-2 border-white" />
+              </div>
+              <span className="mt-1 px-1.5 py-0.5 rounded bg-[#3B82F6] text-white text-[8px] font-black tracking-tight shadow-sm font-mono uppercase">
+                SH-01 Hub
               </span>
             </div>
           </div>

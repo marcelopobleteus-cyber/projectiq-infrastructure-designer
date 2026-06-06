@@ -16,9 +16,14 @@ export default function LandingHeader() {
               <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-[#0A1F44] text-[#00C896] font-extrabold text-sm tracking-wider shadow-sm transition-transform group-hover:scale-105">
                 PQ
               </div>
-              <span className="text-[#0A1F44] font-black text-xl tracking-tight">
-                Project<span className="text-[#00C896]">IQ</span>
-              </span>
+              <div className="flex flex-col leading-none">
+                <span className="text-[#0A1F44] font-black text-xl tracking-tight leading-none">
+                  Project<span className="text-[#00C896]">IQ</span>
+                </span>
+                <span className="text-[7.5px] text-[#64748B] font-black tracking-[0.18em] uppercase mt-0.5 select-none opacity-80">
+                  by NextQ Technology
+                </span>
+              </div>
             </Link>
           </div>
 

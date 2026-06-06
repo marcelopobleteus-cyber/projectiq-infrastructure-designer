@@ -81,7 +81,7 @@ export default function HeroSection() {
 
             {/* Small Trust Line */}
             <p className="text-[#64748B] text-xs font-semibold pt-2.5">
-              🚀 Built for engineers. Designed for field teams. Trusted by infrastructure leaders.
+              🚀 A NextQ Technology infrastructure design platform. Built for engineers, designed for field teams.
             </p>
 
           </div>
