@@ -14,13 +14,26 @@ export default function HeroSection() {
   }
 
   return (
-    <section className="relative overflow-hidden pt-20 pb-24 md:pt-28 md:pb-32 bg-[#F7FAFC]">
-      {/* Decorative Blur Spheres */}
-      <div className="absolute top-1/4 left-1/10 w-[500px] h-[500px] bg-[#00C896]/5 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
-      <div className="absolute top-1/2 right-1/10 w-[500px] h-[500px] bg-[#3B82F6]/5 rounded-full blur-3xl translate-x-1/2 -translate-y-1/2 pointer-events-none" />
+    <section className="relative overflow-hidden min-h-[calc(100vh-64px)] flex items-center py-12 md:py-16 bg-gradient-to-b from-white via-[#F4F8FA] to-[#F7FAFC] w-full">
+      {/* Engineering Grid Background Pattern */}
+      <div className="absolute inset-0 opacity-[0.25] pointer-events-none select-none">
+        <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="hero-grid" width="40" height="40" patternUnits="userSpaceOnUse">
+              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#CBD5E1" strokeWidth="0.5" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#hero-grid)" />
+        </svg>
+      </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+      {/* Decorative Blur Spheres (Soft cyan/green/purple glows) */}
+      <div className="absolute top-1/3 left-1/4 w-[600px] h-[600px] bg-[#00C896]/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
+      <div className="absolute top-1/2 right-1/4 w-[700px] h-[700px] bg-[#3B82F6]/8 rounded-full blur-3xl translate-x-1/3 -translate-y-1/3 pointer-events-none" />
+      <div className="absolute bottom-1/10 left-1/2 w-[500px] h-[500px] bg-[#8B5CF6]/5 rounded-full blur-3xl -translate-x-1/2 pointer-events-none" />
+
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 relative z-10 my-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-8 items-center">
           
           {/* Left Column: Headline, Subtext, CTAs */}
           <div className="lg:col-span-5 flex flex-col items-start text-left space-y-6">

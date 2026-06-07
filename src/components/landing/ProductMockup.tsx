@@ -52,7 +52,7 @@ export default function ProductMockup() {
       {/* Main App Workspace */}
       <div className="flex flex-1 overflow-hidden">
         {/* 2. Left Sidebar */}
-        <aside className="w-48 bg-[#F7FAFC] border-r border-[#E5EAF0] p-3 hidden md:flex flex-col gap-1 select-none">
+        <aside className="w-48 bg-[#F7FAFC] border-r border-[#E5EAF0] p-3 hidden lg:flex flex-col gap-1 select-none">
           {[
             { label: 'Dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
             { label: 'Projects', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2z' },
@@ -269,7 +269,7 @@ export default function ProductMockup() {
         </div>
 
         {/* 5. Right Sidebar: Details Card */}
-        <aside className="w-64 bg-white border-l border-[#E5EAF0] p-4 flex flex-col gap-4 select-none shrink-0 z-20">
+        <aside className="w-64 bg-white border-l border-[#E5EAF0] p-4 hidden md:flex flex-col gap-4 select-none shrink-0 z-20">
           <div className="space-y-3">
             <div className="flex items-center justify-between border-b border-[#E5EAF0] pb-2">
               <span className="font-extrabold text-[#0A1F44] text-xs uppercase tracking-wider">
