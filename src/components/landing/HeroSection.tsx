@@ -34,7 +34,7 @@ export default function HeroSection() {
             <h1 className="text-[#0A1F44] font-black text-4xl sm:text-5xl lg:text-5.5xl leading-[1.1] tracking-tight">
               Plan Fiber, CCTV & <br />
               <span className="bg-gradient-to-r from-[#00C896] via-[#3B82F6] to-[#8B5CF6] bg-clip-text text-transparent">
-                Wireless Grid
+                Wireless Infrastructure
               </span> <br />
               in One Workspace
             </h1>

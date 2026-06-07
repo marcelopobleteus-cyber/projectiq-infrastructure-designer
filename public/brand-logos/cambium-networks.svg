@@ -1,7 +1,0 @@
-<svg viewBox="0 0 180 30" xmlns="http://www.w3.org/2000/svg" fill="none">
-  <circle cx="15" cy="15" r="11" stroke="#0284C7" stroke-width="2"/>
-  <path d="M9 16 C 12 11, 18 11, 21 16" stroke="#0284C7" stroke-width="2" stroke-linecap="round"/>
-  <path d="M11 11 C 13 8, 17 8, 19 11" stroke="#0284C7" stroke-width="2" stroke-linecap="round"/>
-  <text x="32" y="21" font-family="Inter, system-ui, -apple-system, sans-serif" font-weight="800" font-size="16" fill="#0F172A" letter-spacing="-0.02em">Cambium</text>
-  <text x="106" y="21" font-family="Inter, system-ui, -apple-system, sans-serif" font-weight="500" font-size="15" fill="#0284C7">Networks</text>
-</svg>
