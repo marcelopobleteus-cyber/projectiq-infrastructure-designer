@@ -2091,6 +2091,78 @@ export type Database = {
         }
         Relationships: []
       }
+      project_coordinate_points: {
+        Row: {
+          created_at: string
+          default_gateway: string | null
+          description: string | null
+          device_id: string
+          device_type: string | null
+          id: string
+          ip_address: string | null
+          is_read_only: boolean | null
+          latitude: number
+          longitude: number
+          organization_id: string | null
+          project_id: string
+          source_name: string | null
+          subnet_mask: string | null
+          updated_at: string
+          vlan: string | null
+        }
+        Insert: {
+          created_at?: string
+          default_gateway?: string | null
+          description?: string | null
+          device_id: string
+          device_type?: string | null
+          id?: string
+          ip_address?: string | null
+          is_read_only?: boolean | null
+          latitude: number
+          longitude: number
+          organization_id?: string | null
+          project_id: string
+          source_name?: string | null
+          subnet_mask?: string | null
+          updated_at?: string
+          vlan?: string | null
+        }
+        Update: {
+          created_at?: string
+          default_gateway?: string | null
+          description?: string | null
+          device_id?: string
+          device_type?: string | null
+          id?: string
+          ip_address?: string | null
+          is_read_only?: boolean | null
+          latitude?: number
+          longitude?: number
+          organization_id?: string | null
+          project_id?: string
+          source_name?: string | null
+          subnet_mask?: string | null
+          updated_at?: string
+          vlan?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_coordinate_points_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_coordinate_points_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           created_at: string
@@ -2295,6 +2367,10 @@ export type Database = {
       is_org_member: {
         Args: { org_id: string; user_id: string }
         Returns: boolean
+      }
+      seed_wst_seg6_coordinates: {
+        Args: { target_project_id: string }
+        Returns: undefined
       }
       unassign_camera_from_switch_port: {
         Args: { camera_id: string }
