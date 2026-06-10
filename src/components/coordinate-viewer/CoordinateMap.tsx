@@ -382,7 +382,14 @@ export default function CoordinateMap({
 
   // Center map on Selected Point change from list
   useEffect(() => {
-    if (!map || !selectedPoint) return
+    if (!map) return
+
+    if (!selectedPoint) {
+      if (infoWindowRef.current) {
+        infoWindowRef.current.close()
+      }
+      return
+    }
 
     const lat = Number(selectedPoint.latitude)
     const lng = Number(selectedPoint.longitude)
@@ -416,7 +423,7 @@ export default function CoordinateMap({
       }
       infoWindowRef.current.open(map, marker)
     }
-  }, [selectedPoint])
+  }, [selectedPoint, map, points, showCameras, showSwitches, groupSameLocation])
 
   return (
     <div className="relative w-full h-full rounded-2xl overflow-hidden border border-slate-850 shadow-xl flex flex-col bg-slate-900/10">

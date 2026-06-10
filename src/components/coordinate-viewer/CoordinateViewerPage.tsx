@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { CoordinatePoint } from '@/app/projects/actions-coordinate-viewer'
 import CoordinateStats from './CoordinateStats'
 import CoordinateList from './CoordinateList'
@@ -37,9 +37,32 @@ export default function CoordinateViewerPage({
   const [showSwitches, setShowSwitches] = useState(true)
   const [groupSameLocation, setGroupSameLocation] = useState(true)
 
+  const filteredPoints = points.filter(p => {
+    const matchesSearch =
+      p.device_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.ip_address && p.ip_address.includes(searchQuery)) ||
+      (p.vlan && p.vlan.includes(searchQuery)) ||
+      (p.description && p.description.toLowerCase().includes(searchQuery.toLowerCase()))
+
+    const typeMatch =
+      filterType === 'ALL' ||
+      (filterType === 'CAM' && (p.device_type === 'CAM' || p.device_id.startsWith('CAM'))) ||
+      (filterType === 'SWITCH' && (p.device_type === 'SWITCH' || p.device_id.startsWith('SWITCH')))
+
+    return matchesSearch && typeMatch
+  })
+
+  // Handle marker selection from map
   const handleMarkerSelect = (point: CoordinatePoint | null) => {
     setSelectedPoint(point)
   }
+
+  // If selected point is filtered out, clear selection
+  useEffect(() => {
+    if (selectedPoint && !filteredPoints.some(p => p.id === selectedPoint.id)) {
+      setSelectedPoint(null)
+    }
+  }, [filteredPoints, selectedPoint])
 
   return (
     <div className="space-y-4 px-6 py-4 flex-1 flex flex-col overflow-hidden h-full font-sans text-slate-300">
@@ -134,7 +157,7 @@ export default function CoordinateViewerPage({
         {/* Right map container (8 cols) */}
         <div className="lg:col-span-8 h-full min-h-[400px] lg:min-h-0">
           <CoordinateMap
-            points={points}
+            points={filteredPoints}
             selectedPoint={selectedPoint}
             onMarkerClick={handleMarkerSelect}
             googleMapsApiKey={googleMapsApiKey}
