@@ -60,6 +60,542 @@ function haversineDistanceFeet(lat1: number, lon1: number, lat2: number, lon2: n
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 3.28084
 }
 
+// ─── 1a. Create fiber route by node IDs (Fiber Path Design) ─────────────────
+
+export async function createFiberRouteByNodes(params: {
+  projectId: string
+  fromNodeId: string
+  toNodeId: string
+  routeIdTag: string
+  installationType: InstallationType
+  routePurpose?: RoutePurpose
+  conduitDiameterInches?: number
+  slackPercentage?: number
+  notes?: string
+}): Promise<{ success: true; data: { id: string; route_id_tag: string; measured_length_feet: number } } | { success: false; error: string }> {
+  const supabase = await createClient()
+
+  // 1. Verify authenticated user
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { success: false, error: 'Not authenticated.' }
+  }
+
+  // 2. Verify user has access to this project's organization
+  const { data: project } = await supabase
+    .from('projects')
+    .select('id, organization_id')
+    .eq('id', params.projectId)
+    .single()
+
+  if (!project) {
+    return { success: false, error: 'Project not found or access denied.' }
+  }
+
+  const { data: membership } = await supabase
+    .from('organization_members')
+    .select('id')
+    .eq('organization_id', project.organization_id)
+    .eq('profile_id', user.id)
+    .single()
+
+  if (!membership) {
+    return { success: false, error: 'Access denied: you are not a member of this project organization.' }
+  }
+
+  // 3. Validate endpoints are different
+  if (params.fromNodeId === params.toNodeId) {
+    return { success: false, error: 'Cannot create a route: From Node and To Node must be different.' }
+  }
+
+  // 4. Fetch both nodes and validate they exist, belong to this project and organization
+  const { data: nodes, error: nodesErr } = await supabase
+    .from('fiber_nodes')
+    .select('id, node_tag, node_type, latitude, longitude, project_id, organization_id')
+    .in('id', [params.fromNodeId, params.toNodeId])
+
+  if (nodesErr) {
+    return { success: false, error: `Failed to fetch nodes: ${nodesErr.message}` }
+  }
+
+  if (!nodes || nodes.length !== 2) {
+    return { success: false, error: 'Cannot create route: one or both selected nodes do not exist.' }
+  }
+
+  const fromNode = nodes.find(n => n.id === params.fromNodeId)
+  const toNode = nodes.find(n => n.id === params.toNodeId)
+
+  if (!fromNode || !toNode) {
+    return { success: false, error: 'Cannot create route: one or both selected nodes do not exist.' }
+  }
+
+  // 5. Verify both nodes belong to the same project
+  if (fromNode.project_id !== params.projectId || toNode.project_id !== params.projectId) {
+    return { success: false, error: 'Cannot create route: nodes do not belong to this project.' }
+  }
+
+  // 6. Verify both nodes belong to the same organization
+  if (fromNode.organization_id !== project.organization_id || toNode.organization_id !== project.organization_id) {
+    return { success: false, error: 'Cannot create route: nodes belong to a different organization.' }
+  }
+
+  // 7. Validate coordinates — reject zero/null coordinates
+  const hasValidCoords = (lat: number | null, lng: number | null) =>
+    lat !== null && lng !== null &&
+    lat !== 0 && lng !== 0 &&
+    Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+
+  if (!hasValidCoords(fromNode.latitude, fromNode.longitude)) {
+    return { success: false, error: `Cannot create route: node ${fromNode.node_tag} is missing valid coordinates.` }
+  }
+
+  if (!hasValidCoords(toNode.latitude, toNode.longitude)) {
+    return { success: false, error: `Cannot create route: node ${toNode.node_tag} is missing valid coordinates.` }
+  }
+
+  // 8. Validate metadata
+  const conduitDiam = params.conduitDiameterInches ?? 2.0
+  const slackPct = params.slackPercentage ?? 10.0
+
+  if (conduitDiam <= 0 || conduitDiam > 48) {
+    return { success: false, error: 'Conduit diameter must be between 0.1 and 48 inches.' }
+  }
+
+  if (slackPct < 0 || slackPct > 100) {
+    return { success: false, error: 'Slack percentage must be between 0 and 100.' }
+  }
+
+  if (!params.routeIdTag || params.routeIdTag.trim().length === 0) {
+    return { success: false, error: 'Route ID tag is required.' }
+  }
+
+  // 9. Check for duplicate route between these exact endpoints (warn, not block)
+  const { data: existingSegments } = await supabase
+    .from('fiber_route_segments')
+    .select('route_id, start_latitude, start_longitude, end_latitude, end_longitude')
+    .eq('project_id', params.projectId)
+
+  const hasDuplicate = (existingSegments ?? []).some(seg => {
+    const matchForward =
+      Math.abs(seg.start_latitude - fromNode.latitude) < 0.00001 &&
+      Math.abs(seg.start_longitude - fromNode.longitude) < 0.00001 &&
+      Math.abs(seg.end_latitude - toNode.latitude) < 0.00001 &&
+      Math.abs(seg.end_longitude - toNode.longitude) < 0.00001
+    const matchReverse =
+      Math.abs(seg.start_latitude - toNode.latitude) < 0.00001 &&
+      Math.abs(seg.start_longitude - toNode.longitude) < 0.00001 &&
+      Math.abs(seg.end_latitude - fromNode.latitude) < 0.00001 &&
+      Math.abs(seg.end_longitude - fromNode.longitude) < 0.00001
+    return matchForward || matchReverse
+  })
+
+  if (hasDuplicate) {
+    return { success: false, error: `A route segment already exists between ${fromNode.node_tag} and ${toNode.node_tag}. Delete the existing route first or select different endpoints.` }
+  }
+
+  // 10. Compute haversine distance
+  const measuredLength = Number(
+    haversineDistanceFeet(fromNode.latitude, fromNode.longitude, toNode.latitude, toNode.longitude).toFixed(2)
+  )
+  const installedLength = Number((measuredLength * (1 + slackPct / 100)).toFixed(2))
+
+  // 11. Insert fiber_routes
+  const { data: newRoute, error: routeErr } = await supabase
+    .from('fiber_routes')
+    .insert({
+      project_id: params.projectId,
+      organization_id: '00000000-0000-0000-0000-000000000000', // trigger fills from project
+      route_id_tag: params.routeIdTag.trim(),
+      measured_length_feet: measuredLength,
+      slack_percentage: slackPct,
+      installed_length_feet: installedLength,
+      conduit_diameter_inches: conduitDiam,
+      fill_percentage: 0.0,
+      spare_capacity: 100.0,
+      installation_type: params.installationType,
+      route_purpose: params.routePurpose ?? 'camera_backbone',
+    })
+    .select('id, route_id_tag, measured_length_feet')
+    .single()
+
+  if (routeErr || !newRoute) {
+    return { success: false, error: `Failed to create route: ${routeErr?.message ?? 'unknown error'}` }
+  }
+
+  // 12. Insert one fiber_route_segments row
+  const { error: segErr } = await supabase
+    .from('fiber_route_segments')
+    .insert({
+      project_id: params.projectId,
+      organization_id: '00000000-0000-0000-0000-000000000000', // trigger fills
+      route_id: newRoute.id,
+      segment_index: 0,
+      start_latitude: fromNode.latitude,
+      start_longitude: fromNode.longitude,
+      end_latitude: toNode.latitude,
+      end_longitude: toNode.longitude,
+      length_feet: measuredLength,
+      slack_feet: 0.0,
+    })
+
+  if (segErr) {
+    // Clean up the orphaned route if segment insert fails
+    await supabase.from('fiber_routes').delete().eq('id', newRoute.id)
+    return { success: false, error: `Route created but segment insert failed: ${segErr.message}` }
+  }
+
+  revalidatePath(`/projects/${params.projectId}`)
+  revalidatePath(`/projects/${params.projectId}/fiber`)
+
+
+
+  return { success: true, data: newRoute }
+}
+
+// ─── 1b. Create fiber route by ordered node IDs (Phase 1.3B) ────────────────
+
+export async function createFiberRouteByOrderedNodes(params: {
+  projectId: string
+  orderedNodeIds: string[]
+  routeIdTag: string
+  installationType: InstallationType
+  routePurpose?: RoutePurpose
+  conduitDiameterInches?: number
+  slackPercentage?: number
+  cableCatalogId?: string
+  notes?: string
+}): Promise<{ success: true; data: { id: string; route_id_tag: string; measured_length_feet: number }; warning?: string } | { success: false; error: string }> {
+  const supabase = await createClient()
+
+  // 1. Verify authenticated user
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { success: false, error: 'Not authenticated.' }
+  }
+
+  // 2. Verify user has access to this project's organization
+  const { data: project } = await supabase
+    .from('projects')
+    .select('id, organization_id')
+    .eq('id', params.projectId)
+    .single()
+
+  if (!project) {
+    return { success: false, error: 'Project not found or access denied.' }
+  }
+
+  const { data: membership } = await supabase
+    .from('organization_members')
+    .select('id')
+    .eq('organization_id', project.organization_id)
+    .eq('profile_id', user.id)
+    .single()
+
+  if (!membership) {
+    return { success: false, error: 'Access denied: you are not a member of this project organization.' }
+  }
+
+  // 3. Verify orderedNodeIds has at least 2 elements
+  if (!params.orderedNodeIds || params.orderedNodeIds.length < 2) {
+    return { success: false, error: 'Cannot create route: must select at least two fiber nodes.' }
+  }
+
+  // 4. Verify orderedNodeIds has no duplicate elements
+  const uniqueIds = new Set(params.orderedNodeIds)
+  if (uniqueIds.size !== params.orderedNodeIds.length) {
+    return { success: false, error: 'Cannot create route: loops or visiting the same node multiple times is not supported.' }
+  }
+
+  // 5. Fetch all nodes in orderedNodeIds
+  const { data: nodes, error: nodesErr } = await supabase
+    .from('fiber_nodes')
+    .select('id, node_tag, node_type, latitude, longitude, project_id, organization_id')
+    .in('id', params.orderedNodeIds)
+
+  if (nodesErr) {
+    return { success: false, error: `Failed to fetch nodes: ${nodesErr.message}` }
+  }
+
+  if (!nodes || nodes.length !== params.orderedNodeIds.length) {
+    return { success: false, error: 'Cannot create route: one or more selected nodes do not exist.' }
+  }
+
+  // 6. Map fetched nodes to the original input order
+  const orderedNodes = params.orderedNodeIds.map(id => nodes.find(n => n.id === id)!)
+
+  // 7. Verify all nodes belong to this project and organization
+  for (const node of orderedNodes) {
+    if (node.project_id !== params.projectId) {
+      return { success: false, error: `Cannot create route: node ${node.node_tag} does not belong to this project.` }
+    }
+    if (node.organization_id !== project.organization_id) {
+      return { success: false, error: `Cannot create route: node ${node.node_tag} belongs to a different organization.` }
+    }
+  }
+
+  // 8. Validate coordinates — reject zero/null coordinates
+  const hasValidCoords = (lat: number | null, lng: number | null) =>
+    lat !== null && lng !== null &&
+    lat !== 0 && lng !== 0 &&
+    Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+
+  for (const node of orderedNodes) {
+    if (!hasValidCoords(node.latitude, node.longitude)) {
+      return { success: false, error: `Cannot create route: node ${node.node_tag} is missing valid coordinates.` }
+    }
+  }
+
+  // 9. Validate metadata
+  const conduitDiam = params.conduitDiameterInches ?? 2.0
+  const slackPct = params.slackPercentage ?? 10.0
+
+  if (conduitDiam <= 0 || conduitDiam > 48) {
+    return { success: false, error: 'Conduit diameter must be between 0.1 and 48 inches.' }
+  }
+
+  if (slackPct < 0 || slackPct > 100) {
+    return { success: false, error: 'Slack percentage must be between 0 and 100.' }
+  }
+
+  if (!params.routeIdTag || params.routeIdTag.trim().length === 0) {
+    return { success: false, error: 'Route ID tag is required.' }
+  }
+
+  // 10. Duplicate Checks
+  // A. Tag uniqueness
+  const { data: existingRoutes, error: tagCheckErr } = await supabase
+    .from('fiber_routes')
+    .select('id, route_id_tag, route_purpose')
+    .eq('project_id', params.projectId)
+
+  if (tagCheckErr) {
+    return { success: false, error: `Failed to query existing routes: ${tagCheckErr.message}` }
+  }
+
+  const isTagDuplicate = (existingRoutes ?? []).some(
+    r => r.route_id_tag.toLowerCase() === params.routeIdTag.trim().toLowerCase()
+  )
+  if (isTagDuplicate) {
+    return { success: false, error: `A route with the tag "${params.routeIdTag}" already exists in this project.` }
+  }
+
+  // B. Exact duplicate full path check (ordered nodes sequence, same purpose)
+  const { data: existingSegments, error: segsQueryErr } = await supabase
+    .from('fiber_route_segments')
+    .select('route_id, start_latitude, start_longitude, end_latitude, end_longitude, segment_index')
+    .eq('project_id', params.projectId)
+
+  if (segsQueryErr) {
+    return { success: false, error: `Failed to query route segments: ${segsQueryErr.message}` }
+  }
+
+  const segmentsByRoute: Record<string, typeof existingSegments> = {}
+  for (const seg of existingSegments ?? []) {
+    if (!segmentsByRoute[seg.route_id]) {
+      segmentsByRoute[seg.route_id] = []
+    }
+    segmentsByRoute[seg.route_id].push(seg)
+  }
+
+  for (const routeId in segmentsByRoute) {
+    segmentsByRoute[routeId].sort((a, b) => a.segment_index - b.segment_index)
+  }
+
+  let hasExactDuplicateFullPath = false
+  for (const routeId in segmentsByRoute) {
+    const routeSegs = segmentsByRoute[routeId]
+    const routeInfo = existingRoutes.find(r => r.id === routeId)
+    if (!routeInfo) continue
+
+    if (routeSegs.length !== orderedNodes.length - 1) continue
+
+    let matchForward = true
+    let matchReverse = true
+
+    for (let i = 0; i < routeSegs.length; i++) {
+      const seg = routeSegs[i]
+      const nodeA = orderedNodes[i]
+      const nodeB = orderedNodes[i + 1]
+      const revNodeA = orderedNodes[orderedNodes.length - 1 - i]
+      const revNodeB = orderedNodes[orderedNodes.length - 2 - i]
+
+      const coordMatch = (lat1: number, lng1: number, lat2: number, lng2: number) =>
+        Math.abs(lat1 - lat2) < 0.00001 && Math.abs(lng1 - lng2) < 0.00001
+
+      if (!coordMatch(seg.start_latitude, seg.start_longitude, nodeA.latitude, nodeA.longitude) ||
+          !coordMatch(seg.end_latitude, seg.end_longitude, nodeB.latitude, nodeB.longitude)) {
+        matchForward = false
+      }
+
+      if (!coordMatch(seg.start_latitude, seg.start_longitude, revNodeA.latitude, revNodeA.longitude) ||
+          !coordMatch(seg.end_latitude, seg.end_longitude, revNodeB.latitude, revNodeB.longitude)) {
+        matchReverse = false
+      }
+    }
+
+    if (matchForward || matchReverse) {
+      if (routeInfo.route_purpose === (params.routePurpose ?? 'camera_backbone')) {
+        hasExactDuplicateFullPath = true
+        break
+      }
+    }
+  }
+
+  if (hasExactDuplicateFullPath) {
+    return { success: false, error: 'A route with the exact same sequence of nodes and purpose already exists.' }
+  }
+
+  // C. Shared segment warning check (permit but warn)
+  let hasSharedSegment = false
+  for (let i = 0; i < orderedNodes.length - 1; i++) {
+    const nodeA = orderedNodes[i]
+    const nodeB = orderedNodes[i + 1]
+
+    const segmentExists = (existingSegments ?? []).some(seg => {
+      const coordMatch = (lat1: number, lng1: number, lat2: number, lng2: number) =>
+        Math.abs(lat1 - lat2) < 0.00001 && Math.abs(lng1 - lng2) < 0.00001
+      
+      const matchForward = coordMatch(seg.start_latitude, seg.start_longitude, nodeA.latitude, nodeA.longitude) &&
+                           coordMatch(seg.end_latitude, seg.end_longitude, nodeB.latitude, nodeB.longitude)
+      const matchReverse = coordMatch(seg.start_latitude, seg.start_longitude, nodeB.latitude, nodeB.longitude) &&
+                           coordMatch(seg.end_latitude, seg.end_longitude, nodeA.latitude, nodeA.longitude)
+      return matchForward || matchReverse
+    })
+
+    if (segmentExists) {
+      hasSharedSegment = true
+    }
+  }
+
+  // 11. Compute Total Measured Length
+  let measuredLength = 0
+  for (let i = 0; i < orderedNodes.length - 1; i++) {
+    measuredLength += haversineDistanceFeet(
+      orderedNodes[i].latitude, orderedNodes[i].longitude,
+      orderedNodes[i + 1].latitude, orderedNodes[i + 1].longitude
+    )
+  }
+  measuredLength = Number(measuredLength.toFixed(2))
+  const installedLength = Number((measuredLength * (1 + slackPct / 100)).toFixed(2))
+
+  // ── TRANSACTION ROLLBACK SIMULATION ──
+  // If route creation succeeds but segment or cable insert fails, we manually delete
+  // the created parent route, which cascades to delete segments, and we clean up cable if needed.
+  let createdRouteId: string | null = null
+
+  try {
+    // A. Insert parent route
+    const { data: newRoute, error: routeErr } = await supabase
+      .from('fiber_routes')
+      .insert({
+        project_id: params.projectId,
+        organization_id: '00000000-0000-0000-0000-000000000000', // trigger fills
+        route_id_tag: params.routeIdTag.trim(),
+        measured_length_feet: measuredLength,
+        slack_percentage: slackPct,
+        installed_length_feet: installedLength,
+        conduit_diameter_inches: conduitDiam,
+        fill_percentage: 0.0,
+        spare_capacity: 100.0,
+        installation_type: params.installationType,
+        route_purpose: params.routePurpose ?? 'camera_backbone',
+      })
+      .select('id, route_id_tag, measured_length_feet')
+      .single()
+
+    if (routeErr || !newRoute) {
+      throw new Error(`Failed to create parent route record: ${routeErr?.message ?? 'unknown error'}`)
+    }
+
+    createdRouteId = newRoute.id
+
+    // B. Insert ordered segments
+    const segmentInserts = orderedNodes.slice(0, -1).map((node, i) => {
+      const nextNode = orderedNodes[i + 1]
+      const segLength = Number(
+        haversineDistanceFeet(node.latitude, node.longitude, nextNode.latitude, nextNode.longitude).toFixed(2)
+      )
+      return {
+        project_id: params.projectId,
+        organization_id: '00000000-0000-0000-0000-000000000000', // trigger fills
+        route_id: newRoute.id,
+        segment_index: i,
+        start_latitude: node.latitude,
+        start_longitude: node.longitude,
+        end_latitude: nextNode.latitude,
+        end_longitude: nextNode.longitude,
+        length_feet: segLength,
+        slack_feet: 0.0,
+      }
+    })
+
+    const { error: segmentsErr } = await supabase
+      .from('fiber_route_segments')
+      .insert(segmentInserts)
+
+    if (segmentsErr) {
+      throw new Error(`Failed to insert route segments: ${segmentsErr.message}`)
+    }
+
+    // C. Insert cable from catalog if catalog item was chosen
+    if (params.cableCatalogId) {
+      const { data: catalogItem, error: catErr } = await supabase
+        .from('fiber_catalog')
+        .select('*')
+        .eq('id', params.cableCatalogId)
+        .single()
+
+      if (catErr || !catalogItem) {
+        throw new Error('Selected cable catalog item not found in catalog.')
+      }
+
+      const cableTag = `CBL-${newRoute.route_id_tag}`
+      const { error: cableErr } = await supabase
+        .from('fiber_cables')
+        .insert({
+          project_id: params.projectId,
+          organization_id: '00000000-0000-0000-0000-000000000000', // trigger fills
+          route_id: newRoute.id,
+          cable_tag: cableTag,
+          cable_type: 'Backbone',
+          fiber_count: catalogItem.fiber_count,
+          strand_count: catalogItem.fiber_count,
+          length_ft: installedLength,
+          install_status: 'Planned',
+          test_status: 'Not Tested',
+          manufacturer: catalogItem.manufacturer,
+          model: catalogItem.part_number, // Map catalog part_number to cables model field
+          from_node_id: orderedNodes[0].id,
+          to_node_id: orderedNodes[orderedNodes.length - 1].id,
+          notes: params.notes,
+        })
+
+      if (cableErr) {
+        throw new Error(`Cable creation failed: ${cableErr.message}`)
+      }
+    }
+
+    // D. Revalidate paths
+    revalidatePath(`/projects/${params.projectId}/maps`)
+    revalidatePath(`/projects/${params.projectId}/fiber`)
+    revalidatePath(`/projects/${params.projectId}/bom`)
+    revalidatePath(`/projects/${params.projectId}/overview`)
+
+    return {
+      success: true,
+      data: newRoute,
+      warning: hasSharedSegment ? 'One or more segments in this path share existing routes. Shared infrastructure allowed.' : undefined
+    }
+  } catch (err: any) {
+    // Rollback cleanup: remove the created parent route if inserts failed.
+    // (Existing postgres schema triggers/cascades will clean up segments on delete of parent route).
+    if (createdRouteId) {
+      await supabase.from('fiber_routes').delete().eq('id', createdRouteId)
+    }
+    return { success: false, error: err.message ?? 'Failed to create route or cable.' }
+  }
+}
+
 // ─── 1. Get fiber design data ────────────────────────────────────────────────
 
 export async function getFiberDesignData(projectId: string) {
@@ -579,12 +1115,114 @@ export async function createFiberRoute(params: {
 
 // ─── 8. Delete fiber route ───────────────────────────────────────────────────
 
-export async function deleteFiberRoute(params: { id: string; projectId: string }) {
+export async function deleteFiberRoute(params: { id: string; projectId: string }): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient()
-  const { error } = await supabase.from('fiber_routes').delete().eq('id', params.id)
-  if (error) return { error: `Failed to delete route: ${error.message}` }
+
+  // 1. Verify user authentication
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { success: false, error: 'Not authenticated.' }
+  }
+
+  // 2. Fetch linked cables for this route
+  const { data: cables, error: cablesQueryErr } = await supabase
+    .from('fiber_cables')
+    .select('id')
+    .eq('route_id', params.id)
+
+  if (cablesQueryErr) {
+    return { success: false, error: `Failed to query route cables: ${cablesQueryErr.message}` }
+  }
+
+  const cableIds = (cables ?? []).map(c => c.id)
+
+  // 3. Check BOM references
+  const { count: bomCount, error: bomCheckErr } = await supabase
+    .from('bom_items')
+    .select('id', { count: 'exact', head: true })
+    .eq('fiber_route_id', params.id)
+
+  if (bomCheckErr) {
+    return { success: false, error: `Failed to check BOM dependencies: ${bomCheckErr.message}` }
+  }
+
+  if (bomCount && bomCount > 0) {
+    return { success: false, error: 'This route cannot be deleted because it has active BOM references.' }
+  }
+
+  if (cableIds.length > 0) {
+    // 4. Check active camera assignments
+    const { count: backboneCount } = await supabase
+      .from('camera_fiber_assignments')
+      .select('id', { count: 'exact', head: true })
+      .in('backbone_cable_id', cableIds)
+
+    const { count: dropCount } = await supabase
+      .from('camera_fiber_assignments')
+      .select('id', { count: 'exact', head: true })
+      .in('drop_cable_id', cableIds)
+
+    // 5. Check active general fiber assignments
+    const { count: fiberAssignCount } = await supabase
+      .from('fiber_assignments')
+      .select('id', { count: 'exact', head: true })
+      .in('cable_id', cableIds)
+
+    if (
+      (backboneCount && backboneCount > 0) ||
+      (dropCount && dropCount > 0) ||
+      (fiberAssignCount && fiberAssignCount > 0)
+    ) {
+      return { success: false, error: 'This route cannot be deleted because it has assigned strands, splices, or linked field work.' }
+    }
+
+    // 6. Check active splices
+    const { count: spliceFromCount } = await supabase
+      .from('fiber_splice_records')
+      .select('id', { count: 'exact', head: true })
+      .in('from_cable_id', cableIds)
+
+    const { count: spliceToCount } = await supabase
+      .from('fiber_splice_records')
+      .select('id', { count: 'exact', head: true })
+      .in('to_cable_id', cableIds)
+
+    if (
+      (spliceFromCount && spliceFromCount > 0) ||
+      (spliceToCount && spliceToCount > 0)
+    ) {
+      return { success: false, error: 'This route cannot be deleted because it has active strands, splices, or linked field work.' }
+    }
+  }
+
+  // 7. Explicitly delete linked cables first (to prevent orphaned strands/tubes)
+  if (cableIds.length > 0) {
+    const { error: cablesDeleteErr } = await supabase
+      .from('fiber_cables')
+      .delete()
+      .in('id', cableIds)
+
+    if (cablesDeleteErr) {
+      return { success: false, error: `Failed to delete linked cables: ${cablesDeleteErr.message}` }
+    }
+  }
+
+  // 8. Delete the parent route (automatically cascades to delete ordered segments)
+  const { error: routeDeleteErr } = await supabase
+    .from('fiber_routes')
+    .delete()
+    .eq('id', params.id)
+
+  if (routeDeleteErr) {
+    return { success: false, error: `Failed to delete route: ${routeDeleteErr.message}` }
+  }
+
+  // 9. Revalidate paths
+  revalidatePath(`/projects/${params.projectId}/maps`)
   revalidatePath(`/projects/${params.projectId}/fiber`)
   revalidatePath(`/projects/${params.projectId}/bom`)
+  revalidatePath(`/projects/${params.projectId}/overview`)
+
   return { success: true }
 }
 

@@ -1,11 +1,30 @@
 'use client'
 
-import React from 'react'
+import React, { createContext, useContext, useState } from 'react'
+import { ThemeProvider } from '../theme/ThemeProvider'
+import SettingsModal from './SettingsModal'
+
+const SettingsContext = createContext<{
+  openSettings: () => void
+}>({
+  openSettings: () => {},
+})
+
+export const useSettings = () => useContext(SettingsContext)
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+
   return (
-    <div className="flex h-screen w-screen bg-slate-950 text-slate-100 overflow-hidden font-sans select-none">
-      {children}
-    </div>
+    <ThemeProvider>
+      <SettingsContext.Provider value={{ openSettings: () => setIsSettingsOpen(true) }}>
+        <div className="flex h-screen w-screen bg-background text-foreground overflow-hidden font-sans select-none transition-colors duration-150">
+          {children}
+        </div>
+        {isSettingsOpen && (
+          <SettingsModal onClose={() => setIsSettingsOpen(false)} />
+        )}
+      </SettingsContext.Provider>
+    </ThemeProvider>
   )
 }

@@ -34,6 +34,7 @@ import {
   generateFiberTasksForCamera,
   clearStrandAssignmentsForCamera
 } from '../actions-fiber'
+import { getDetailedConnectivity, setDetailedConnectivityInNotes, getCameraReadiness } from '@/lib/workflow/projectWorkflowRegistry'
 import ContextSidebar from '@/components/layout/ContextSidebar'
 
 type CameraLocation = Database['public']['Tables']['camera_locations']['Row']
@@ -126,6 +127,14 @@ export default function ProjectMapCanvas({
   const [cameraPowerType, setCameraPowerType] = useState<Database['public']['Enums']['power_type']>('poe')
   const [cameraAddressRef, setCameraAddressRef] = useState('')
   const [cameraStructureRef, setCameraStructureRef] = useState('')
+  
+  // Commercial UX: connectivity method state
+  const [cameraDetailedConn, setCameraDetailedConn] = useState('Unknown')
+  // Drawer accordion toggles
+  const [isSpecsOpen, setIsSpecsOpen] = useState(true)
+  const [isChecklistOpen, setIsChecklistOpen] = useState(true)
+  const [isChainOpen, setIsChainOpen] = useState(true)
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   
   // Fiber form states
   const [cameraSourceNodeId, setCameraSourceNodeId] = useState('')
@@ -305,6 +314,19 @@ export default function ProjectMapCanvas({
     }
   }
 
+  const handleDetailedConnChange = (val: string) => {
+    setCameraDetailedConn(val)
+    if (val === 'Fiber') {
+      setCameraCommType('fiber')
+    } else if (val === 'Ethernet / Copper') {
+      setCameraCommType('copper')
+    } else if (val === 'Wireless PTP' || val === 'Wireless PTMP' || val === 'Wi-Fi Bridge') {
+      setCameraCommType('wireless')
+    } else {
+      setCameraCommType('copper') // Default fallback to copper for database enum compatibility
+    }
+  }
+
   // Load ports and fiber assignment when selected camera changes
   useEffect(() => {
     if (selectedCamera) {
@@ -319,6 +341,7 @@ export default function ProjectMapCanvas({
       setCameraNotes(selectedCamera.notes || '')
       setAssignedSwitchId(selectedCamera.assigned_network_device_id || '')
       setCameraPanelMessage(null)
+      setCameraDetailedConn(getDetailedConnectivity(selectedCamera.communication_type, selectedCamera.notes || ''))
 
       // Load tasks and history
       loadCameraTasksAndHistory(selectedCamera.id)
@@ -1095,15 +1118,16 @@ export default function ProjectMapCanvas({
     if (!selectedCamera) return
     setCameraPanelMessage(null)
 
+    const updatedNotesObj = setDetailedConnectivityInNotes(cameraDetailedConn, cameraNotes)
     const details = {
       camera_id_tag: cameraTag,
       camera_model_id: cameraModelId,
       status: cameraStatus,
-      communication_type: cameraCommType,
+      communication_type: updatedNotesObj.commType,
       power_type: cameraPowerType,
       address_reference: cameraAddressRef || null,
       structure_reference: cameraStructureRef || null,
-      notes: cameraNotes || null,
+      notes: updatedNotesObj.notes || null,
     }
 
     startTransition(async () => {
@@ -1926,767 +1950,667 @@ export default function ProjectMapCanvas({
       </div>
 
       {/* 3. Sliding Config Drawers (Right side) */}
-      {selectedCamera && (
-        <div className="w-80 bg-slate-900 border-l border-slate-800 flex flex-col justify-between shrink-0 h-full p-6 relative z-10 overflow-hidden shadow-2xl">
-          <form onSubmit={handleSaveCamera} className="flex flex-col h-full justify-between">
-            <div className="space-y-4 overflow-y-auto pr-1 flex-1 scrollbar-thin">
-              <div className="flex justify-between items-start border-b border-slate-850 pb-4">
-                <div>
-                  <h3 className="font-bold text-white tracking-tight flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getCameraStatusColor(selectedCamera.status) }} />
-                    {selectedCamera.camera_id_tag} Specs
-                  </h3>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Edit camera properties and switch connection</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSelectedCamera(null)}
-                  className="p-1 rounded bg-slate-950 hover:bg-slate-850 text-slate-400 hover:text-white"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
-              </div>
+      {selectedCamera && (() => {
+        // Calculate camera readiness state based on current parameters
+        const readiness = getCameraReadiness(
+          {
+            id: selectedCamera.id,
+            latitude: selectedCamera.latitude,
+            longitude: selectedCamera.longitude,
+            communication_type: cameraCommType,
+            power_type: cameraPowerType,
+            notes: cameraNotes,
+            assigned_network_device_id: assignedSwitchId,
+          },
+          fiberAssignments,
+          allSwitchPorts,
+          cameraTasks
+        )
 
-              {cameraPanelMessage && (
-                <div className={`p-3 rounded-xl border text-[11px] ${
-                  cameraPanelMessage.type === 'success'
-                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                    : 'bg-red-500/10 border-red-500/20 text-red-400'
-                }`}>
-                  {cameraPanelMessage.text}
-                </div>
-              )}
+        const totalCount = cameraTasks.length
+        const completeCount = cameraTasks.filter(t => t.status === 'Complete').length
 
-              {/* Form fields */}
-              <div className="space-y-3.5">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Camera Tag</label>
-                  <input
-                    type="text" required value={cameraTag} onChange={e => setCameraTag(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Camera Model</label>
-                  <select
-                    value={cameraModelId} onChange={e => setCameraModelId(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+        return (
+          <div className="w-80 bg-slate-900 border-l border-slate-800 flex flex-col justify-between shrink-0 h-full p-6 relative z-10 overflow-hidden shadow-2xl">
+            <form onSubmit={handleSaveCamera} className="flex flex-col h-full justify-between overflow-hidden">
+              <div className="space-y-4 overflow-y-auto pr-1 flex-1 scrollbar-thin pb-4">
+                
+                {/* Header Section */}
+                <div className="flex justify-between items-start border-b border-slate-850 pb-4 shrink-0">
+                  <div>
+                    <h3 className="font-bold text-white tracking-tight flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: getCameraStatusColor(cameraStatus) }} />
+                      {cameraTag || selectedCamera.camera_id_tag || 'Camera'} Specs
+                    </h3>
+                    <p className="text-[10px] text-slate-400 mt-0.5 font-mono">ID: {selectedCamera.id.substring(0, 8)}...</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCamera(null)}
+                    className="p-1.5 rounded bg-slate-950 hover:bg-slate-850 text-slate-400 hover:text-white transition-colors"
                   >
-                    {cameraModels.map(model => (
-                      <option key={model.id} value={model.id}>
-                        {model.manufacturer} - {model.model_number} ({model.resolution})
-                      </option>
-                    ))}
-                  </select>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
                 </div>
 
-                {/* Assignment selection */}
-                <div className="border border-slate-850 p-3 rounded-xl bg-slate-950/20 space-y-2.5">
-                  <span className="block text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Switch Assignment</span>
-                  <div>
-                    <label className="block text-[9px] font-semibold text-slate-400 mb-1">Target Switch</label>
-                    <select
-                      value={assignedSwitchId} onChange={e => setAssignedSwitchId(e.target.value)}
-                      className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-[11px] focus:outline-none focus:border-indigo-500"
-                    >
-                      <option value="">Unassigned</option>
-                      {networkDevices.filter(d => d.device_type === 'switch' || d.device_type === 'Industrial Switch').map(sw => (
-                        <option key={sw.id} value={sw.id}>{sw.name} ({sw.manufacturer || 'Generic'})</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {assignedSwitchId && (
-                    <div>
-                      <label className="block text-[9px] font-semibold text-slate-400 mb-1">Available Ports</label>
-                      {loadingPorts ? (
-                        <span className="text-[10px] text-slate-500 block animate-pulse">Loading port matrix...</span>
-                      ) : (
-                        <select
-                          value={assignedPortId} onChange={e => setAssignedPortId(e.target.value)}
-                          className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-[11px] focus:outline-none"
-                        >
-                          <option value="">Choose Port...</option>
-                          {switchPorts.map(p => {
-                            const isAssigned = p.assigned_camera_location_id !== null
-                            const isThisCamera = p.assigned_camera_location_id === selectedCamera.id
-                            
-                            // Only list unassigned ports OR the port currently assigned to this camera
-                            if (isAssigned && !isThisCamera) return null
-
-                            return (
-                              <option key={p.id} value={p.id}>
-                                Port {p.port_number} - {p.port_type.toUpperCase()} ({isThisCamera ? 'This Camera' : 'Available'})
-                              </option>
-                            )
-                          })}
-                        </select>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Comm Type</label>
-                    <select
-                      value={cameraCommType} onChange={e => setCameraCommType(e.target.value as any)}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none"
-                    >
-                      <option value="copper">Copper</option>
-                      <option value="fiber">Fiber</option>
-                      <option value="wireless">Wireless</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Power Type</label>
-                    <select
-                      value={cameraPowerType} onChange={e => setCameraPowerType(e.target.value as any)}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none"
-                    >
-                      <option value="poe">PoE</option>
-                      <option value="poe+">PoE+</option>
-                      <option value="local">Local</option>
-                      <option value="solar">Solar</option>
-                    </select>
-                  </div>
-                </div>
-
-                {cameraCommType === 'fiber' && (
-                  <div className="border border-indigo-950 p-3.5 rounded-2xl bg-indigo-950/10 space-y-3.5 relative overflow-hidden">
-                    <div className="absolute top-0 left-0 right-0 h-[2px] bg-indigo-500/30" />
-                    <span className="block text-[10px] font-bold text-indigo-400 uppercase tracking-wider">OSP Fiber Pathway Connection</span>
-                    
-                    {/* Connectivity Path Type */}
-                    <div>
-                      <label className="block text-[9px] font-semibold text-slate-400 mb-1">Connectivity Path Type</label>
-                      <select
-                        value={connectivityPathType}
-                        onChange={e => setConnectivityPathType(e.target.value)}
-                        className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-[11px] focus:outline-none"
-                      >
-                        <option value="Fiber -> Camera">Fiber → Camera (Direct Drop)</option>
-                        <option value="Fiber -> Switch -> Camera">Fiber → Switch → Camera</option>
-                        <option value="Fiber -> Switch -> Wireless Radio -> Camera">Fiber → Switch → Wireless → Camera</option>
-                      </select>
-                    </div>
-
-                    {/* Source Node */}
-                    <div>
-                      <label className="block text-[9px] font-semibold text-slate-400 mb-1">Source Node</label>
-                      <select
-                        value={cameraSourceNodeId} onChange={e => {
-                          setCameraSourceNodeId(e.target.value)
-                          setCameraEnclosureId('') // reset enclosure on node change
-                        }}
-                        className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-[11px] focus:outline-none"
-                      >
-                        <option value="">Select Source Node...</option>
-                        {fiberNodes.map(node => (
-                          <option key={node.id} value={node.id}>
-                            {node.node_tag} ({node.node_type})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Enclosure */}
-                    <div>
-                      <label className="block text-[9px] font-semibold text-slate-400 mb-1">Enclosure</label>
-                      <select
-                        value={cameraEnclosureId} onChange={e => setCameraEnclosureId(e.target.value)}
-                        className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-[11px] focus:outline-none"
-                        disabled={!cameraSourceNodeId}
-                      >
-                        <option value="">Select Enclosure...</option>
-                        {fiberEnclosures
-                          .filter(e => e.node_id === cameraSourceNodeId)
-                          .map(enc => (
-                            <option key={enc.id} value={enc.id}>
-                              {enc.enclosure_tag} ({enc.enclosure_type})
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-
-                    {/* Drop Cable */}
-                    <div>
-                      <label className="block text-[9px] font-semibold text-slate-400 mb-1">Drop Cable</label>
-                      <select
-                        value={cameraDropCableId} onChange={e => setCameraDropCableId(e.target.value)}
-                        className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-[11px] focus:outline-none"
-                      >
-                        <option value="">Select Drop Cable...</option>
-                        {fiberCables
-                          .filter(c => c.cable_type === 'Drop')
-                          .map(cable => (
-                            <option key={cable.id} value={cable.id}>
-                              {cable.cable_tag} ({cable.fiber_count}F)
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-
-                    {/* Backbone Cable */}
-                    <div>
-                      <label className="block text-[9px] font-semibold text-slate-400 mb-1">Backbone Cable</label>
-                      <select
-                        value={cameraBackboneCableId} onChange={e => setCameraBackboneCableId(e.target.value)}
-                        className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-[11px] focus:outline-none"
-                      >
-                        <option value="">Select Backbone Cable...</option>
-                        {fiberCables
-                          .filter(c => c.cable_type === 'Backbone')
-                          .map(cable => (
-                            <option key={cable.id} value={cable.id}>
-                              {cable.cable_tag} ({cable.fiber_count}F)
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-
-                    {/* Strands (TX/RX) */}
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <div>
-                        <label className="block text-[9px] font-semibold text-slate-400 mb-1">TX/Uplink Strand</label>
-                        <select
-                          value={assignedStrandTxId} onChange={e => setAssignedStrandTxId(e.target.value)}
-                          className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-[11px] focus:outline-none"
-                          disabled={!cameraDropCableId && !cameraBackboneCableId}
-                        >
-                          <option value="">Unassigned</option>
-                          {fiberStrands
-                            .filter(s => s.cable_id === (cameraDropCableId || cameraBackboneCableId))
-                            .map(strand => (
-                              <option key={strand.id} value={strand.id}>
-                                Core {strand.strand_number} ({strand.fiber_color})
-                              </option>
-                            ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-[9px] font-semibold text-slate-400 mb-1">RX Strand</label>
-                        <select
-                          value={assignedStrandRxId} onChange={e => setAssignedStrandRxId(e.target.value)}
-                          className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-[11px] focus:outline-none"
-                          disabled={!cameraDropCableId && !cameraBackboneCableId}
-                        >
-                          <option value="">Unassigned</option>
-                          {fiberStrands
-                            .filter(s => s.cable_id === (cameraDropCableId || cameraBackboneCableId))
-                            .map(strand => (
-                              <option key={strand.id} value={strand.id}>
-                                Core {strand.strand_number} ({strand.fiber_color})
-                              </option>
-                            ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Switch / Cabinet patching details (only visible if connectivity path uses a switch) */}
-                    {connectivityPathType !== 'Fiber -> Camera' && (
-                      <div className="pt-2.5 border-t border-slate-850 space-y-3">
-                        <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cabinet & Switch Termination</span>
-                        
-                        {/* Cabinet */}
-                        <div>
-                          <label className="block text-[9px] font-semibold text-slate-400 mb-1">Assigned Cabinet</label>
-                          <select
-                            value={assignedCabinetId}
-                            onChange={e => {
-                              setAssignedCabinetId(e.target.value)
-                              setAssignedSwitchId('') // reset dependent selects
-                              setAssignedSwitchPortId('')
-                              setAssignedSfpPortId('')
-                              setAssignedFppId('')
-                              setAssignedFduId('')
-                            }}
-                            className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-[11px] focus:outline-none"
-                          >
-                            <option value="">Select Cabinet...</option>
-                            {cabinets.map(cab => (
-                              <option key={cab.id} value={cab.id}>
-                                {cab.cabinet_tag} ({cab.cabinet_type})
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* FDU */}
-                        <div>
-                          <label className="block text-[9px] font-semibold text-slate-400 mb-1">Assigned FDU</label>
-                          <select
-                            value={assignedFduId}
-                            onChange={e => setAssignedFduId(e.target.value)}
-                            className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-[11px] focus:outline-none"
-                            disabled={!assignedCabinetId}
-                          >
-                            <option value="">Select FDU...</option>
-                            {fdus
-                              .filter(f => f.cabinet_id === assignedCabinetId)
-                              .map(fdu => (
-                                <option key={fdu.id} value={fdu.id}>
-                                  {fdu.fdu_tag} ({fdu.fiber_capacity}F)
-                                </option>
-                              ))}
-                          </select>
-                        </div>
-
-                        {/* FPP */}
-                        <div>
-                          <label className="block text-[9px] font-semibold text-slate-400 mb-1">Assigned FPP</label>
-                          <select
-                            value={assignedFppId}
-                            onChange={e => setAssignedFppId(e.target.value)}
-                            className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-[11px] focus:outline-none"
-                            disabled={!assignedCabinetId}
-                          >
-                            <option value="">Select FPP...</option>
-                            {fpps
-                              .filter(f => f.cabinet_id === assignedCabinetId)
-                              .map(fpp => (
-                                <option key={fpp.id} value={fpp.id}>
-                                  {fpp.fpp_tag} ({fpp.port_count} Ports)
-                                </option>
-                              ))}
-                          </select>
-                        </div>
-
-                        {/* Switch */}
-                        <div>
-                          <label className="block text-[9px] font-semibold text-slate-400 mb-1">Assigned switch</label>
-                          <select
-                            value={assignedSwitchId}
-                            onChange={e => {
-                              setAssignedSwitchId(e.target.value)
-                              setAssignedSwitchPortId('')
-                              setAssignedSfpPortId('')
-                            }}
-                            className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-[11px] focus:outline-none"
-                            disabled={!assignedCabinetId}
-                          >
-                            <option value="">Select Switch...</option>
-                            {networkDevices
-                              .filter(d => d.cabinet_id === assignedCabinetId && (d.device_type === 'Industrial Switch' || d.device_type === 'switch'))
-                              .map(sw => (
-                                <option key={sw.id} value={sw.id}>
-                                  {sw.name} ({sw.device_type})
-                                </option>
-                              ))}
-                          </select>
-                        </div>
-
-                        {/* Switch Port fields & calculations */}
-                        {assignedSwitchId && (() => {
-                          const selectedSwitch = networkDevices.find(d => d.id === assignedSwitchId)
-                          const totalPorts = selectedSwitch?.total_ports || 0
-                          const switchPortsList = allSwitchPorts.filter(p => p.network_device_id === assignedSwitchId)
-                          const usedPorts = switchPortsList.filter(p => p.assigned_camera_location_id || p.assigned_fiber_strand_id || p.assigned_device_type !== 'unused').length
-                          const availablePorts = totalPorts - usedPorts
-
-                          return (
-                            <div className="space-y-3.5 bg-slate-950/60 p-2.5 rounded-xl border border-slate-900">
-                              <div className="flex justify-between items-center text-[10px]">
-                                <span className="font-semibold text-slate-450">Switch Port Status:</span>
-                                <span className={`px-2 py-0.5 rounded-full font-bold font-mono text-[9px] ${availablePorts > 0 ? 'bg-emerald-950 text-emerald-400' : 'bg-rose-950 text-rose-400'}`}>
-                                  Used: {usedPorts}/{totalPorts} ({availablePorts} Avail)
-                                </span>
-                              </div>
-
-                              {/* Copper Port */}
-                              <div>
-                                <label className="block text-[8px] font-bold text-slate-450 uppercase mb-1">Copper / RJ45 Port</label>
-                                <select
-                                  value={assignedSwitchPortId}
-                                  onChange={e => setAssignedSwitchPortId(e.target.value)}
-                                  className="w-full px-2 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-white text-[10px] focus:outline-none"
-                                >
-                                  <option value="">Select RJ45 Port...</option>
-                                  {switchPortsList
-                                    .filter(p => p.port_type === 'rj45')
-                                    .map(port => {
-                                      const isAssignedToOther = port.assigned_camera_location_id && port.assigned_camera_location_id !== selectedCamera.id
-                                      return (
-                                        <option key={port.id} value={port.id} disabled={!!isAssignedToOther}>
-                                          Port {port.port_number} {isAssignedToOther ? '(Assigned)' : '(Available)'}
-                                        </option>
-                                      )
-                                    })}
-                                </select>
-                              </div>
-
-                              {/* SFP Port */}
-                              <div>
-                                <label className="block text-[8px] font-bold text-slate-450 uppercase mb-1">SFP Jumper Port (Uplink)</label>
-                                <select
-                                  value={assignedSfpPortId}
-                                  onChange={e => setAssignedSfpPortId(e.target.value)}
-                                  className="w-full px-2 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-white text-[10px] focus:outline-none"
-                                >
-                                  <option value="">Select SFP Port...</option>
-                                  {switchPortsList
-                                    .filter(p => p.port_type === 'sfp' || p.port_type === 'sfp_plus')
-                                    .map(port => {
-                                      const isAssignedToOther = port.assigned_fiber_strand_id && port.assigned_fiber_strand_id !== assignedStrandTxId
-                                      return (
-                                        <option key={port.id} value={port.id} disabled={!!isAssignedToOther}>
-                                          Port {port.port_number} - {port.port_type.toUpperCase()} {isAssignedToOther ? '(Assigned)' : '(Available)'}
-                                        </option>
-                                      )
-                                    })}
-                                </select>
-                              </div>
-                            </div>
-                          )
-                        })()}
-                      </div>
-                    )}
-
-                    {/* Fiber Path Status */}
-                    <div>
-                      <label className="block text-[9px] font-semibold text-slate-400 mb-1">Path Status</label>
-                      <select
-                        value={cameraFiberPathStatus} onChange={e => setCameraFiberPathStatus(e.target.value)}
-                        className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-[11px] focus:outline-none"
-                      >
-                        <option value="Planned">Planned</option>
-                        <option value="Fiber Pulled">Fiber Pulled</option>
-                        <option value="Splicing Pending">Splicing Pending</option>
-                        <option value="Spliced">Spliced</option>
-                        <option value="Testing Pending">Testing Pending</option>
-                        <option value="Tested">Tested</option>
-                        <option value="Connected">Connected</option>
-                        <option value="Complete">Complete</option>
-                        <option value="Blocked">Blocked</option>
-                      </select>
-                    </div>
-
-                    {/* Generate Fiber Tasks & Infrastructure Tasks Buttons */}
-                    <div className="pt-2 border-t border-slate-850 flex gap-2">
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (!selectedCamera) return
-                          if (confirm(`Do you want to generate Fiber installation, splicing and testing tasks for ${selectedCamera.camera_id_tag}?`)) {
-                            startTransition(async () => {
-                              const res = await generateFiberTasksForCamera({
-                                projectId,
-                                cameraId: selectedCamera.id,
-                                cameraTag: selectedCamera.camera_id_tag
-                              })
-                              if (res.success) {
-                                alert(`Generated ${res.created} new tasks (${res.skipped} skipped).`)
-                                await loadCameraTasksAndHistory(selectedCamera.id)
-                              } else if (res.error) {
-                                alert(`Error: ${res.error}`)
-                              }
-                            })
-                          }
-                        }}
-                        className="flex-1 py-1.5 px-2 bg-indigo-600/25 hover:bg-indigo-600/40 border border-indigo-500/30 text-indigo-300 rounded-lg text-[10px] font-bold transition text-center"
-                      >
-                        Generate Fiber Tasks
-                      </button>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (!selectedCamera) return
-                          if (confirm(`Do you want to initialize all standard camera infrastructure checklists for ${selectedCamera.camera_id_tag}?`)) {
-                            startTransition(async () => {
-                              const res = await generateScopeTemplateTasks({
-                                projectId,
-                                cameraId: selectedCamera.id,
-                                communicationType: 'fiber'
-                              })
-                              if (res.success) {
-                                alert(`Initialized checklist successfully.`)
-                                await loadCameraTasksAndHistory(selectedCamera.id)
-                              } else if (res.error) {
-                                alert(`Error: ${res.error}`)
-                              }
-                            })
-                          }
-                        }}
-                        className="flex-1 py-1.5 px-2 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-300 rounded-lg text-[10px] font-bold transition text-center"
-                      >
-                        Generate Infra Tasks
-                      </button>
-                    </div>
+                {cameraPanelMessage && (
+                  <div className={`p-3 rounded-xl border text-[11px] ${
+                    cameraPanelMessage.type === 'success'
+                      ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                      : 'bg-red-500/10 border-red-500/20 text-red-400'
+                  }`}>
+                    {cameraPanelMessage.text}
                   </div>
                 )}
 
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Status</label>
+                {/* 1. Connectivity Method Selector (Guided First) */}
+                <div className="space-y-1.5 bg-indigo-950/20 border border-indigo-900/30 p-3.5 rounded-xl shadow-inner">
+                  <label className="block text-[10px] font-black text-indigo-400 uppercase tracking-wider">Connectivity Backhaul</label>
                   <select
-                    value={cameraStatus} onChange={e => setCameraStatus(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none"
+                    value={cameraDetailedConn}
+                    onChange={e => handleDetailedConnChange(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-xs focus:outline-none focus:border-indigo-500 font-semibold cursor-pointer hover:border-slate-700 transition"
                   >
-                    <option value="planned">Planned</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="complete">Complete</option>
-                    <option value="issue">Issue</option>
-                    <option value="unknown">Unknown / TBD</option>
+                    <option value="Fiber">Fiber (Spliced Drop)</option>
+                    <option value="Ethernet / Copper">Ethernet / Copper (Local PoE)</option>
+                    <option value="Wireless PTP">Wireless PTP (Radio Link)</option>
+                    <option value="Wireless PTMP">Wireless PTMP (Sector Client)</option>
+                    <option value="Wi-Fi Bridge">Wi-Fi Bridge (Mesh Client)</option>
+                    <option value="LTE / 5G">LTE / 5G (Cellular Modem)</option>
+                    <option value="Existing Network">Existing Third-Party Link</option>
+                    <option value="Unknown">Unknown / TBD</option>
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Location Ref</label>
-                  <input
-                    type="text" placeholder="Pole, Wall name..." value={cameraStructureRef} onChange={e => setCameraStructureRef(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Notes</label>
-                  <textarea
-                    rows={2} placeholder="Obstructions, special notes..." value={cameraNotes} onChange={e => setCameraNotes(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs resize-none"
-                  />
-                </div>
-
-                {/* Tasks Section */}
-                <div className="border-t border-slate-800 pt-4 space-y-4">
-                  {/* Status Conflict Warning */}
-                  {isCompleteButTasksOpen && (
-                    <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 p-3 rounded-xl text-[11px] space-y-2 mt-2">
-                      <div className="flex items-start gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="shrink-0 mt-0.5"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                        <span>Camera is marked Complete but checklist has open or missing tasks.</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleNormalizeCameraStatus}
-                        className="w-full py-1.5 px-3 bg-amber-600/20 hover:bg-amber-600/35 border border-amber-600/30 text-amber-300 rounded-lg text-[10px] font-bold transition"
-                      >
-                        Normalize Status
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="block text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Camera Checklist</span>
-                      {cameraTasks.length > 0 && (
-                        <div className="text-[9.5px] text-slate-400 font-semibold font-mono mt-1 leading-snug">
-                          Open: {cameraTasks.filter(t => t.status === 'Not Started' || t.status === 'In Progress' || !t.status).length} | 
-                          Blocked: {cameraTasks.filter(t => t.status === 'Blocked').length} | 
-                          QA Fail: {cameraTasks.filter(t => t.status === 'Failed QA').length} | 
-                          Rework: {cameraTasks.filter(t => t.status === 'Needs Rework').length}
-                        </div>
-                      )}
-                    </div>
-                    {cameraTasks.length > 0 && (
-                      <div className="flex flex-col items-end gap-1 shrink-0">
-                        <span className="text-[10px] text-slate-200 font-bold bg-slate-950 border border-slate-850 px-2 py-0.5 rounded-full">
-                          {completeCount}/{totalCount} Done
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setIsFullChecklistOpen(true)}
-                          className="text-[9.5px] text-indigo-400 hover:text-indigo-300 font-bold transition underline mt-0.5"
-                        >
-                          Open Full Checklist
-                        </button>
-                      </div>
-                    )}
+                {/* 2. Asset Readiness Checklist */}
+                <div className="bg-slate-950/25 border border-slate-850 rounded-xl p-3.5 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Readiness Status</span>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase font-mono tracking-wider ${
+                      readiness.overallStatus === 'Ready'
+                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                        : readiness.overallStatus === 'Needs Attention'
+                        ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                        : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                    }`}>
+                      {readiness.overallStatus}
+                    </span>
                   </div>
-
-                  {loadingTasks ? (
-                    <div className="text-xs text-slate-500 animate-pulse">Loading checklist...</div>
-                  ) : cameraTasks.length === 0 ? (
-                    <div className="bg-slate-950/40 border border-slate-800 p-3 rounded-xl text-center space-y-2">
-                      <p className="text-[11px] text-slate-400">No tasks checklist generated for this camera.</p>
-                      <button
-                        type="button"
-                        onClick={handleInitializeChecklist}
-                        disabled={isInitializingChecklist}
-                        className="py-1.5 px-3 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-700 text-white rounded-lg text-[10px] font-semibold transition"
-                      >
-                        {isInitializingChecklist ? 'Initializing...' : `Initialize Checklist`}
-                      </button>
+                  {readiness.overallStatus !== 'Ready' ? (
+                    <div className="bg-slate-950/40 p-2.5 rounded-lg border border-slate-900 text-[10px] text-amber-400/90 font-medium flex items-start gap-1.5">
+                      <span className="text-[8px] mt-0.5 text-amber-500">⚠️</span>
+                      <span>{readiness.nextAction}</span>
                     </div>
                   ) : (
-                    <div className="space-y-3">
-                      {/* Progress Bar */}
-                      <div className="w-full bg-slate-950 rounded-full h-1.5">
-                        <div
-                          className="bg-indigo-500 h-1.5 rounded-full transition-all duration-300"
-                          style={{
-                            width: `${Math.round((completeCount / totalCount) * 100)}%`
-                          }}
+                    <div className="text-[10px] text-slate-400 bg-slate-950/40 p-2 rounded-lg border border-slate-900/60 flex items-center gap-1.5 font-medium">
+                      <span className="text-emerald-400">✓</span>
+                      <span>All engineering preconditions satisfied.</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. Accordion: Specs (Device & Local Details) */}
+                <div className="border border-slate-850 rounded-xl overflow-hidden bg-slate-950/10">
+                  <button
+                    type="button"
+                    onClick={() => setIsSpecsOpen(!isSpecsOpen)}
+                    className="w-full flex justify-between items-center p-3.5 bg-slate-950/40 text-left hover:bg-slate-950/60 transition-colors border-b border-slate-850/40"
+                  >
+                    <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                      <svg className="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+                      Specs & Details
+                    </span>
+                    <span className="text-slate-400">{isSpecsOpen ? '▲' : '▼'}</span>
+                  </button>
+
+                  {isSpecsOpen && (
+                    <div className="p-3.5 space-y-3.5 bg-slate-900/40">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Camera Tag</label>
+                        <input
+                          type="text" required value={cameraTag} onChange={e => setCameraTag(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
                         />
                       </div>
 
-                      {/* Task List (flows naturally in drawer scroll) */}
-                      <div className="space-y-3 bg-slate-950/20 p-2 rounded-xl border border-slate-850">
-                        {cameraTasks.map(task => (
-                          <div key={task.id} className="group border border-slate-800/80 bg-slate-950/40 p-3 rounded-xl flex flex-col gap-2 hover:border-slate-700/60 transition-all">
-                            <div className="flex items-start gap-2.5 justify-between">
-                              <label className="flex items-start gap-2.5 cursor-pointer select-none grow">
-                                <input
-                                  type="checkbox"
-                                  checked={task.status === 'Complete'}
-                                  onChange={() => handleToggleTaskStatus(task)}
-                                  className="mt-0.5 rounded border-slate-800 bg-slate-950 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 shrink-0"
-                                />
-                                <span className={`text-[12px] font-bold text-slate-200 leading-snug group-hover:text-white transition-colors ${task.status === 'Complete' ? 'line-through text-slate-500 group-hover:text-slate-500 font-medium' : ''}`}>
-                                  {task.title}
-                                </span>
-                              </label>
-                              
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Camera Model</label>
+                        <select
+                          value={cameraModelId} onChange={e => setCameraModelId(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                        >
+                          <option value="">Select Model...</option>
+                          {cameraModels.map(model => (
+                            <option key={model.id} value={model.id}>
+                              {model.manufacturer} - {model.model_number} ({model.resolution || 'Resolution TBD'}, {model.default_poe_draw}W)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Status</label>
+                          <select
+                            value={cameraStatus} onChange={e => setCameraStatus(e.target.value as any)}
+                            className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                          >
+                            <option value="planned">Planned</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="complete">Complete</option>
+                            <option value="issue">Issue</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Power Type</label>
+                          <select
+                            value={cameraPowerType} onChange={e => setCameraPowerType(e.target.value as any)}
+                            className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                          >
+                            <option value="poe">PoE (Standard)</option>
+                            <option value="poe_plus">PoE+ (30W)</option>
+                            <option value="poe_bt">PoE++ (60W/90W)</option>
+                            <option value="dc_12v">12V DC Local</option>
+                            <option value="dc_24v">24V DC Local</option>
+                            <option value="ac_24v">24V AC Local</option>
+                            <option value="solar">Solar/Battery</option>
+                            <option value="other">Other / TBD</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Address Reference</label>
+                        <input
+                          type="text" value={cameraAddressRef} onChange={e => setCameraAddressRef(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+                          placeholder="e.g., 100 Main St Pole 4"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Structure Reference</label>
+                        <input
+                          type="text" value={cameraStructureRef} onChange={e => setCameraStructureRef(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+                          placeholder="e.g., Pole 4B, Wall Mount"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Notes</label>
+                        <textarea
+                          value={cameraNotes} onChange={e => setCameraNotes(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 min-h-[50px] resize-y"
+                          placeholder="General specs, mounting requirements..."
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 4. Accordion: Checklist (Camera Checklist) */}
+                <div className="border border-slate-850 rounded-xl overflow-hidden bg-slate-950/10">
+                  <button
+                    type="button"
+                    onClick={() => setIsChecklistOpen(!isChecklistOpen)}
+                    className="w-full flex justify-between items-center p-3.5 bg-slate-950/40 text-left hover:bg-slate-950/60 transition-colors border-b border-slate-850/40"
+                  >
+                    <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                      <svg className="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                      Guided Checklist
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {totalCount > 0 && (
+                        <span className="text-[9.5px] text-slate-300 bg-slate-950 border border-slate-850 px-1.5 py-0.25 rounded-full font-bold">
+                          {completeCount}/{totalCount}
+                        </span>
+                      )}
+                      <span className="text-slate-400">{isChecklistOpen ? '▲' : '▼'}</span>
+                    </div>
+                  </button>
+
+                  {isChecklistOpen && (
+                    <div className="p-3.5 space-y-3.5 bg-slate-900/40">
+                      {loadingTasks ? (
+                        <div className="text-xs text-slate-500 animate-pulse">Loading checklist...</div>
+                      ) : cameraTasks.length === 0 ? (
+                        <div className="bg-slate-950/40 border border-slate-800 p-3 rounded-xl text-center space-y-2">
+                          <p className="text-[11px] text-slate-400">No tasks checklist generated for this camera.</p>
+                          <button
+                            type="button"
+                            onClick={handleInitializeChecklist}
+                            disabled={isInitializingChecklist}
+                            className="py-1.5 px-3 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-700 text-white rounded-lg text-[10px] font-semibold transition"
+                          >
+                            {isInitializingChecklist ? 'Initializing...' : `Initialize Checklist`}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {/* Progress Bar */}
+                          <div className="w-full bg-slate-950 rounded-full h-1.5">
+                            <div
+                              className="bg-indigo-500 h-1.5 rounded-full transition-all duration-300"
+                              style={{
+                                width: `${Math.round((completeCount / Math.max(totalCount, 1)) * 100)}%`
+                              }}
+                            />
+                          </div>
+
+                          {/* Task List (flows naturally in drawer scroll) */}
+                          <div className="space-y-2 max-h-56 overflow-y-auto scrollbar-thin pr-1">
+                            {cameraTasks.map(task => (
+                              <div key={task.id} className="group border border-slate-800/80 bg-slate-950/40 p-2.5 rounded-xl flex flex-col gap-2 hover:border-slate-700/60 transition-all">
+                                <div className="flex items-start gap-2.5 justify-between">
+                                  <label className="flex items-start gap-2 cursor-pointer select-none grow">
+                                    <input
+                                      type="checkbox"
+                                      checked={task.status === 'Complete'}
+                                      onChange={() => handleToggleTaskStatus(task)}
+                                      className="mt-0.5 rounded border-slate-800 bg-slate-950 text-indigo-600 focus:ring-indigo-500 w-3 h-3 shrink-0"
+                                    />
+                                    <span className={`text-[11px] font-bold text-slate-200 leading-snug group-hover:text-white transition-colors ${task.status === 'Complete' ? 'line-through text-slate-500 group-hover:text-slate-500 font-medium' : ''}`}>
+                                      {task.title}
+                                    </span>
+                                  </label>
+                                  
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteTask(task.id)}
+                                    className="text-slate-500 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 shrink-0"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                  </button>
+                                </div>
+
+                                <div className="flex items-center justify-between border-t border-slate-900/60 pt-2 mt-0.5">
+                                  <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider bg-slate-950 border border-slate-850 px-1 py-0.5 rounded shrink-0">{task.task_type}</span>
+                                  
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    {/* Status Select */}
+                                    <select
+                                      value={task.status}
+                                      onChange={e => handleTaskStatusChange(task.id, e.target.value)}
+                                      className="bg-slate-950 border border-slate-800 text-slate-300 rounded px-1.5 py-0.5 text-[9px] focus:outline-none focus:border-indigo-500 cursor-pointer"
+                                    >
+                                      <option value="Not Started">Not Started</option>
+                                      <option value="In Progress">In Progress</option>
+                                      <option value="Blocked">Blocked</option>
+                                      <option value="Complete">Complete</option>
+                                      <option value="Failed QA">Failed QA</option>
+                                      <option value="Needs Rework">Needs Rework</option>
+                                      <option value="Cancelled">Cancelled</option>
+                                    </select>
+
+                                    {/* Priority Select */}
+                                    <select
+                                      value={task.priority}
+                                      onChange={e => handleTaskPriorityChange(task.id, e.target.value)}
+                                      className={`rounded px-1.5 py-0.5 text-[9px] font-extrabold focus:outline-none border border-slate-800 cursor-pointer ${
+                                        task.priority === 'Critical' ? 'bg-red-500/10 text-red-400' :
+                                        task.priority === 'High' ? 'bg-amber-500/10 text-amber-400' :
+                                        task.priority === 'Medium' ? 'bg-indigo-500/10 text-indigo-400' :
+                                        'bg-slate-500/10 text-slate-400'
+                                      }`}
+                                    >
+                                      <option value="Low" className="bg-slate-950 text-white">Low</option>
+                                      <option value="Medium" className="bg-slate-950 text-white">Medium</option>
+                                      <option value="High" className="bg-slate-950 text-white">High</option>
+                                      <option value="Critical" className="bg-slate-950 text-white">Critical</option>
+                                    </select>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Add Manual Task Inline Form */}
+                          <div className="bg-slate-950/20 border border-slate-850 p-2.5 rounded-xl space-y-2">
+                            <span className="block text-[8.5px] font-bold text-slate-400 uppercase tracking-wider">Add Custom Task</span>
+                            <div className="flex gap-1.5">
+                              <input
+                                type="text"
+                                placeholder="Task title..."
+                                value={newTaskTitle}
+                                onChange={e => setNewTaskTitle(e.target.value)}
+                                className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-slate-200 text-xs grow focus:outline-none focus:border-indigo-500"
+                              />
                               <button
                                 type="button"
-                                onClick={() => handleDeleteTask(task.id)}
-                                className="text-slate-500 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 shrink-0"
+                                onClick={handleCreateTask}
+                                disabled={isCreatingTask || !newTaskTitle.trim()}
+                                className="px-2 py-1 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-900 text-white text-xs font-semibold rounded-lg shrink-0"
                               >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                Add
                               </button>
                             </div>
+                            <div className="grid grid-cols-2 gap-1.5">
+                              <select
+                                value={newTaskType}
+                                onChange={e => setNewTaskType(e.target.value)}
+                                className="bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5 text-[9px] text-slate-400 focus:outline-none cursor-pointer"
+                              >
+                                <option value="Cabling">Cabling</option>
+                                <option value="Mounting">Mounting</option>
+                                <option value="Site Survey">Site Survey</option>
+                                <option value="Fiber">Fiber</option>
+                                <option value="Wireless">Wireless</option>
+                                <option value="Testing">Testing</option>
+                                <option value="Documentation">Documentation</option>
+                                <option value="Configuration">Configuration</option>
+                                <option value="Switch Assignment">Switch Assignment</option>
+                                <option value="IP Addressing">IP Addressing</option>
+                                <option value="Power">Power</option>
+                                <option value="Photos">Photos</option>
+                                <option value="Closeout">Closeout</option>
+                              </select>
+                              <select
+                                value={newTaskPriority}
+                                onChange={e => setNewTaskPriority(e.target.value)}
+                                className="bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5 text-[9px] text-slate-400 focus:outline-none cursor-pointer"
+                              >
+                                <option value="Low">Low</option>
+                                <option value="Medium">Medium</option>
+                                <option value="High">High</option>
+                                <option value="Critical">Critical</option>
+                              </select>
+                            </div>
+                          </div>
 
-                            <div className="flex items-center justify-between border-t border-slate-900/60 pt-2.5 mt-0.5">
-                              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider bg-slate-950 border border-slate-850 px-1.5 py-0.5 rounded shrink-0">{task.task_type}</span>
-                              
-                              <div className="flex items-center gap-2 shrink-0">
-                                {/* Status Select */}
+                          <div className="flex justify-end pt-0.5">
+                            <button
+                              type="button"
+                              onClick={() => setIsFullChecklistOpen(true)}
+                              className="text-[9.5px] text-indigo-400 hover:text-indigo-300 font-bold transition underline"
+                            >
+                              Open Full Project Checklist
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* 5. Accordion: Connectivity Chain */}
+                <div className="border border-slate-850 rounded-xl overflow-hidden bg-slate-950/10">
+                  <button
+                    type="button"
+                    onClick={() => setIsChainOpen(!isChainOpen)}
+                    className="w-full flex justify-between items-center p-3.5 bg-slate-950/40 text-left hover:bg-slate-950/60 transition-colors border-b border-slate-850/40"
+                  >
+                    <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                      <svg className="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+                      Connectivity Chain
+                    </span>
+                    <span className="text-slate-400">{isChainOpen ? '▲' : '▼'}</span>
+                  </button>
+
+                  {isChainOpen && (
+                    <div className="p-3.5 space-y-3.5 bg-slate-900/40">
+                      {cameraCommType === 'fiber' ? (
+                        <>
+                          <div className="text-[10px] text-indigo-400 font-bold border-b border-slate-850 pb-1.5">OSP Fiber Properties</div>
+                          
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Source Fiber Node</label>
+                            <select
+                              value={cameraSourceNodeId} onChange={e => setCameraSourceNodeId(e.target.value)}
+                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                            >
+                              <option value="">Select Node...</option>
+                              {fiberNodes.map(node => (
+                                <option key={node.id} value={node.id}>
+                                  {node.node_tag} ({node.node_type})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Fiber Enclosure</label>
+                            <select
+                              value={cameraEnclosureId} onChange={e => setCameraEnclosureId(e.target.value)}
+                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                            >
+                              <option value="">Select Enclosure...</option>
+                              {fiberEnclosures
+                                .filter(enc => !cameraSourceNodeId || enc.node_id === cameraSourceNodeId)
+                                .map(enc => (
+                                  <option key={enc.id} value={enc.id}>
+                                    {enc.enclosure_tag} ({enc.model_type || 'splice tray'})
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Drop Cable</label>
+                            <select
+                              value={cameraDropCableId} onChange={e => setCameraDropCableId(e.target.value)}
+                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                            >
+                              <option value="">Select Cable...</option>
+                              {fiberCables
+                                .filter(cab => cab.cable_type === 'Drop')
+                                .map(cab => (
+                                  <option key={cab.id} value={cab.id}>
+                                    {cab.cable_tag} ({cab.fiber_count}F, {cab.install_status})
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Backbone Cable</label>
+                            <select
+                              value={cameraBackboneCableId} onChange={e => setCameraBackboneCableId(e.target.value)}
+                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                            >
+                              <option value="">Select Backbone...</option>
+                              {fiberCables
+                                .filter(cab => cab.cable_type === 'Backbone')
+                                .map(cab => (
+                                  <option key={cab.id} value={cab.id}>
+                                    {cab.cable_tag} ({cab.fiber_count}F, {cab.install_status})
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3 border-t border-slate-800/60 pt-3">
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">TX Strand</label>
+                              <select
+                                value={assignedStrandTxId} onChange={e => setAssignedStrandTxId(e.target.value)}
+                                className="w-full px-2 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                              >
+                                <option value="">None</option>
+                                {fiberStrands
+                                  .filter(st => {
+                                    const cable = fiberCables.find(c => c.id === st.cable_id)
+                                    return cable && (st.cable_id === cameraDropCableId || st.cable_id === cameraBackboneCableId)
+                                  })
+                                  .map(st => (
+                                    <option key={st.id} value={st.id}>
+                                      Strand {st.strand_number} ({st.color_name || 'Standard'})
+                                    </option>
+                                  ))}
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">RX Strand</label>
+                              <select
+                                value={assignedStrandRxId} onChange={e => setAssignedStrandRxId(e.target.value)}
+                                className="w-full px-2 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                              >
+                                <option value="">None</option>
+                                {fiberStrands
+                                  .filter(st => {
+                                    const cable = fiberCables.find(c => c.id === st.cable_id)
+                                    return cable && (st.cable_id === cameraDropCableId || st.cable_id === cameraBackboneCableId)
+                                  })
+                                  .map(st => (
+                                    <option key={st.id} value={st.id}>
+                                      Strand {st.strand_number} ({st.color_name || 'Standard'})
+                                    </option>
+                                  ))}
+                              </select>
+                            </div>
+                          </div>
+
+                          <div className="space-y-3 border-t border-slate-800/60 pt-3">
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Fiber Path Status</label>
+                              <select
+                                value={cameraFiberPathStatus} onChange={e => setCameraFiberPathStatus(e.target.value)}
+                                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                              >
+                                <option value="Planned">Planned</option>
+                                <option value="Pulled">Pulled</option>
+                                <option value="Spliced">Spliced</option>
+                                <option value="Tested">Tested</option>
+                                <option value="Connected">Connected</option>
+                              </select>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Splice Status</label>
                                 <select
-                                  value={task.status}
-                                  onChange={e => handleTaskStatusChange(task.id, e.target.value)}
-                                  className="bg-slate-950 border border-slate-800 text-slate-300 rounded px-2 py-0.75 text-[10px] focus:outline-none focus:border-indigo-500"
+                                  value={cameraSpliceStatus} onChange={e => setCameraSpliceStatus(e.target.value)}
+                                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
                                 >
-                                  <option value="Not Started">Not Started</option>
+                                  <option value="Not Spliced">Not Spliced</option>
                                   <option value="In Progress">In Progress</option>
-                                  <option value="Blocked">Blocked</option>
                                   <option value="Complete">Complete</option>
-                                  <option value="Failed QA">Failed QA</option>
-                                  <option value="Needs Rework">Needs Rework</option>
-                                  <option value="Cancelled">Cancelled</option>
                                 </select>
+                              </div>
 
-                                {/* Priority Select */}
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Test Status</label>
                                 <select
-                                  value={task.priority}
-                                  onChange={e => handleTaskPriorityChange(task.id, e.target.value)}
-                                  className={`rounded px-2 py-0.75 text-[10px] font-extrabold focus:outline-none border border-slate-800 ${
-                                    task.priority === 'Critical' ? 'bg-red-500/10 text-red-400' :
-                                    task.priority === 'High' ? 'bg-amber-500/10 text-amber-400' :
-                                    task.priority === 'Medium' ? 'bg-indigo-500/10 text-indigo-400' :
-                                    'bg-slate-500/10 text-slate-400'
-                                  }`}
+                                  value={cameraTestStatus} onChange={e => setCameraTestStatus(e.target.value)}
+                                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
                                 >
-                                  <option value="Low" className="bg-slate-950 text-white">Low</option>
-                                  <option value="Medium" className="bg-slate-950 text-white">Medium</option>
-                                  <option value="High" className="bg-slate-950 text-white">High</option>
-                                  <option value="Critical" className="bg-slate-950 text-white">Critical</option>
+                                  <option value="Not Tested">Not Tested</option>
+                                  <option value="Passed">Passed</option>
+                                  <option value="Failed">Failed</option>
                                 </select>
                               </div>
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-[10px] text-indigo-400 font-bold border-b border-slate-850 pb-1.5">Copper / Switch Port Properties</div>
 
-                  {/* Add Manual Task Inline Form */}
-                  {cameraTasks.length > 0 && (
-                    <div className="bg-slate-950/20 border border-slate-850 p-2.5 rounded-xl space-y-2">
-                      <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Add Custom Task</span>
-                      <div className="flex gap-1.5">
-                        <input
-                          type="text"
-                          placeholder="Task title..."
-                          value={newTaskTitle}
-                          onChange={e => setNewTaskTitle(e.target.value)}
-                          className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-slate-200 text-xs grow focus:outline-none focus:border-indigo-500"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleCreateTask}
-                          disabled={isCreatingTask || !newTaskTitle.trim()}
-                          className="px-2 py-1 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-900 text-white text-xs font-semibold rounded-lg shrink-0"
-                        >
-                          + Add
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        <select
-                          value={newTaskType}
-                          onChange={e => setNewTaskType(e.target.value)}
-                          className="bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5 text-[9px] text-slate-400 focus:outline-none"
-                        >
-                          <option value="Cabling">Cabling</option>
-                          <option value="Mounting">Mounting</option>
-                          <option value="Site Survey">Site Survey</option>
-                          <option value="Fiber">Fiber</option>
-                          <option value="Wireless">Wireless</option>
-                          <option value="Testing">Testing</option>
-                          <option value="Documentation">Documentation</option>
-                          <option value="Configuration">Configuration</option>
-                          <option value="Switch Assignment">Switch Assignment</option>
-                          <option value="IP Addressing">IP Addressing</option>
-                          <option value="Power">Power</option>
-                          <option value="Photos">Photos</option>
-                          <option value="Closeout">Closeout</option>
-                        </select>
-                        <select
-                          value={newTaskPriority}
-                          onChange={e => setNewTaskPriority(e.target.value)}
-                          className="bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5 text-[9px] text-slate-400 focus:outline-none"
-                        >
-                          <option value="Low">Low</option>
-                          <option value="Medium">Medium</option>
-                          <option value="High">High</option>
-                          <option value="Critical">Critical</option>
-                        </select>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* History Section */}
-                <div className="border-t border-slate-800 pt-4 space-y-2">
-                  <span className="block text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Audit Log / History</span>
-                  {loadingTasks ? (
-                    <div className="text-xs text-slate-500 animate-pulse">Loading history...</div>
-                  ) : cameraTaskHistory.length === 0 ? (
-                    <div className="text-[10px] text-slate-500 italic">No history logged yet.</div>
-                  ) : (
-                    <div className="space-y-2 max-h-40 overflow-y-auto scrollbar-thin pr-1 text-[10px]">
-                      {cameraTaskHistory.map(h => (
-                        <div key={h.id} className="border-l-2 border-slate-800 pl-2 py-0.5 space-y-0.5">
-                          <div className="flex justify-between items-center text-slate-400">
-                            <span className="font-semibold text-slate-300">{h.event_type.replace('_', ' ')}</span>
-                            <span>{new Date(h.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Assigned Switch</label>
+                            <select
+                              value={assignedSwitchId}
+                              onChange={e => setAssignedSwitchId(e.target.value)}
+                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                            >
+                              <option value="">Select Switch...</option>
+                              {networkDevices
+                                .filter(d => d.device_type === 'switch' || d.device_type === 'Industrial Switch')
+                                .map(sw => (
+                                  <option key={sw.id} value={sw.id}>
+                                    {sw.name} ({sw.ip_address || 'No IP'})
+                                  </option>
+                                ))}
+                            </select>
                           </div>
-                          <p className="text-slate-400 text-[9.5px] leading-snug">{h.note}</p>
-                        </div>
-                      ))}
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Switch Port</label>
+                            <select
+                              value={assignedPortId}
+                              onChange={e => setAssignedPortId(e.target.value)}
+                              disabled={loadingPorts || !assignedSwitchId}
+                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 disabled:opacity-50 cursor-pointer"
+                            >
+                              <option value="">{loadingPorts ? 'Loading Ports...' : 'Select Port...'}</option>
+                              {switchPorts.map(port => {
+                                const isAssignedToOther = port.assigned_camera_location_id && port.assigned_camera_location_id !== selectedCamera.id
+                                const displayName = isAssignedToOther
+                                  ? `Port ${port.port_number} - Assigned to ${port.assigned_camera?.camera_id_tag || 'another camera'}`
+                                  : `Port ${port.port_number}`
+                                return (
+                                  <option key={port.id} value={port.id} disabled={!!isAssignedToOther}>
+                                    {displayName}
+                                  </option>
+                                )
+                              })}
+                            </select>
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
+
+                {/* 6. Accordion: History / Audit Log */}
+                <div className="border border-slate-850 rounded-xl overflow-hidden bg-slate-950/10">
+                  <button
+                    type="button"
+                    onClick={() => setIsHistoryOpen(!isHistoryOpen)}
+                    className="w-full flex justify-between items-center p-3.5 bg-slate-950/40 text-left hover:bg-slate-950/60 transition-colors border-b border-slate-850/40"
+                  >
+                    <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                      <svg className="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                      History & Audit Log
+                    </span>
+                    <span className="text-slate-400">{isHistoryOpen ? '▲' : '▼'}</span>
+                  </button>
+
+                  {isHistoryOpen && (
+                    <div className="p-3.5 space-y-2 bg-slate-900/40 max-h-48 overflow-y-auto scrollbar-thin">
+                      {cameraTaskHistory.length === 0 ? (
+                        <div className="text-[10px] text-slate-500 italic">No history logged yet.</div>
+                      ) : (
+                        <div className="space-y-2.5 text-[10px]">
+                          {cameraTaskHistory.map(h => (
+                            <div key={h.id} className="border-l-2 border-slate-700 pl-2.5 py-0.5 space-y-0.5">
+                              <div className="flex justify-between items-center text-slate-400">
+                                <span className="font-semibold text-slate-300">{h.event_type.replace('_', ' ')}</span>
+                                <span>{new Date(h.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                              </div>
+                              <p className="text-slate-400 text-[9.5px] leading-snug">{h.note}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
               </div>
-            </div>
 
-            <div className="pt-4 border-t border-slate-850 mt-4 flex gap-3">
-              <button
-                type="button" onClick={handleDeleteCameraClick} disabled={isPending}
-                className="flex-1 py-2.5 px-4 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-900/50 text-rose-300 font-semibold rounded-xl text-xs"
-              >
-                Delete
-              </button>
-              <button
-                type="submit" disabled={isPending}
-                className="flex-[2] py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-700 text-white font-semibold rounded-xl text-xs shadow-md shadow-indigo-600/10"
-              >
-                {isPending ? 'Saving...' : 'Save Specs'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
+              {/* Action Buttons (Sticky Bottom) */}
+              <div className="pt-4 border-t border-slate-850 mt-4 flex gap-3 shrink-0">
+                <button
+                  type="button" onClick={handleDeleteCameraClick} disabled={isPending}
+                  className="flex-1 py-2.5 px-4 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-900/50 text-rose-300 font-semibold rounded-xl text-xs transition"
+                >
+                  Delete
+                </button>
+                <button
+                  type="submit" disabled={isPending}
+                  className="flex-[2] py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-700 text-white font-semibold rounded-xl text-xs shadow-md shadow-indigo-600/10 transition"
+                >
+                  {isPending ? 'Saving...' : 'Save Specs'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )
+      })()}
+      
       {selectedDevice && (
         <div className="w-80 bg-slate-900 border-l border-slate-800 flex flex-col justify-between shrink-0 h-full p-6 relative z-10 overflow-hidden shadow-2xl">
           <form onSubmit={handleSaveDevice} className="flex flex-col h-full justify-between">

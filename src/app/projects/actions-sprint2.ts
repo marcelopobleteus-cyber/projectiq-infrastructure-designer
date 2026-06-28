@@ -973,3 +973,54 @@ export async function getProfiles() {
   return data
 }
 
+export async function updateThemePreference(theme: string) {
+  if (theme !== 'light' && theme !== 'dark' && theme !== 'system') {
+    return { error: 'Invalid theme preference value.' }
+  }
+
+  const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return { error: 'Unauthorized. Please log in.' }
+  }
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ theme_preference: theme })
+    .eq('id', user.id)
+
+  if (error) {
+    return { error: `Failed to update theme preference: ${error.message}` }
+  }
+
+  return { success: true }
+}
+
+export async function getThemePreference() {
+  try {
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return 'system'
+    }
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('theme_preference')
+      .eq('id', user.id)
+      .single()
+
+    if (error || !data || !data.theme_preference) {
+      return 'system'
+    }
+
+    return data.theme_preference as 'light' | 'dark' | 'system'
+  } catch (err) {
+    console.error('Error fetching theme preference:', err)
+    return 'system'
+  }
+}
+
+

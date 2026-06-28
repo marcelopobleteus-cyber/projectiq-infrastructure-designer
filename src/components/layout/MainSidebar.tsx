@@ -3,6 +3,7 @@
 import React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useSettings } from './AppShell'
 
 interface MainSidebarProps {
   userEmail?: string | null
@@ -12,10 +13,12 @@ interface MainSidebarProps {
 
 export default function MainSidebar({ userEmail, userName, onSignOut }: MainSidebarProps) {
   const pathname = usePathname()
+  const { openSettings } = useSettings()
 
   // Match UUID format for projectId: /projects/ce20138e-9000-42ea-99f7-afd713d08903
   const projectMatch = pathname.match(/^\/projects\/([a-fA-F0-9-]{36})/)
   const projectId = projectMatch ? projectMatch[1] : null
+
 
   const items = [
     {
@@ -94,6 +97,22 @@ export default function MainSidebar({ userEmail, userName, onSignOut }: MainSide
                     {item.label} <span className="text-[10px] text-slate-500 block">(Requires active project)</span>
                   </span>
                 </div>
+              )
+            }
+
+            if (item.id === 'settings') {
+              return (
+                <button
+                  key={item.id}
+                  onClick={openSettings}
+                  className="w-12 h-12 rounded-xl flex items-center justify-center transition-all group relative border bg-transparent border-transparent text-slate-400 hover:text-white hover:bg-slate-800/40 hover:border-slate-800 cursor-pointer"
+                >
+                  {item.icon}
+                  {/* Tooltip */}
+                  <span className="absolute left-16 bg-slate-950 text-slate-200 text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-800 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 shadow-xl">
+                    {item.label}
+                  </span>
+                </button>
               )
             }
 

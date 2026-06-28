@@ -11,7 +11,7 @@ export default function WorkspaceContent({ children }: { children: React.ReactNo
   const isMapOrCanvas = pathname?.endsWith('/fiber') || pathname?.endsWith('/maps') || pathname?.endsWith('/network')
 
   return (
-    <div className={`flex-1 flex flex-col relative bg-slate-950 h-full w-full ${isMapOrCanvas ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+    <div className={`flex-1 flex flex-col relative bg-background h-full w-full ${isMapOrCanvas ? 'overflow-hidden' : 'overflow-y-auto'}`}>
       {children}
     </div>
   )

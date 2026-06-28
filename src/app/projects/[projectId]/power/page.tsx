@@ -50,7 +50,7 @@ export default async function ProjectPowerPage({ params }: PageProps) {
       <div className="bg-amber-950/10 border border-amber-900/35 rounded-2xl p-4 text-xs flex gap-3 text-amber-400">
         <svg className="shrink-0 mt-0.5" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
         <div>
-          <p className="font-bold">Power Module Architecture</p>
+          <p className="font-bold">Power data is not mapped yet.</p>
           <p className="text-slate-400 mt-1">Power load calculations, active voltage drop estimates, and solar battery storage sizing calculations will be fully activated in Sprint 4. No calculations are running currently.</p>
         </div>
       </div>
