@@ -135,6 +135,41 @@ export default function ProjectMapCanvas({
   const [isChecklistOpen, setIsChecklistOpen] = useState(true)
   const [isChainOpen, setIsChainOpen] = useState(true)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
+
+  // Wireless form states
+  const [isWirelessSpecsOpen, setIsWirelessSpecsOpen] = useState(true)
+  const [wirelessRadio, setWirelessRadio] = useState('')
+  const [wirelessFrequency, setWirelessFrequency] = useState('')
+  const [wirelessSignal, setWirelessSignal] = useState('')
+  const [wirelessCapacity, setWirelessCapacity] = useState('')
+  const [wirelessLatency, setWirelessLatency] = useState('')
+  const [wirelessLos, setWirelessLos] = useState('')
+  const [wirelessValidation, setWirelessValidation] = useState('')
+
+  // Helper to get brackets values
+  const getBracketValue = (notes: string, key: string, defaultValue = ''): string => {
+    const regex = new RegExp(`\\[${key}:\\s*([^\\]]+)\\]`, 'i')
+    const match = notes.match(regex)
+    return match ? match[1].trim() : defaultValue
+  }
+
+  // Helper to set bracket values
+  const setBracketValue = (notes: string, key: string, value: string): string => {
+    let cleanNotes = notes || ''
+    const regex = new RegExp(`\\[${key}:\\s*[^\\]]+\\]`, 'i')
+    const newValue = value.trim() ? `[${key}: ${value.trim()}]` : ''
+    
+    if (regex.test(cleanNotes)) {
+      if (newValue) {
+        cleanNotes = cleanNotes.replace(regex, newValue)
+      } else {
+        cleanNotes = cleanNotes.replace(regex, '').trim()
+      }
+    } else if (newValue) {
+      cleanNotes = cleanNotes.trim() ? `${cleanNotes} ${newValue}` : newValue
+    }
+    return cleanNotes
+  }
   
   // Fiber form states
   const [cameraSourceNodeId, setCameraSourceNodeId] = useState('')
@@ -202,6 +237,7 @@ export default function ProjectMapCanvas({
   const deviceMarkerStateRef = useRef<{ [id: string]: { isSelected: boolean; deviceType: string; name: string } }>({})
   const fiberNodeMarkersRef = useRef<{ [id: string]: google.maps.Marker }>({})
   const fiberRoutePolylinesRef = useRef<google.maps.Polyline[]>([])
+  const wirelessRoutePolylinesRef = useRef<google.maps.Polyline[]>([])
   const clickListenerRef = useRef<google.maps.MapsEventListener | null>(null)
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isHoveringCardRef = useRef(false)
@@ -341,6 +377,14 @@ export default function ProjectMapCanvas({
       setCameraNotes(selectedCamera.notes || '')
       setAssignedSwitchId(selectedCamera.assigned_network_device_id || '')
       setCameraPanelMessage(null)
+      const notesStr = selectedCamera.notes || ''
+      setWirelessRadio(getBracketValue(notesStr, 'Radio', 'TBD'))
+      setWirelessFrequency(getBracketValue(notesStr, 'Frequency', '5.8 GHz'))
+      setWirelessSignal(getBracketValue(notesStr, 'Signal', '-65 dBm'))
+      setWirelessCapacity(getBracketValue(notesStr, 'Capacity', '500 Mbps'))
+      setWirelessLatency(getBracketValue(notesStr, 'Latency', '2 ms'))
+      setWirelessLos(getBracketValue(notesStr, 'LoS', 'Clear'))
+      setWirelessValidation(getBracketValue(notesStr, 'LinkStatus', 'Pending'))
       setCameraDetailedConn(getDetailedConnectivity(selectedCamera.communication_type, selectedCamera.notes || ''))
 
       // Load tasks and history
@@ -386,6 +430,13 @@ export default function ProjectMapCanvas({
         setAssignedSfpPortId('')
         setAssignedFppId('')
         setAssignedFduId('')
+        setWirelessRadio('')
+        setWirelessFrequency('')
+        setWirelessSignal('')
+        setWirelessCapacity('')
+        setWirelessLatency('')
+        setWirelessLos('')
+        setWirelessValidation('')
       }
 
       // Find if this camera is assigned to a switch port (for copper comm type or fallback)
@@ -748,6 +799,97 @@ export default function ProjectMapCanvas({
       }
     })
   }, [networkDevices, map, selectedDevice, showDevices, projectId])
+
+  // Synchronize Wireless Links
+  useEffect(() => {
+    if (!map) return
+
+    // 1. Clear old wireless polylines
+    wirelessRoutePolylinesRef.current.forEach(p => p.setMap(null))
+    wirelessRoutePolylinesRef.current = []
+
+    const winObj = window as any
+    let infoWindow = winObj._mapInfoWindow
+    if (!infoWindow && typeof google !== 'undefined') {
+      infoWindow = new google.maps.InfoWindow()
+      winObj._mapInfoWindow = infoWindow
+    }
+
+    // 2. Draw wireless links
+    cameras.forEach(cam => {
+      const method = getDetailedConnectivity(cam.communication_type, cam.notes)
+      const isWireless = ['Wireless PTP', 'Wireless PTMP', 'Wi-Fi Bridge', 'LTE / 5G'].includes(method)
+      if (!isWireless) return
+
+      // LTE/5G has no physical link line on map (per design guidelines)
+      if (method === 'LTE / 5G') return
+
+      if (!cam.assigned_network_device_id) return
+      const dev = networkDevices.find(d => d.id === cam.assigned_network_device_id)
+      if (!dev || dev.latitude === null || dev.longitude === null) return
+
+      let color = '#a855f7' // default wireless purple
+      if (method === 'Wireless PTP') color = '#a855f7' // PtP: purple
+      else if (method === 'Wireless PTMP') color = '#8b5cf6' // PtMP: purple/blue
+      else if (method === 'Wi-Fi Bridge') color = '#6366f1' // Wi-Fi Bridge: blue
+
+      // If camera or link has status issues, make it red
+      if (cam.status === 'issue' || (cam.notes && cam.notes.toLowerCase().includes('issue'))) {
+        color = '#ef4444' // Fault/issue: red dashed line
+      }
+
+      const symbol = {
+        path: 'M 0,-1 0,1',
+        strokeOpacity: 0.8,
+        scale: 2
+      }
+
+      const poly = new google.maps.Polyline({
+        path: [
+          { lat: cam.latitude, lng: cam.longitude },
+          { lat: dev.latitude, lng: dev.longitude }
+        ],
+        geodesic: true,
+        strokeColor: color,
+        strokeOpacity: 0,
+        icons: [{
+          icon: symbol,
+          offset: '0',
+          repeat: '12px'
+        }],
+        map: map
+      })
+
+      poly.addListener('mouseover', (e: google.maps.PolyMouseEvent) => {
+        const content = `
+          <div style="padding: 8px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a; min-width: 160px;">
+            <div style="font-weight: bold; font-size: 12px; margin-bottom: 4px; border-b: 1px solid #e2e8f0; padding-bottom: 2px;">
+              Wireless Link: ${cam.camera_id_tag}
+            </div>
+            <div><strong>Type:</strong> ${method}</div>
+            <div><strong>Destination:</strong> ${dev.name}</div>
+            <div><strong>Frequency:</strong> 5.8 GHz (Planned)</div>
+            <div><strong>Status:</strong> ${cam.status === 'issue' ? 'Degraded (Line of Sight blocked)' : 'Planned'}</div>
+          </div>
+        `
+        if (infoWindow && e.latLng) {
+          infoWindow.setContent(content)
+          infoWindow.setPosition(e.latLng)
+          infoWindow.open(map)
+        }
+      })
+
+      poly.addListener('mouseout', () => {
+        if (infoWindow) infoWindow.close()
+      })
+
+      wirelessRoutePolylinesRef.current.push(poly)
+    })
+
+    return () => {
+      wirelessRoutePolylinesRef.current.forEach(p => p.setMap(null))
+    }
+  }, [map, cameras, networkDevices])
 
   // Synchronize Fiber Map Elements
   useEffect(() => {
@@ -1119,6 +1261,20 @@ export default function ProjectMapCanvas({
     setCameraPanelMessage(null)
 
     const updatedNotesObj = setDetailedConnectivityInNotes(cameraDetailedConn, cameraNotes)
+    
+    // Serialise wireless parameters into notes
+    let finalNotes = updatedNotesObj.notes || ''
+    const isWirelessVal = ['Wireless PTP', 'Wireless PTMP', 'Wi-Fi Bridge', 'LTE / 5G'].includes(cameraDetailedConn)
+    if (isWirelessVal) {
+      finalNotes = setBracketValue(finalNotes, 'Radio', wirelessRadio)
+      finalNotes = setBracketValue(finalNotes, 'Frequency', wirelessFrequency)
+      finalNotes = setBracketValue(finalNotes, 'Signal', wirelessSignal)
+      finalNotes = setBracketValue(finalNotes, 'Capacity', wirelessCapacity)
+      finalNotes = setBracketValue(finalNotes, 'Latency', wirelessLatency)
+      finalNotes = setBracketValue(finalNotes, 'LoS', wirelessLos)
+      finalNotes = setBracketValue(finalNotes, 'LinkStatus', wirelessValidation)
+    }
+
     const details = {
       camera_id_tag: cameraTag,
       camera_model_id: cameraModelId,
@@ -1127,7 +1283,7 @@ export default function ProjectMapCanvas({
       power_type: cameraPowerType,
       address_reference: cameraAddressRef || null,
       structure_reference: cameraStructureRef || null,
-      notes: updatedNotesObj.notes || null,
+      notes: finalNotes || null,
     }
 
     startTransition(async () => {
@@ -2333,6 +2489,145 @@ export default function ProjectMapCanvas({
                     </div>
                   )}
                 </div>
+
+                {/* Wireless Backhaul Specs Accordion */}
+                {['Wireless PTP', 'Wireless PTMP', 'Wi-Fi Bridge', 'LTE / 5G'].includes(cameraDetailedConn) && (
+                  <div className="border border-slate-850 rounded-xl overflow-hidden bg-slate-950/10">
+                    <button
+                      type="button"
+                      onClick={() => setIsWirelessSpecsOpen(!isWirelessSpecsOpen)}
+                      className="w-full flex justify-between items-center p-3.5 bg-slate-950/40 text-left hover:bg-slate-950/60 transition-colors border-b border-slate-850/40"
+                    >
+                      <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                        <svg className="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 100-6 3 3 0 000 6z" />
+                        </svg>
+                        Wireless Backhaul Specs
+                      </span>
+                      <span className="text-slate-400">{isWirelessSpecsOpen ? '▲' : '▼'}</span>
+                    </button>
+
+                    {isWirelessSpecsOpen && (
+                      <div className="p-3.5 space-y-3.5 bg-slate-900/40">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Radio / Antenna</label>
+                            <select
+                              value={wirelessRadio}
+                              onChange={e => setWirelessRadio(e.target.value)}
+                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                            >
+                              <option value="TBD">TBD / Planned</option>
+                              <option value="Base Station (AP)">Base Station (AP)</option>
+                              <option value="Subscriber Module (SM)">Subscriber Module (SM)</option>
+                              <option value="Wi-Fi Bridge Terminal">Wi-Fi Bridge Terminal</option>
+                              <option value="LTE/5G Cellular Gateway">LTE/5G Gateway</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Link Target</label>
+                            <select
+                              value={assignedSwitchId}
+                              onChange={e => setAssignedSwitchId(e.target.value)}
+                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                            >
+                              <option value="">Select Receiver...</option>
+                              {networkDevices.map(dev => (
+                                <option key={dev.id} value={dev.id}>
+                                  {dev.name} ({dev.device_type})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Frequency</label>
+                            <select
+                              value={wirelessFrequency}
+                              onChange={e => setWirelessFrequency(e.target.value)}
+                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                            >
+                              <option value="5.8 GHz">5.8 GHz</option>
+                              <option value="60 GHz">60 GHz (V-Band)</option>
+                              <option value="2.4 GHz">2.4 GHz</option>
+                              <option value="5.1-5.7 GHz (DFS)">5.1-5.7 GHz (DFS)</option>
+                              <option value="CBRS Band 48">CBRS Band 48</option>
+                              <option value="LTE/5G Licensed">LTE/5G Licensed</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Signal Strength</label>
+                            <input
+                              type="text"
+                              value={wirelessSignal}
+                              onChange={e => setWirelessSignal(e.target.value)}
+                              placeholder="e.g., -65 dBm"
+                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Link Capacity</label>
+                            <input
+                              type="text"
+                              value={wirelessCapacity}
+                              onChange={e => setWirelessCapacity(e.target.value)}
+                              placeholder="e.g., 500 Mbps"
+                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Latency</label>
+                            <input
+                              type="text"
+                              value={wirelessLatency}
+                              onChange={e => setWirelessLatency(e.target.value)}
+                              placeholder="e.g., 2 ms"
+                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Line of Sight (LoS)</label>
+                            <select
+                              value={wirelessLos}
+                              onChange={e => setWirelessLos(e.target.value)}
+                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                            >
+                              <option value="Clear">Clear LoS</option>
+                              <option value="Partially Obstructed">Partially Obstructed</option>
+                              <option value="Blocked">Blocked</option>
+                              <option value="TBD">TBD / Unverified</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Link Validation</label>
+                            <select
+                              value={wirelessValidation}
+                              onChange={e => setWirelessValidation(e.target.value)}
+                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                            >
+                              <option value="Validated">Validated</option>
+                              <option value="Pending">Pending Validation</option>
+                              <option value="Failed">Failed / Degraded</option>
+                              <option value="N/A">Not Applicable</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* 5. Accordion: Connectivity Chain */}
                 <div className="border border-slate-850 rounded-xl overflow-hidden bg-slate-950/10">

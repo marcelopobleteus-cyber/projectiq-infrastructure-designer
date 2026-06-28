@@ -284,13 +284,13 @@ export function getWorkflowSteps(stats: {
       order: 14,
       title: 'Wireless Links & Antenna Path',
       description: 'Establish point-to-point (PTP) or point-to-multipoint (PTMP) backhaul, line-of-sight analysis, and signals.',
-      relatedRoute: 'maps',
-      phaseAvailability: 'Planned',
-      status: 'Planned',
-      nextActionLabel: 'Wireless Links (Planned)',
-      nextActionRoute: 'maps',
+      relatedRoute: 'wireless',
+      phaseAvailability: 'Active',
+      status: stats.networkDevicesCount > 0 ? 'In Progress' : 'Not Started',
+      nextActionLabel: 'Open Wireless Workspace',
+      nextActionRoute: 'wireless',
       completionCriteria: 'Configure radio heights, frequencies, and link alignments.',
-      message: 'Establish radio backhaul and Line-of-Sight metrics.'
+      message: 'Establish PtP/PtMP wireless backhaul configurations.'
     },
     {
       id: 'infra-network-switches',
@@ -443,6 +443,7 @@ export interface CameraReadiness {
   testing: 'Not Started' | 'In Progress' | 'Complete'
   overallStatus: 'Ready' | 'In Progress' | 'Needs Attention'
   nextAction: string
+  wirelessLink: 'Done' | 'Missing' | 'Not Applicable'
 }
 
 export function getCameraReadiness(
@@ -461,6 +462,7 @@ export function getCameraReadiness(
 ): CameraReadiness {
   const detailedMethod = getDetailedConnectivity(camera.communication_type, camera.notes)
   const isFiber = camera.communication_type === 'fiber'
+  const isWireless = ['Wireless PTP', 'Wireless PTMP', 'Wi-Fi Bridge', 'LTE / 5G'].includes(detailedMethod)
 
   const location: 'Done' | 'Missing' = camera.latitude !== 0 && camera.longitude !== 0 ? 'Done' : 'Missing'
   const connectivity = detailedMethod
@@ -485,6 +487,11 @@ export function getCameraReadiness(
   const hasSwitchPort = switchPorts.some(p => p.assigned_camera_location_id === camera.id) || camera.assigned_network_device_id !== null
   const switchPort: 'Done' | 'Missing' = hasSwitchPort ? 'Done' : 'Missing'
 
+  // Wireless link/radio checks
+  const wirelessLink: 'Done' | 'Missing' | 'Not Applicable' = !isWireless
+    ? 'Not Applicable'
+    : (camera.assigned_network_device_id ? 'Done' : 'Missing')
+
   // Power checks
   const power: 'Done' | 'Missing' = camera.power_type && camera.power_type !== 'unknown' ? 'Done' : 'Missing'
 
@@ -502,6 +509,9 @@ export function getCameraReadiness(
       testing = 'In Progress'
     }
   }
+
+  // Wireless validation checks in notes (Signal & Latency details)
+  const hasSignalInfo = camera.notes && camera.notes.includes('[Signal:') && camera.notes.includes('[Latency:')
 
   // Next action evaluation
   let nextAction = 'All core checkpoints complete. Camera is ready for field deployment.'
@@ -522,6 +532,9 @@ export function getCameraReadiness(
   } else if (isFiber && splicing === 'Missing') {
     nextAction = 'Configure strand assignments and splice tray terminations.'
     overallStatus = 'Needs Attention'
+  } else if (isWireless && wirelessLink === 'Missing') {
+    nextAction = 'Assign the wireless radio terminal to a cabinet switch or receiver.'
+    overallStatus = 'Needs Attention'
   } else if (switchPort === 'Missing') {
     nextAction = 'Terminate the camera connection to an industrial switch port.'
     overallStatus = 'Needs Attention'
@@ -531,6 +544,9 @@ export function getCameraReadiness(
   } else if (fieldTask === 'Missing') {
     nextAction = 'Generate field installation checklist tasks.'
     overallStatus = 'In Progress'
+  } else if (isWireless && !hasSignalInfo) {
+    nextAction = 'Log wireless link validation stats (Signal strength, Capacity, and Latency) in the notes.'
+    overallStatus = 'Needs Attention'
   } else if (testing !== 'Complete') {
     nextAction = 'Run ping tests and log physical signal/light validations.'
     overallStatus = 'In Progress'
@@ -547,7 +563,8 @@ export function getCameraReadiness(
     fieldTask,
     testing,
     overallStatus,
-    nextAction
+    nextAction,
+    wirelessLink
   }
 }
 
