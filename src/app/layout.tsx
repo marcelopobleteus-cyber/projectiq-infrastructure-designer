@@ -1,49 +1,49 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
+import { redirect } from 'next/navigation'
+import { createClient } from '@/utils/supabase/server'
+import { logout } from './auth/actions'
+import AppShell from '@/components/layout/AppShell'
+import MainSidebar from '@/components/layout/MainSidebar'
+import ProjectsContentArea from '@/components/layout/ProjectsContentArea'
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-export const metadata: Metadata = {
-  title: "NextQ Infrastructure Designer",
-  description: "Spatial planner for CCTV, networking, power, BOM, and infrastructure deployments.",
-};
-
-export default function RootLayout({
+export default async function ProjectsLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: {
+  children: React.ReactNode
+}) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect('/login')
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .single()
+
+  const handleSignOut = async () => {
+    'use server'
+    await logout()
+  }
+
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              try {
-                var theme = localStorage.getItem('nextq-theme-preference');
-                if (theme === 'dark' || (theme !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                  document.documentElement.classList.add('dark');
-                } else {
-                  document.documentElement.classList.remove('dark');
-                }
-              } catch (e) {}
-            `
-          }}
-        />
-      </head>
-      <body className="min-h-full flex flex-col">{children}</body>
-    </html>
-  );
+    <AppShell>
+      {/* Narrow Primary Left Sidebar */}
+      <MainSidebar
+        userEmail={user.email}
+        userName={profile?.full_name || 'User'}
+        onSignOut={handleSignOut}
+      />
+
+      {/* Main Content Area */}
+      <ProjectsContentArea>
+        {children}
+      </ProjectsContentArea>
+    </AppShell>
+  )
 }
+

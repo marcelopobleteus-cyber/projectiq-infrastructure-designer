@@ -3,7 +3,6 @@
 import React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useSettings } from './AppShell'
 
 interface MainSidebarProps {
   userEmail?: string | null
@@ -13,12 +12,6 @@ interface MainSidebarProps {
 
 export default function MainSidebar({ userEmail, userName, onSignOut }: MainSidebarProps) {
   const pathname = usePathname()
-  const { openSettings } = useSettings()
-
-  // Match UUID format for projectId: /projects/ce20138e-9000-42ea-99f7-afd713d08903
-  const projectMatch = pathname.match(/^\/projects\/([a-fA-F0-9-]{36})/)
-  const projectId = projectMatch ? projectMatch[1] : null
-
 
   const items = [
     {
@@ -27,9 +20,9 @@ export default function MainSidebar({ userEmail, userName, onSignOut }: MainSide
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
       ),
-      href: '#',
+      href: '/dashboard',
       enabled: true,
-      active: false,
+      active: pathname === '/dashboard',
     },
     {
       id: 'projects',
@@ -37,9 +30,9 @@ export default function MainSidebar({ userEmail, userName, onSignOut }: MainSide
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
       ),
-      href: '/design-review/projects',
+      href: '/projects',
       enabled: true,
-      active: pathname === '/projects' || pathname === '/projects/create' || pathname.startsWith('/design-review/projects') || pathname.match(/^\/projects\/[a-fA-F0-9-]{36}/) !== null,
+      active: pathname.startsWith('/projects') || pathname === '/projects/create' || pathname.startsWith('/design-review/projects'),
     },
     {
       id: 'templates',
@@ -47,9 +40,19 @@ export default function MainSidebar({ userEmail, userName, onSignOut }: MainSide
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
       ),
-      href: '#',
+      href: '/templates',
       enabled: true,
-      active: false,
+      active: pathname.startsWith('/templates'),
+    },
+    {
+      id: 'catalog',
+      label: 'Equipment Catalog',
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+      ),
+      href: '/equipment-catalog',
+      enabled: true,
+      active: pathname.startsWith('/equipment-catalog'),
     },
     {
       id: 'reports',
@@ -57,9 +60,9 @@ export default function MainSidebar({ userEmail, userName, onSignOut }: MainSide
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
       ),
-      href: '#',
+      href: '/reports',
       enabled: true,
-      active: false,
+      active: pathname === '/reports',
     },
     {
       id: 'settings',
@@ -67,9 +70,9 @@ export default function MainSidebar({ userEmail, userName, onSignOut }: MainSide
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       ),
-      href: '#',
+      href: '/settings',
       enabled: true,
-      active: false,
+      active: pathname === '/settings',
     },
   ]
 
@@ -77,7 +80,7 @@ export default function MainSidebar({ userEmail, userName, onSignOut }: MainSide
     <aside className="w-16 bg-slate-900 border-r border-slate-800 flex flex-col justify-between shrink-0 h-full py-4 relative z-20">
       {/* Top Section / Logo */}
       <div className="flex flex-col items-center gap-6">
-        <Link href="/design-review/projects" title="NextQ" className="w-10 h-10 rounded-xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 font-black text-sm tracking-wider hover:bg-indigo-600/25 transition-all">
+        <Link href="/dashboard" title="NextQ" className="w-10 h-10 rounded-xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 font-black text-sm tracking-wider hover:bg-indigo-600/25 transition-all">
           NQ
         </Link>
 
@@ -97,22 +100,6 @@ export default function MainSidebar({ userEmail, userName, onSignOut }: MainSide
                     {item.label} <span className="text-[10px] text-slate-500 block">(Requires active project)</span>
                   </span>
                 </div>
-              )
-            }
-
-            if (item.id === 'settings') {
-              return (
-                <button
-                  key={item.id}
-                  onClick={openSettings}
-                  className="w-12 h-12 rounded-xl flex items-center justify-center transition-all group relative border bg-transparent border-transparent text-slate-400 hover:text-white hover:bg-slate-800/40 hover:border-slate-800 cursor-pointer"
-                >
-                  {item.icon}
-                  {/* Tooltip */}
-                  <span className="absolute left-16 bg-slate-950 text-slate-200 text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-800 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 shadow-xl">
-                    {item.label}
-                  </span>
-                </button>
               )
             }
 
@@ -156,9 +143,9 @@ export default function MainSidebar({ userEmail, userName, onSignOut }: MainSide
 
         <button
           onClick={onSignOut}
-          className="w-12 h-12 rounded-xl flex items-center justify-center text-slate-400 hover:text-rose-400 hover:bg-rose-950/15 hover:border-rose-900/30 border border-transparent transition-all group relative"
+          className="w-12 h-12 rounded-xl flex items-center justify-center text-slate-400 hover:text-rose-400 hover:bg-rose-950/15 hover:border-rose-900/30 border border-transparent transition-all group relative cursor-pointer"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <svg xmlns="http://www.w3.org/2050/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           <span className="absolute left-16 bg-slate-950 text-rose-450 text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-800 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 shadow-xl">
             Sign Out
           </span>
