@@ -317,35 +317,58 @@ export default function OverviewEditPanel({ project, googleMapsApiKey }: Overvie
           </div>
 
           {/* Action buttons */}
-          <div className="flex gap-3 pt-2 border-t border-slate-800">
+          <div className="flex flex-col sm:flex-row gap-3 pt-2 border-t border-slate-800">
             <button
-              id="edit-cancel-btn"
               type="button"
-              onClick={handleCancel}
+              onClick={async () => {
+                const confirmDelete = window.confirm(`⚠️ ¿Estás seguro de ELIMINAR PERMANENTEMENTE el proyecto "${project.name}"?\n\nEsta acción borrará de la base de datos todas las cámaras, nodos de fibra, switches, BOM y órdenes de trabajo asociadas. Esta acción NO se puede deshacer.`)
+                if (!confirmDelete) return
+                setSaving(true)
+                const res = await deleteProject(project.id)
+                setSaving(false)
+                if (res.error) {
+                  setMessage({ type: 'error', text: res.error })
+                } else {
+                  router.push('/projects')
+                }
+              }}
               disabled={saving}
-              className="flex-1 py-2.5 px-4 bg-slate-950 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition-all disabled:opacity-50"
+              className="py-2.5 px-4 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 font-semibold rounded-xl text-xs transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
             >
-              Cancel
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+              Delete Project
             </button>
-            <button
-              id="edit-save-btn"
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="flex-[2] py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 disabled:text-indigo-400 text-white font-semibold rounded-xl text-xs shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2"
-            >
-              {saving ? (
-                <>
-                  <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  Saving...
-                </>
-              ) : (
-                'Save Project Settings'
-              )}
-            </button>
+            
+            <div className="flex-1 flex gap-3">
+              <button
+                id="edit-cancel-btn"
+                type="button"
+                onClick={handleCancel}
+                disabled={saving}
+                className="flex-1 py-2.5 px-4 bg-slate-950 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition-all disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                id="edit-save-btn"
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className="flex-[2] py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 disabled:text-indigo-400 text-white font-semibold rounded-xl text-xs shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2"
+              >
+                {saving ? (
+                  <>
+                    <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Saving...
+                  </>
+                ) : (
+                  'Save Project Settings'
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

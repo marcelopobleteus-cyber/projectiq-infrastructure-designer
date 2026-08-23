@@ -15,7 +15,6 @@ interface ProjectLayoutProps {
 
 export default async function ProjectLayout({ children, params }: ProjectLayoutProps) {
   const { projectId } = await params
-  console.log("LAYOUT RENDERED FOR PROJECT:", projectId)
   const supabase = await createClient()
 
   const {
@@ -37,12 +36,20 @@ export default async function ProjectLayout({ children, params }: ProjectLayoutP
     project = DEMO_PROJECT as any
   }
 
+  // disciplines is the authoritative source for which modules this project shows.
+  // An empty array (unset, or a legacy project predating the column) falls back to
+  // the disciplines that currently have a real workspace built for them.
+  const disciplines = project.disciplines?.length
+    ? project.disciplines
+    : ['cctv', 'fiber', 'networking', 'wireless', 'power']
+
   return (
     <div className="flex-1 flex overflow-hidden h-full w-full">
       {/* Secondary Project Navigation Sidebar */}
       <ProjectSidebar
         projectId={projectId}
         projectName={project.name}
+        disciplines={disciplines}
       />
 
       {/* Main Content Pane */}

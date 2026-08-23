@@ -2173,9 +2173,11 @@ export type Database = {
           default_longitude: number
           default_zoom: number
           description: string | null
+          disciplines: string[]
           id: string
           name: string
           organization_id: string
+          parent_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -2184,9 +2186,11 @@ export type Database = {
           default_longitude?: number
           default_zoom?: number
           description?: string | null
+          disciplines?: string[]
           id?: string
           name: string
           organization_id: string
+          parent_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -2195,9 +2199,11 @@ export type Database = {
           default_longitude?: number
           default_zoom?: number
           description?: string | null
+          disciplines?: string[]
           id?: string
           name?: string
           organization_id?: string
+          parent_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -2206,6 +2212,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]

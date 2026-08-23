@@ -9,6 +9,7 @@ export interface DemoProject {
   organization_id: string
   created_at: string
   updated_at: string
+  disciplines: string[]
 }
 
 export const DEMO_PROJECT: DemoProject = {
@@ -22,6 +23,7 @@ export const DEMO_PROJECT: DemoProject = {
   organization_id: 'org-demo-001',
   created_at: '2026-07-15T10:00:00Z',
   updated_at: '2026-08-23T12:00:00Z',
+  disciplines: ['cctv', 'fiber', 'networking'],
 }
 
 export const DEMO_CAMERAS = [

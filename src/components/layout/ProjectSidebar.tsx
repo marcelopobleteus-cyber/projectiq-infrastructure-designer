@@ -1,127 +1,100 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { updateProjectDisciplines } from '@/app/projects/actions'
 
 interface ProjectSidebarProps {
   projectId: string
   projectName: string
+  disciplines: string[]
 }
 
-const ALL_DISCIPLINES = [
-  { id: 'fiber', name: 'Fibra Óptica (OSP/ISP)', icon: '🧵', defaultPath: 'fiber' },
-  { id: 'cameras', name: 'CCTV & Videovigilancia', icon: '🎥', defaultPath: 'cameras' },
-  { id: 'network', name: 'Networking & Switches', icon: '🔌', defaultPath: 'network' },
-  { id: 'wireless', name: 'Enlaces Wireless & PTP', icon: '📡', defaultPath: 'wireless' },
-  { id: 'power', name: 'Energía & Subestaciones', icon: '⚡', defaultPath: 'power' },
+// Canonical discipline ids — must match PROJECT_TYPES in /projects/create and the
+// `disciplines` column on public.projects. 'conduit' and 'lighting' are valid tags
+// today (a project can be created and saved as one) but have no dedicated workspace
+// yet, so their nav entries render disabled until that module ships.
+const ALL_DISCIPLINES: { id: string; name: string; href: string; icon: React.ReactNode; ready: boolean }[] = [
+  {
+    id: 'cctv', name: 'CCTV & Videovigilancia', href: 'cameras', ready: true,
+    icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>,
+  },
+  {
+    id: 'fiber', name: 'Fibra Óptica (OSP/ISP)', href: 'fiber', ready: true,
+    icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0z"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg>,
+  },
+  {
+    id: 'conduit', name: 'Canalización & Ductos', href: '', ready: false,
+    icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h6a4 4 0 0 1 4 4v4a4 4 0 0 0 4 4h2"/><circle cx="4" cy="6" r="2"/><circle cx="20" cy="18" r="2"/></svg>,
+  },
+  {
+    id: 'networking', name: 'Networking & Switches', href: 'network', ready: true,
+    icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M12 8v8"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/></svg>,
+  },
+  {
+    id: 'wireless', name: 'Enlaces Wireless & PTP', href: 'wireless', ready: true,
+    icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>,
+  },
+  {
+    id: 'power', name: 'Energía & Subestaciones', href: 'power', ready: true,
+    icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
+  },
+  {
+    id: 'lighting', name: 'Alumbrado Público', href: '', ready: false,
+    icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6M10 22h4M12 2a6 6 0 0 0-4 10.5c.6.55 1 1.36 1 2.5h6c0-1.14.4-1.95 1-2.5A6 6 0 0 0 12 2z"/></svg>,
+  },
 ]
 
-export default function ProjectSidebar({ projectId, projectName }: ProjectSidebarProps) {
+export default function ProjectSidebar({ projectId, projectName, disciplines }: ProjectSidebarProps) {
   const pathname = usePathname()
   const [showAddMenu, setShowAddMenu] = useState(false)
-
-  // Determine initial discipline from projectId tag or default to master for demo
-  const getInitialDisciplines = () => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(`proj_disciplines_${projectId}`)
-      if (saved) {
-        try { return JSON.parse(saved) } catch (e) {}
-      }
-    }
-    if (projectId.includes('fiber')) return ['fiber']
-    if (projectId.includes('cctv')) return ['cameras']
-    if (projectId.includes('network')) return ['network']
-    if (projectId.includes('wireless')) return ['wireless']
-    if (projectId.includes('power')) return ['power']
-    if (projectId.includes('lighting')) return ['power']
-    if (projectId.includes('conduit')) return ['fiber']
-    return ['fiber', 'cameras', 'network', 'wireless', 'power'] // Demo/Master default
-  }
-
-  const [activeDisciplines, setActiveDisciplines] = useState<string[]>(getInitialDisciplines)
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(`proj_disciplines_${projectId}`, JSON.stringify(activeDisciplines))
-    }
-  }, [projectId, activeDisciplines])
+  const [activeDisciplines, setActiveDisciplines] = useState<string[]>(disciplines)
+  const [isPending, startTransition] = useTransition()
 
   const toggleDiscipline = (discId: string) => {
-    if (activeDisciplines.includes(discId)) {
-      if (activeDisciplines.length > 1) {
-        setActiveDisciplines(activeDisciplines.filter(id => id !== discId))
-      }
-    } else {
-      setActiveDisciplines([...activeDisciplines, discId])
-    }
+    const next = activeDisciplines.includes(discId)
+      ? activeDisciplines.filter(id => id !== discId)
+      : [...activeDisciplines, discId]
+
+    if (next.length === 0) return // at least one discipline must stay active
+
+    setActiveDisciplines(next) // optimistic
+    startTransition(async () => {
+      const res = await updateProjectDisciplines(projectId, next)
+      if (res?.error) setActiveDisciplines(activeDisciplines) // roll back on failure
+    })
     setShowAddMenu(false)
   }
 
+  const isCctvActive = activeDisciplines.includes('cctv')
   const isFiberActive = activeDisciplines.includes('fiber')
-  const isCamerasActive = activeDisciplines.includes('cameras')
-  const isNetworkActive = activeDisciplines.includes('network')
+  const isConduitActive = activeDisciplines.includes('conduit')
+  const isNetworkingActive = activeDisciplines.includes('networking')
   const isWirelessActive = activeDisciplines.includes('wireless')
   const isPowerActive = activeDisciplines.includes('power')
+  const isLightingActive = activeDisciplines.includes('lighting')
 
-  // Dynamic Discipline Title
   const getDisciplineBadge = () => {
     if (activeDisciplines.length === 1) {
       const disc = ALL_DISCIPLINES.find(d => d.id === activeDisciplines[0])
-      return { icon: disc?.icon || '📁', title: disc?.name || 'Proyecto Especializado' }
+      return { title: disc?.name || 'Proyecto Especializado' }
     }
-    return { icon: '🌐', title: `Multi-Disciplina (${activeDisciplines.length} Módulos)` }
+    return { title: `Multi-Disciplina (${activeDisciplines.length} módulos)` }
   }
 
   const badge = getDisciplineBadge()
 
-  const designItems = [
-    ...(isFiberActive ? [{
-      id: 'fiber',
-      label: 'Fibra Óptica (Pathways)',
-      href: `/projects/${projectId}/fiber`,
-      active: pathname === `/projects/${projectId}/fiber`,
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0z"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg>
-      ),
-    }] : []),
-    ...(isCamerasActive ? [{
-      id: 'cameras',
-      label: 'CCTV & Cámaras 4K',
-      href: `/projects/${projectId}/cameras`,
-      active: pathname === `/projects/${projectId}/cameras`,
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-      ),
-    }] : []),
-    ...(isNetworkActive ? [{
-      id: 'network',
-      label: 'Networking & Switches',
-      href: `/projects/${projectId}/network`,
-      active: pathname === `/projects/${projectId}/network`,
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M12 8v8"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/></svg>
-      ),
-    }] : []),
-    ...(isWirelessActive ? [{
-      id: 'wireless',
-      label: 'Wireless Backhaul',
-      href: `/projects/${projectId}/wireless`,
-      active: pathname === `/projects/${projectId}/wireless`,
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>
-      ),
-    }] : []),
-    ...(isPowerActive ? [{
-      id: 'power',
-      label: 'Power & Subestaciones',
-      href: `/projects/${projectId}/power`,
-      active: pathname === `/projects/${projectId}/power`,
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-      ),
-    }] : []),
-  ]
+  const designItems = ALL_DISCIPLINES
+    .filter(d => activeDisciplines.includes(d.id))
+    .map(d => ({
+      id: d.id,
+      label: d.name,
+      href: d.ready ? `/projects/${projectId}/${d.href}` : '#',
+      active: d.ready && pathname === `/projects/${projectId}/${d.href}`,
+      disabled: !d.ready,
+      icon: d.icon,
+    }))
 
   const categories = [
     {
@@ -205,10 +178,8 @@ export default function ProjectSidebar({ projectId, projectName }: ProjectSideba
 
         {/* Specialty Discipline Indicator Badge */}
         <div className="flex items-center justify-between gap-1.5 px-2.5 py-1.5 bg-sky-950/60 border border-sky-800/40 rounded-xl text-[11px] text-sky-300 font-semibold truncate shadow-inner">
-          <div className="flex items-center gap-1.5 truncate">
-            <span className="shrink-0">{badge.icon}</span>
-            <span className="truncate">{badge.title}</span>
-          </div>
+          <span className="truncate">{badge.title}</span>
+          {isPending && <span className="w-2.5 h-2.5 rounded-full border border-sky-400 border-t-transparent animate-spin shrink-0" />}
         </div>
       </div>
 
@@ -216,7 +187,7 @@ export default function ProjectSidebar({ projectId, projectName }: ProjectSideba
       <div className="p-3 pb-0 shrink-0 space-y-2 relative">
         <Link href="/projects/create" className="w-full py-2 bg-slate-950 border border-slate-800 hover:border-sky-500/50 hover:text-sky-400 text-slate-300 rounded-xl font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-sm active:scale-98">
           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          + Nuevo Proyecto
+          Nuevo Proyecto
         </Link>
 
         {/* Dynamic + Unir Módulo Button */}
@@ -226,14 +197,14 @@ export default function ProjectSidebar({ projectId, projectName }: ProjectSideba
           className="w-full py-1.5 bg-sky-500/10 border border-sky-500/30 hover:bg-sky-500/20 text-sky-300 rounded-xl font-bold text-[11px] transition flex items-center justify-center gap-1.5 active:scale-98"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          + Unir Módulo / Disciplina
+          Unir Módulo / Disciplina
         </button>
 
         {/* Dropdown menu for adding/removing modules */}
         {showAddMenu && (
           <div className="absolute top-full left-3 right-3 mt-1 bg-slate-950 border border-slate-800 rounded-xl shadow-2xl p-2 z-50 space-y-1">
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1 border-b border-slate-800">
-              Activar Módulos en este Proyecto:
+              Activar Módulos en este Proyecto
             </div>
             {ALL_DISCIPLINES.map(d => {
               const active = activeDisciplines.includes(d.id)
@@ -249,10 +220,17 @@ export default function ProjectSidebar({ projectId, projectName }: ProjectSideba
                   }`}
                 >
                   <span className="flex items-center gap-2">
-                    <span>{d.icon}</span>
+                    <span className={active ? 'text-sky-400' : 'text-slate-500'}>{d.icon}</span>
                     <span>{d.name}</span>
+                    {!d.ready && (
+                      <span className="text-[8.5px] font-bold uppercase tracking-wide text-slate-600 border border-slate-700 rounded px-1">
+                        pronto
+                      </span>
+                    )}
                   </span>
-                  {active && <span className="text-sky-400 font-bold">✓</span>}
+                  {active && (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-sky-400 shrink-0"><path d="M4 12.5 9.5 18 20 6.5"/></svg>
+                  )}
                 </button>
               )
             })}
@@ -268,21 +246,32 @@ export default function ProjectSidebar({ projectId, projectName }: ProjectSideba
               {cat.label}
             </span>
             <div className="space-y-0.5">
-              {cat.items.map((sec) => (
-                <Link
-                  key={sec.id}
-                  href={sec.href}
-                  className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl text-[11px] transition-all border ${
-                    sec.active
-                      ? 'bg-sky-500/10 border-sky-500/20 text-sky-400 font-semibold shadow-inner shadow-sky-950/10'
-                      : 'bg-transparent border-transparent text-slate-400 hover:text-white hover:bg-slate-800/40'
-                  }`}
-                >
-                  <span className={sec.active ? 'text-sky-400' : 'text-slate-500'}>
-                    {sec.icon}
-                  </span>
-                  {sec.label}
-                </Link>
+              {cat.items.map((sec: any) => (
+                sec.disabled ? (
+                  <div
+                    key={sec.id}
+                    title={`${sec.label} — módulo en desarrollo`}
+                    className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl text-[11px] text-slate-600 cursor-not-allowed border border-transparent"
+                  >
+                    <span className="text-slate-700">{sec.icon}</span>
+                    {sec.label}
+                  </div>
+                ) : (
+                  <Link
+                    key={sec.id}
+                    href={sec.href}
+                    className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl text-[11px] transition-all border ${
+                      sec.active
+                        ? 'bg-sky-500/10 border-sky-500/20 text-sky-400 font-semibold shadow-inner shadow-sky-950/10'
+                        : 'bg-transparent border-transparent text-slate-400 hover:text-white hover:bg-slate-800/40'
+                    }`}
+                  >
+                    <span className={sec.active ? 'text-sky-400' : 'text-slate-500'}>
+                      {sec.icon}
+                    </span>
+                    {sec.label}
+                  </Link>
+                )
               ))}
             </div>
           </div>
