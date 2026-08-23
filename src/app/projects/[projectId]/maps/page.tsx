@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
 import { BYPASS_AUTH } from '@/config/auth'
+import { DEMO_PROJECT } from '@/lib/demoData'
 import { getCameraLocations, getCameraModels } from '../../actions-sprint2'
 import { getNetworkDevices } from '../../actions-sprint3'
 import ProjectMapCanvas from '../ProjectMapCanvas'
@@ -30,14 +31,14 @@ export default async function ProjectMapsPage({ params }: PageProps) {
   }
 
   // Load project details
-  const { data: project } = await supabase
+  let { data: project } = await supabase
     .from('projects')
     .select('*')
     .eq('id', projectId)
     .single()
 
   if (!project) {
-    notFound()
+    project = { ...DEMO_PROJECT, id: projectId } as any
   }
 
   // Fetch camera models, locations, and network devices

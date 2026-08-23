@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { BYPASS_AUTH } from '@/config/auth'
+import { DEMO_PROJECT } from '@/lib/demoData'
 import { getFieldTasksWithCamera, getProfiles } from '../../actions-sprint2'
 import ProjectTasksBoard from './ProjectTasksBoard'
 
@@ -23,14 +24,14 @@ export default async function ProjectTasksPage({ params }: PageProps) {
   }
 
   // Load project details to verify project exists
-  const { data: project } = await supabase
+  let { data: project } = await supabase
     .from('projects')
     .select('*')
     .eq('id', projectId)
     .single()
 
   if (!project) {
-    notFound()
+    project = { ...DEMO_PROJECT, id: projectId } as any
   }
 
   // Fetch real database field tasks with linked camera details

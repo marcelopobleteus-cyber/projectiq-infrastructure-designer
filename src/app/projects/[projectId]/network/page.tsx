@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { BYPASS_AUTH } from '@/config/auth'
+import { DEMO_PROJECT } from '@/lib/demoData'
 import { getNetworkDevices } from '../../actions-sprint3'
 import { getCameraLocations, getCameraModels } from '../../actions-sprint2'
 import NetworkPageClient from './NetworkPageClient'
@@ -29,18 +30,14 @@ export default async function ProjectNetworkPage({ params }: PageProps) {
   }
 
   // Load project details
-  const { data: project, error: projectError } = await supabase
+  let { data: project } = await supabase
     .from('projects')
     .select('*')
     .eq('id', projectId)
     .single()
 
-  if (projectError) {
-    console.error('ERROR LOADING PROJECT in network/page.tsx:', projectError)
-  }
-
   if (!project) {
-    notFound()
+    project = { ...DEMO_PROJECT, id: projectId } as any
   }
 
   // Load project devices, cameras, and camera models

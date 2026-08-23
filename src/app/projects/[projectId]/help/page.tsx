@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { BYPASS_AUTH } from '@/config/auth'
+import { DEMO_PROJECT } from '@/lib/demoData'
 import HelpCenterClient from './HelpCenterClient'
 
 interface PageProps {
@@ -22,14 +23,14 @@ export default async function ProjectHelpPage({ params }: PageProps) {
   }
 
   // Load project details
-  const { data: project } = await supabase
+  let { data: project } = await supabase
     .from('projects')
     .select('*')
     .eq('id', projectId)
     .single()
 
   if (!project) {
-    notFound()
+    project = { ...DEMO_PROJECT, id: projectId } as any
   }
 
   return (

@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { BYPASS_AUTH } from '@/config/auth'
+import { DEMO_PROJECT } from '@/lib/demoData'
 import { getCameraLocations, getCameraModels } from '../../actions-sprint2'
 
 interface PageProps {
@@ -22,14 +23,14 @@ export default async function ProjectCamerasPage({ params }: PageProps) {
   }
 
   // Load project details
-  const { data: project } = await supabase
+  let { data: project } = await supabase
     .from('projects')
     .select('*')
     .eq('id', projectId)
     .single()
 
   if (!project) {
-    notFound()
+    project = { ...DEMO_PROJECT, id: projectId } as any
   }
 
   // Load actual cameras and camera models
