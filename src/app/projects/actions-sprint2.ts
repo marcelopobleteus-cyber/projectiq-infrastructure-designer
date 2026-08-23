@@ -31,10 +31,10 @@ export async function getCameraLocations(projectId: string) {
     .eq('project_id', projectId)
     .order('camera_id_tag', { ascending: true })
 
-  if (error || !data || data.length === 0) {
+  if (projectId === 'demo-metro-cctv' && (error || !data || data.length === 0)) {
     return DEMO_CAMERAS as any
   }
-  return data
+  return data ?? []
 }
 
 export async function createCameraLocation(params: {
@@ -925,7 +925,7 @@ export async function getFieldTasksWithCamera(projectId: string) {
     .eq('project_id', projectId)
     .order('created_at', { ascending: true })
 
-  if (ftError || !fieldTasks || fieldTasks.length === 0) {
+  if (projectId === 'demo-metro-cctv' && (ftError || !fieldTasks || fieldTasks.length === 0)) {
     return DEMO_TASKS as any
   }
 

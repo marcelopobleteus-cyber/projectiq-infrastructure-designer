@@ -18,10 +18,10 @@ export async function getNetworkDevices(projectId: string) {
     .eq('project_id', projectId)
     .order('name', { ascending: true })
 
-  if (error || !data || data.length === 0) {
+  if (projectId === 'demo-metro-cctv' && (error || !data || data.length === 0)) {
     return DEMO_DEVICES as any
   }
-  return data
+  return data ?? []
 }
 
 // Fetch all switch ports for a network device, with assigned camera details

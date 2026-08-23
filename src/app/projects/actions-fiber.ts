@@ -664,7 +664,7 @@ export async function getFiberDesignData(projectId: string) {
   let cables = cablesRes.data ?? []
   let enclosures = enclosuresRes.data ?? []
 
-  if (nodes.length === 0 && routes.length === 0) {
+  if (projectId === 'demo-metro-cctv' && nodes.length === 0 && routes.length === 0) {
     nodes = DEMO_FIBER_DATA.nodes as any
     routes = DEMO_FIBER_DATA.routes as any
     segments = DEMO_FIBER_DATA.segments as any
