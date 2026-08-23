@@ -6,6 +6,7 @@ import { getCameraLocations, getProjectCameraTasks } from '../../actions-sprint2
 import { getNetworkDevices } from '../../actions-sprint3'
 import { getFiberDesignData } from '../../actions-fiber'
 import { getWorkflowSteps } from '@/lib/workflow/projectWorkflowRegistry'
+import { getProjectPortfolio } from '../../actions'
 import OverviewEditPanel from './OverviewEditPanel'
 import OverviewDashboard from './OverviewDashboard'
 
@@ -101,6 +102,9 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
     hasDocuments: true,
   }
 
+  // Load portfolio linkage (parent project, or consolidated rollup of children)
+  const portfolio = await getProjectPortfolio(projectId)
+
   // Load workflow registry
   const steps = getWorkflowSteps(stats)
 
@@ -155,6 +159,7 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
         activeSteps={activeSteps.length}
         nextRecommendedStep={nextRecommendedStep}
         googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+        portfolio={portfolio}
       />
     </div>
   )

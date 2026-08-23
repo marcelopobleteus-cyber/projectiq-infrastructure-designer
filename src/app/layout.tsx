@@ -39,6 +39,22 @@ export default function RootLayout({
                   document.documentElement.classList.remove('dark');
                 }
               } catch (e) {}
+              
+              // Suppress Google Maps BillingNotEnabledMapError dev overlay popups
+              if (typeof window !== 'undefined') {
+                window.gm_authFailure = function() {
+                  console.warn('Google Maps API Key Notice: Billing not enabled or domain unauthorized.');
+                };
+                var _origErr = console.error;
+                console.error = function() {
+                  var msg = arguments[0];
+                  if (typeof msg === 'string' && (msg.indexOf('BillingNotEnabledMapError') !== -1 || msg.indexOf('Google Maps JavaScript API error') !== -1)) {
+                    console.warn('[Google Maps Dev Notice]', msg);
+                    return;
+                  }
+                  return _origErr.apply(console, arguments);
+                };
+              }
             `
           }}
         />

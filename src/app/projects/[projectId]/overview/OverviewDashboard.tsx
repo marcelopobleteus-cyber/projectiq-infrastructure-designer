@@ -3,7 +3,9 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import OverviewEditPanel from './OverviewEditPanel'
+import PortfolioSection from './PortfolioSection'
 import { WorkflowStep, WorkflowGroup, WORKFLOW_GROUPS } from '@/lib/workflow/projectWorkflowRegistry'
+import type { PortfolioData } from '../../actions'
 
 interface ProjectData {
   id: string
@@ -39,6 +41,7 @@ interface OverviewDashboardProps {
   activeSteps: number
   nextRecommendedStep: WorkflowStep | undefined
   googleMapsApiKey: string | undefined
+  portfolio: PortfolioData
 }
 
 export default function OverviewDashboard({
@@ -51,6 +54,7 @@ export default function OverviewDashboard({
   activeSteps,
   nextRecommendedStep,
   googleMapsApiKey,
+  portfolio,
 }: OverviewDashboardProps) {
   // Client state to track the active stepper group
   const [activeGroup, setActiveGroup] = useState<WorkflowGroup>('Setup')
@@ -166,6 +170,9 @@ export default function OverviewDashboard({
           </div>
         </div>
       </div>
+
+      {/* 1.5. Portfolio linkage — parent breadcrumb, consolidated rollup, or link control */}
+      <PortfolioSection projectId={project.id} portfolio={portfolio} />
 
       {/* 2. Key Metrics Row */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">

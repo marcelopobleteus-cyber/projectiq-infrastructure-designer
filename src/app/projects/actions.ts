@@ -155,6 +155,182 @@ export async function updateProjectMetadata(
   return { success: true }
 }
 
+// ---------------------------------------------------------------------------
+// Parent / sub-project portfolio (migration 011: projects.parent_id)
+//
+// Model is intentionally capped at 2 levels — a project either has no parent
+// (it's a root, and may itself have children) or has exactly one parent that
+// is itself a root. No grandchildren. This keeps the consolidated rollup view
+// simple and keeps `linkProjectToParent` cheap to validate.
+// ---------------------------------------------------------------------------
+
+export interface PortfolioChildSummary {
+  id: string
+  name: string
+  disciplines: string[]
+  bomTotal: number
+  bomItemCount: number
+  tasksTotal: number
+  tasksComplete: number
+  updatedAt: string | null
+}
+
+export interface PortfolioData {
+  parent: { id: string; name: string } | null
+  children: PortfolioChildSummary[]
+  linkableParents: { id: string; name: string }[]
+}
+
+export async function getProjectPortfolio(projectId: string): Promise<PortfolioData> {
+  const supabase = await createClient()
+
+  const { data: project } = await supabase
+    .from('projects')
+    .select('id, parent_id, organization_id')
+    .eq('id', projectId)
+    .single()
+
+  if (!project) return { parent: null, children: [], linkableParents: [] }
+
+  let parent: { id: string; name: string } | null = null
+  if (project.parent_id) {
+    const { data: parentRow } = await supabase
+      .from('projects')
+      .select('id, name')
+      .eq('id', project.parent_id)
+      .single()
+    if (parentRow) parent = parentRow
+  }
+
+  const { data: childRows } = await supabase
+    .from('projects')
+    .select('id, name, disciplines, updated_at')
+    .eq('parent_id', projectId)
+    .order('name')
+
+  const children: PortfolioChildSummary[] = []
+  for (const child of childRows || []) {
+    const { data: bomRows } = await supabase
+      .from('bom_items')
+      .select('quantity, unit_cost')
+      .eq('project_id', child.id)
+    const bomTotal = (bomRows || []).reduce(
+      (sum, r) => sum + Number(r.quantity) * Number(r.unit_cost),
+      0
+    )
+
+    const { data: taskRows } = await supabase
+      .from('camera_tasks')
+      .select('status')
+      .eq('project_id', child.id)
+    const tasksTotal = taskRows?.length || 0
+    const tasksComplete = (taskRows || []).filter(t => t.status === 'Complete').length
+
+    children.push({
+      id: child.id,
+      name: child.name,
+      disciplines: child.disciplines || [],
+      bomTotal,
+      bomItemCount: bomRows?.length || 0,
+      tasksTotal,
+      tasksComplete,
+      updatedAt: child.updated_at,
+    })
+  }
+
+  // Candidate parents: root-level projects (no parent of their own) in the same
+  // org, excluding this project and excluding this project's own children
+  // (which would create a cycle).
+  const { data: candidateRows } = await supabase
+    .from('projects')
+    .select('id, name')
+    .eq('organization_id', project.organization_id)
+    .is('parent_id', null)
+    .neq('id', projectId)
+
+  const childIds = new Set((childRows || []).map(c => c.id))
+  const linkableParents = (candidateRows || [])
+    .filter(p => !childIds.has(p.id))
+    .map(p => ({ id: p.id, name: p.name }))
+
+  return { parent, children, linkableParents }
+}
+
+export async function linkProjectToParent(
+  projectId: string,
+  parentId: string | null
+): Promise<{ success?: boolean; error?: string }> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user && !BYPASS_AUTH) return { error: 'Not authenticated' }
+
+  if (parentId === projectId) return { error: 'A project cannot be its own parent.' }
+
+  const { data: project } = await supabase
+    .from('projects')
+    .select('organization_id')
+    .eq('id', projectId)
+    .single()
+
+  if (!project) return { error: 'Project not found' }
+
+  if (user) {
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', project.organization_id)
+      .eq('profile_id', user.id)
+      .single()
+
+    if (!membership && !BYPASS_AUTH) return { error: 'Access denied' }
+  }
+
+  if (parentId) {
+    // This project must not already be a parent itself — max depth is 2 levels.
+    const { count: ownChildCount } = await supabase
+      .from('projects')
+      .select('id', { count: 'exact', head: true })
+      .eq('parent_id', projectId)
+
+    if ((ownChildCount ?? 0) > 0) {
+      return {
+        error:
+          'This project already has sub-projects linked to it — it cannot also become a sub-project (max depth is 2 levels).',
+      }
+    }
+
+    const { data: parentProject } = await supabase
+      .from('projects')
+      .select('id, parent_id, organization_id')
+      .eq('id', parentId)
+      .single()
+
+    if (!parentProject) return { error: 'Parent project not found' }
+    if (parentProject.organization_id !== project.organization_id) {
+      return { error: 'The parent project must belong to the same organization.' }
+    }
+    if (parentProject.parent_id) {
+      return { error: 'That project already has a parent — only two levels are supported.' }
+    }
+  }
+
+  const { error } = await supabase
+    .from('projects')
+    .update({ parent_id: parentId, updated_at: new Date().toISOString() })
+    .eq('id', projectId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath(`/projects/${projectId}/overview`)
+  revalidatePath('/projects')
+  if (parentId) revalidatePath(`/projects/${parentId}/overview`)
+
+  return { success: true }
+}
+
 export async function updateProjectDisciplines(
   projectId: string,
   disciplines: string[]

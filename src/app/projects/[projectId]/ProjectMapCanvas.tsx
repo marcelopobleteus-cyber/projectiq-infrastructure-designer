@@ -573,8 +573,17 @@ export default function ProjectMapCanvas({
 
 
 
+  const [mapsAuthError, setMapsAuthError] = useState(false)
+
   // Initialize Map
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).gm_authFailure = () => {
+        console.warn('Google Maps API Key Authentication Failure or Billing Warning.')
+        setMapsAuthError(true)
+      }
+    }
+
     const apiKey = googleMapsApiKey || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
     if (!apiKey || !mapRef.current) return
 
