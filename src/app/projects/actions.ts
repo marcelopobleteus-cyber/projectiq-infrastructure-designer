@@ -5,19 +5,12 @@ import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { BYPASS_AUTH } from '@/config/auth'
 
-// Canonical discipline ids — must match PROJECT_TYPES in /projects/create and
-// ALL_DISCIPLINES in ProjectSidebar. 'master' is not a discipline itself; it expands
-// to the disciplines that currently have a real workspace built for them.
-const DISCIPLINE_MAP: Record<string, string[]> = {
-  master: ['cctv', 'fiber', 'networking', 'wireless', 'power'],
-  cctv: ['cctv'],
-  fiber: ['fiber'],
-  conduit: ['conduit'],
-  networking: ['networking'],
-  wireless: ['wireless'],
-  power: ['power'],
-  lighting: ['lighting'],
-}
+// Canonical discipline ids — must match DISCIPLINE_OPTIONS in /projects/create,
+// ALL_DISCIPLINES in ProjectSidebar.tsx, and DISCIPLINE_LABELS in
+// overview/PortfolioSection.tsx. The create form now submits one or more
+// 'disciplines' form values directly (a real multi-select) instead of a single
+// preset project_type.
+const CANONICAL_DISCIPLINES = ['cctv', 'fiber', 'conduit', 'networking', 'wireless', 'power', 'lighting']
 
 export async function createProject(formData: FormData) {
   const supabase = await createClient()
@@ -73,8 +66,13 @@ export async function createProject(formData: FormData) {
   const latitude = latitudeStr ? parseFloat(latitudeStr) : 33.7490
   const longitude = longitudeStr ? parseFloat(longitudeStr) : -84.3880
   const zoom = zoomStr ? parseInt(zoomStr, 10) : 15
-  const projectType = (formData.get('project_type') as string) || 'master'
-  const disciplines = DISCIPLINE_MAP[projectType] || []
+
+  const requestedDisciplines = formData.getAll('disciplines').map(d => String(d))
+  const disciplines = requestedDisciplines.filter(d => CANONICAL_DISCIPLINES.includes(d))
+
+  if (disciplines.length === 0) {
+    return { error: 'Select at least one discipline for the project.' }
+  }
 
   const { data: project } = await supabase
     .from('projects')
@@ -90,7 +88,7 @@ export async function createProject(formData: FormData) {
     .select('id')
     .single()
 
-  const redirectId = project?.id || `proj-${projectType}-${Date.now().toString(36)}`
+  const redirectId = project?.id || `proj-${disciplines[0]}-${Date.now().toString(36)}`
 
   revalidatePath('/projects')
   redirect(`/projects/${redirectId}/overview`)
