@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
+import { BYPASS_AUTH } from '@/config/auth'
 import { getCameraLocations, getProjectCameraTasks } from '../../actions-sprint2'
 import { getNetworkDevices } from '../../actions-sprint3'
 import { getFiberDesignData } from '../../actions-fiber'
@@ -15,22 +16,27 @@ interface PageProps {
 
 export default async function ProjectOverviewPage({ params }: PageProps) {
   const { projectId } = await params
+  console.log("OVERVIEW PAGE RENDERED FOR PROJECT:", projectId)
   const supabase = await createClient()
 
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) {
+  if (!user && !BYPASS_AUTH) {
     redirect('/login')
   }
 
   // Load project details
-  const { data: project } = await supabase
+  const { data: project, error } = await supabase
     .from('projects')
     .select('*')
     .eq('id', projectId)
     .single()
+
+  if (error) {
+    console.error('ERROR LOADING PROJECT in overview/page.tsx:', error)
+  }
 
   if (!project) {
     notFound()

@@ -1,8 +1,9 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
+import { BYPASS_AUTH } from '@/config/auth'
 import { getNetworkDevices } from '../../actions-sprint3'
 import { getCameraLocations, getCameraModels } from '../../actions-sprint2'
-import NetworkPortCanvas from './NetworkPortCanvas'
+import NetworkPageClient from './NetworkPageClient'
 import { Database } from '@/types/supabase'
 
 type CameraLocation = Database['public']['Tables']['camera_locations']['Row']
@@ -23,16 +24,20 @@ export default async function ProjectNetworkPage({ params }: PageProps) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) {
+  if (!user && !BYPASS_AUTH) {
     redirect('/login')
   }
 
   // Load project details
-  const { data: project } = await supabase
+  const { data: project, error: projectError } = await supabase
     .from('projects')
     .select('*')
     .eq('id', projectId)
     .single()
+
+  if (projectError) {
+    console.error('ERROR LOADING PROJECT in network/page.tsx:', projectError)
+  }
 
   if (!project) {
     notFound()
@@ -51,13 +56,11 @@ export default async function ProjectNetworkPage({ params }: PageProps) {
   }
 
   return (
-    <div className="flex-1 flex overflow-hidden h-full w-full">
-      <NetworkPortCanvas
-        projectId={projectId}
-        networkDevices={networkDevices}
-        cameras={cameras}
-        cameraModels={cameraModels}
-      />
-    </div>
+    <NetworkPageClient
+      projectId={projectId}
+      networkDevices={networkDevices}
+      cameras={cameras}
+      cameraModels={cameraModels}
+    />
   )
 }

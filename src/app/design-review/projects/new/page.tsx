@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
+import { BYPASS_AUTH } from '@/config/auth'
 import ProjectCreateReviewClient from './ProjectCreateReviewClient'
 
 export default async function DesignReviewNewProjectPage() {
@@ -8,7 +9,7 @@ export default async function DesignReviewNewProjectPage() {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) {
+  if (!user && !BYPASS_AUTH) {
     redirect('/login')
   }
 

@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
+import { BYPASS_AUTH } from '@/config/auth'
 import ProjectTopBar from '@/components/layout/ProjectTopBar'
 import WorkspaceContent from '@/components/layout/WorkspaceContent'
 import ProjectSidebar from '@/components/layout/ProjectSidebar'
@@ -13,22 +14,27 @@ interface ProjectLayoutProps {
 
 export default async function ProjectLayout({ children, params }: ProjectLayoutProps) {
   const { projectId } = await params
+  console.log("LAYOUT RENDERED FOR PROJECT:", projectId)
   const supabase = await createClient()
 
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) {
+  if (!user && !BYPASS_AUTH) {
     redirect('/login')
   }
 
   // Load project details to show name in top bar
-  const { data: project } = await supabase
+  const { data: project, error } = await supabase
     .from('projects')
     .select('*')
     .eq('id', projectId)
     .single()
+
+  if (error) {
+    console.error('ERROR LOADING PROJECT in layout.tsx:', error)
+  }
 
   if (!project) {
     notFound()

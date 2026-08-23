@@ -58,6 +58,10 @@ export default function CoordinateMap({
         mapTypeControl: true,
         streetViewControl: false,
         fullscreenControl: true,
+        styles: [
+          { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+          { featureType: 'transit', elementType: 'labels', stylers: [{ visibility: 'off' }] }
+        ]
       })
 
       // Create a single shared InfoWindow

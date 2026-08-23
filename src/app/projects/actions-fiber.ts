@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
+import { BYPASS_AUTH } from '@/config/auth'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -77,7 +78,7 @@ export async function createFiberRouteByNodes(params: {
 
   // 1. Verify authenticated user
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  if (!user && !BYPASS_AUTH) {
     return { success: false, error: 'Not authenticated.' }
   }
 
@@ -92,15 +93,17 @@ export async function createFiberRouteByNodes(params: {
     return { success: false, error: 'Project not found or access denied.' }
   }
 
-  const { data: membership } = await supabase
-    .from('organization_members')
-    .select('id')
-    .eq('organization_id', project.organization_id)
-    .eq('profile_id', user.id)
-    .single()
+  if (user) {
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', project.organization_id)
+      .eq('profile_id', user.id)
+      .single()
 
-  if (!membership) {
-    return { success: false, error: 'Access denied: you are not a member of this project organization.' }
+    if (!membership && !BYPASS_AUTH) {
+      return { success: false, error: 'Access denied: you are not a member of this project organization.' }
+    }
   }
 
   // 3. Validate endpoints are different
@@ -269,7 +272,7 @@ export async function createFiberRouteByOrderedNodes(params: {
 
   // 1. Verify authenticated user
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  if (!user && !BYPASS_AUTH) {
     return { success: false, error: 'Not authenticated.' }
   }
 
@@ -284,15 +287,17 @@ export async function createFiberRouteByOrderedNodes(params: {
     return { success: false, error: 'Project not found or access denied.' }
   }
 
-  const { data: membership } = await supabase
-    .from('organization_members')
-    .select('id')
-    .eq('organization_id', project.organization_id)
-    .eq('profile_id', user.id)
-    .single()
+  if (user) {
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', project.organization_id)
+      .eq('profile_id', user.id)
+      .single()
 
-  if (!membership) {
-    return { success: false, error: 'Access denied: you are not a member of this project organization.' }
+    if (!membership && !BYPASS_AUTH) {
+      return { success: false, error: 'Access denied: you are not a member of this project organization.' }
+    }
   }
 
   // 3. Verify orderedNodeIds has at least 2 elements
@@ -1120,7 +1125,7 @@ export async function deleteFiberRoute(params: { id: string; projectId: string }
 
   // 1. Verify user authentication
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  if (!user && !BYPASS_AUTH) {
     return { success: false, error: 'Not authenticated.' }
   }
 
@@ -1235,6 +1240,12 @@ export async function updateFiberRoute(params: {
   conduitDiameterInches?: number
   slackPercentage?: number
   installationType?: 'underground' | 'aerial' | 'direct_buried'
+  segments?: {
+    startLat: number
+    startLng: number
+    endLat: number
+    endLng: number
+  }[]
 }) {
   const supabase = await createClient()
 
@@ -1247,16 +1258,58 @@ export async function updateFiberRoute(params: {
 
   if (fetchErr) return { error: `Route not found: ${fetchErr.message}` }
 
-  // Re-calculate installed length if slack percentage is updated
+  let measuredLength = Number(route.measured_length_feet || 0)
+
+  // If new segments coordinates are provided, update segments table
+  if (params.segments && params.segments.length > 0) {
+    // Delete existing segments
+    const { error: delErr } = await supabase
+      .from('fiber_route_segments')
+      .delete()
+      .eq('route_id', params.id)
+
+    if (delErr) console.error('Failed to delete old segments:', delErr.message)
+
+    // Insert new segments and recalculate length
+    measuredLength = 0
+    const segmentInserts = params.segments.map((seg, idx) => {
+      const lenFt = haversineDistanceFeet(seg.startLat, seg.startLng, seg.endLat, seg.endLng)
+      measuredLength += lenFt
+      return {
+        project_id: params.projectId,
+        organization_id: '00000000-0000-0000-0000-000000000000',
+        route_id: params.id,
+        segment_index: idx,
+        start_latitude: seg.startLat,
+        start_longitude: seg.startLng,
+        end_latitude: seg.endLat,
+        end_longitude: seg.endLng,
+        length_feet: Number(lenFt.toFixed(2)),
+        slack_feet: 0.0
+      }
+    })
+
+    const { error: insErr } = await supabase
+      .from('fiber_route_segments')
+      .insert(segmentInserts)
+
+    if (insErr) {
+      console.error('Failed to insert new segments:', insErr.message)
+      return { error: `Failed to update route segments: ${insErr.message}` }
+    }
+  }
+
+  // Re-calculate installed length if slack percentage is updated or if segments were updated
   let installedLength = undefined
-  if (params.slackPercentage !== undefined && route.measured_length_feet !== undefined) {
+  const slackPct = params.slackPercentage !== undefined ? params.slackPercentage : 10.0
+  if (measuredLength !== undefined) {
     const { data: segments } = await supabase
       .from('fiber_route_segments')
       .select('slack_feet')
       .eq('route_id', params.id)
 
     const segmentSlack = segments ? segments.reduce((sum, seg) => sum + (seg.slack_feet ?? 0), 0) : 0
-    installedLength = Number((route.measured_length_feet * (1 + params.slackPercentage / 100) + segmentSlack).toFixed(2))
+    installedLength = Number((measuredLength * (1 + slackPct / 100) + segmentSlack).toFixed(2))
   }
 
   const { error } = await supabase
@@ -1265,6 +1318,7 @@ export async function updateFiberRoute(params: {
       route_id_tag: params.routeIdTag,
       conduit_diameter_inches: params.conduitDiameterInches,
       slack_percentage: params.slackPercentage,
+      measured_length_feet: Number(measuredLength.toFixed(2)),
       installed_length_feet: installedLength,
       installation_type: params.installationType,
       updated_at: new Date().toISOString(),

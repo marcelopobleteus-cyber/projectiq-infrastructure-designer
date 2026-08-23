@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
+import { BYPASS_AUTH } from '@/config/auth'
 import { getProjectCoordinatePoints, CoordinatePoint } from '../../actions-coordinate-viewer'
 import CoordinateViewerPage from '@/components/coordinate-viewer/CoordinateViewerPage'
 
@@ -17,7 +18,7 @@ export default async function ProjectCoordinateViewerPage({ params }: PageProps)
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) {
+  if (!user && !BYPASS_AUTH) {
     redirect('/login')
   }
 

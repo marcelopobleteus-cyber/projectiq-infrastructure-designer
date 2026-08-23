@@ -36,49 +36,50 @@ export default function ProjectsPage() {
     async function loadProjectsData() {
       try {
         const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
 
-        // Get user's organizations
-        const { data: memberships } = await supabase
-          .from('organization_members')
-          .select('organization_id')
-          .eq('profile_id', user.id)
+        let projectsQuery = supabase.from('projects').select('*').order('created_at', { ascending: false })
 
-        const orgIds = memberships?.map((m) => m.organization_id) || []
+        if (user) {
+          const { data: memberships } = await supabase
+            .from('organization_members')
+            .select('organization_id')
+            .eq('profile_id', user.id)
 
-        if (orgIds.length > 0) {
-          // Fetch projects
-          const { data: projectsData } = await supabase
-            .from('projects')
-            .select('*')
-            .in('organization_id', orgIds)
-            .order('created_at', { ascending: false })
-
-          const projectsList = projectsData || []
-          setProjects(projectsList)
-
-          // Fetch camera and device counts
-          const { data: cameras } = await supabase
-            .from('camera_locations')
-            .select('project_id')
-
-          const { data: devices } = await supabase
-            .from('network_devices')
-            .select('project_id')
-
-          // Compute counts maps
-          const camsMap: Record<string, number> = {}
-          cameras?.forEach((c: any) => {
-            camsMap[c.project_id] = (camsMap[c.project_id] || 0) + 1
-          })
-          setCameraCounts(camsMap)
-
-          const devsMap: Record<string, number> = {}
-          devices?.forEach((d: any) => {
-            devsMap[d.project_id] = (devsMap[d.project_id] || 0) + 1
-          })
-          setDeviceCounts(devsMap)
+          const orgIds = memberships?.map((m) => m.organization_id) || []
+          if (orgIds.length > 0) {
+            projectsQuery = supabase
+              .from('projects')
+              .select('*')
+              .in('organization_id', orgIds)
+              .order('created_at', { ascending: false })
+          }
         }
+
+        const { data: projectsData } = await projectsQuery
+        const projectsList = projectsData || []
+        setProjects(projectsList)
+
+        // Fetch camera and device counts
+        const { data: cameras } = await supabase
+          .from('camera_locations')
+          .select('project_id')
+
+        const { data: devices } = await supabase
+          .from('network_devices')
+          .select('project_id')
+
+        // Compute counts maps
+        const camsMap: Record<string, number> = {}
+        cameras?.forEach((c: any) => {
+          camsMap[c.project_id] = (camsMap[c.project_id] || 0) + 1
+        })
+        setCameraCounts(camsMap)
+
+        const devsMap: Record<string, number> = {}
+        devices?.forEach((d: any) => {
+          devsMap[d.project_id] = (devsMap[d.project_id] || 0) + 1
+        })
+        setDeviceCounts(devsMap)
       } catch (err) {
         console.error('Failed to load projects list:', err)
       } finally {
@@ -129,7 +130,8 @@ export default function ProjectsPage() {
       
       {/* Toast alert */}
       {toastMessage && (
-        <div className="fixed top-4 right-4 z-50 bg-slate-900 border border-slate-800 text-sky-400 px-4 py-3 rounded-xl shadow-2xl animate-in slide-in-from-top-4 duration-200 text-xs font-bold font-mono">
+        <div className="fixed top-4 right-4 z-50 bg-slate-900 border border-slate-750 text-white px-4 py-3 rounded-xl shadow-2xl animate-in slide-in-from-top-4 duration-200 text-xs font-bold font-mono flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
           {toastMessage}
         </div>
       )}

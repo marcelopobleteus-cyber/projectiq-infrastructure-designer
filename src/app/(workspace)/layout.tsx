@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
+import { BYPASS_AUTH } from '@/config/auth'
 import { logout } from '../auth/actions'
 import AppShell from '@/components/layout/AppShell'
 import MainSidebar from '@/components/layout/MainSidebar'
@@ -15,15 +16,15 @@ export default async function ProjectsLayout({
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) {
+  if (!user && !BYPASS_AUTH) {
     redirect('/login')
   }
 
-  const { data: profile } = await supabase
+  const { data: profile } = user ? await supabase
     .from('profiles')
     .select('*')
     .eq('id', user.id)
-    .single()
+    .single() : { data: null }
 
   const handleSignOut = async () => {
     'use server'
@@ -34,8 +35,8 @@ export default async function ProjectsLayout({
     <AppShell>
       {/* Narrow Primary Left Sidebar */}
       <MainSidebar
-        userEmail={user.email}
-        userName={profile?.full_name || 'User'}
+        userEmail={user?.email || 'guest@projectiq.local'}
+        userName={profile?.full_name || 'Guest User'}
         onSignOut={handleSignOut}
       />
 

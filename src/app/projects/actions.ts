@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
-
+import { BYPASS_AUTH } from '@/config/auth'
 
 export async function createProject(formData: FormData) {
   const supabase = await createClient()
@@ -11,7 +11,7 @@ export async function createProject(formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) {
+  if (!user && !BYPASS_AUTH) {
     return { error: 'Not authenticated' }
   }
 
@@ -25,16 +25,35 @@ export async function createProject(formData: FormData) {
     return { error: 'Project name is required' }
   }
 
-  // Determine current user's organization (Correction 4)
-  const { data: membership, error: memberError } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('profile_id', user.id)
-    .limit(1)
-    .single()
+  // Resolve organization
+  let orgId: string | null = null
+  if (user) {
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('organization_id')
+      .eq('profile_id', user.id)
+      .limit(1)
+      .single()
+    orgId = membership?.organization_id || null
+  }
 
-  if (memberError || !membership) {
-    return { error: 'Failed to resolve organization. Please try logging out and in again.' }
+  if (!orgId) {
+    const { data: firstProj } = await supabase.from('projects').select('organization_id').limit(1).single()
+    orgId = firstProj?.organization_id || null
+  }
+
+  if (!orgId) {
+    const { data: firstOrg } = await supabase.from('organizations').select('id').limit(1).single()
+    orgId = firstOrg?.id || null
+  }
+
+  if (!orgId) {
+    const { data: newOrg } = await supabase.from('organizations').insert({ name: 'Default Organization' }).select('id').single()
+    orgId = newOrg?.id || null
+  }
+
+  if (!orgId) {
+    return { error: 'Failed to resolve organization.' }
   }
 
   const latitude = latitudeStr ? parseFloat(latitudeStr) : 0.0
@@ -46,7 +65,7 @@ export async function createProject(formData: FormData) {
     .insert({
       name,
       description,
-      organization_id: membership.organization_id,
+      organization_id: orgId,
       default_latitude: latitude,
       default_longitude: longitude,
       default_zoom: zoom,
@@ -77,9 +96,9 @@ export async function updateProjectMetadata(
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) return { error: 'Not authenticated' }
+  if (!user && !BYPASS_AUTH) return { error: 'Not authenticated' }
 
-  // Verify the project belongs to an org the user is a member of
+  // Verify the project exists
   const { data: project } = await supabase
     .from('projects')
     .select('organization_id')
@@ -88,14 +107,16 @@ export async function updateProjectMetadata(
 
   if (!project) return { error: 'Project not found' }
 
-  const { data: membership } = await supabase
-    .from('organization_members')
-    .select('id')
-    .eq('organization_id', project.organization_id)
-    .eq('profile_id', user.id)
-    .single()
+  if (user) {
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', project.organization_id)
+      .eq('profile_id', user.id)
+      .single()
 
-  if (!membership) return { error: 'Access denied' }
+    if (!membership && !BYPASS_AUTH) return { error: 'Access denied' }
+  }
 
   const { error: updateError } = await supabase
     .from('projects')

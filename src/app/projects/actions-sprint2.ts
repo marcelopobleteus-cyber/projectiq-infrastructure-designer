@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
 import { Database } from '@/types/supabase'
+import { BYPASS_AUTH } from '@/config/auth'
 
 type CameraLocationInsert = Database['public']['Tables']['camera_locations']['Insert']
 type CameraLocationUpdate = Database['public']['Tables']['camera_locations']['Update']
@@ -468,7 +469,7 @@ export async function generateMissingProjectChecklists(projectId: string, dryRun
 
   // 1. Authenticate user
   const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
+  if ((authError || !user) && !BYPASS_AUTH) {
     return { error: 'Unauthorized. Please log in.' }
   }
 

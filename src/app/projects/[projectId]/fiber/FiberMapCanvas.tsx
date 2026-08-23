@@ -23,6 +23,33 @@ import {
   completeCameraFiberSplices
 } from '../../actions-fiber'
 
+const haversineDistanceMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R = 6371000 // Earth radius in meters
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLon = ((lon2 - lon1) * Math.PI) / 180
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return R * c
+}
+
+const getNodeCustomColor = (node: any) => {
+  if (node && node.notes && node.notes.startsWith('[COLOR:')) {
+    const match = node.notes.match(/^\[COLOR:([^\]]+)\]/)
+    if (match) return match[1]
+  }
+  return ''
+}
+
+const getNodeActualNotes = (notes: string | null) => {
+  if (!notes) return ''
+  return notes.replace(/^\[COLOR:[^\]]+\]\s*/, '')
+}
+
 interface FiberMapCanvasProps {
   projectId: string
   initialData: {
@@ -91,6 +118,14 @@ export default function FiberMapCanvas({
   const [map, setMap] = useState<google.maps.Map | null>(null)
   const [googleLoaded, setGoogleLoaded] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [activeLayer, setActiveLayer] = useState<'hybrid' | 'roadmap' | 'satellite'>('hybrid')
+
+  const handleLayerChange = (layer: 'hybrid' | 'roadmap' | 'satellite') => {
+    setActiveLayer(layer)
+    if (map) {
+      map.setMapTypeId(layer)
+    }
+  }
 
   // Map drawing mode state
   // Modes: 'select' (default), 'Manhole', 'Handhole', 'Pull Box', 'Cabinet', 'Pole', 'Building', 'Existing Fiber Source', 'Camera Location', 'Custom', 'draw_route'
@@ -127,6 +162,33 @@ export default function FiberMapCanvas({
   const [installationType, setInstallationType] = useState<'underground' | 'aerial' | 'direct_buried'>('underground')
   const [selectedCatalogCableId, setSelectedCatalogCableId] = useState('')
   const [routeFiberCount, setRouteFiberCount] = useState(12)
+
+  const [nodeColor, setNodeColor] = useState('')
+  const [routeColor, setRouteColor] = useState('')
+  const [routeNotes, setRouteNotes] = useState('')
+  const [nodeLat, setNodeLat] = useState<number>(0)
+  const [nodeLng, setNodeLng] = useState<number>(0)
+  const [editedRoutePoints, setEditedRoutePoints] = useState<google.maps.LatLngLiteral[]>([])
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean
+    title: string
+    message: string
+    onConfirm: () => void
+  } | null>(null)
+
+  const getRouteCustomColor = (route: any) => {
+    const cable = initialData.cables.find(c => c.route_id === route.id)
+    if (cable && cable.notes && cable.notes.startsWith('[COLOR:')) {
+      const match = cable.notes.match(/^\[COLOR:([^\]]+)\]/)
+      if (match) return match[1]
+    }
+    return ''
+  }
+
+  const getRouteActualNotes = (notes: string | null) => {
+    if (!notes) return ''
+    return notes.replace(/^\[COLOR:[^\]]+\]\s*/, '')
+  }
 
   // Splicing States
   const [spliceCableA, setSpliceCableA] = useState('')
@@ -210,6 +272,49 @@ export default function FiberMapCanvas({
         setErrorMessage('Google Maps API key is missing or invalid. Check credentials on Vercel.')
       })
   }, [googleMapsApiKey])
+
+  // Synchronize form color and notes states on selection changes
+  useEffect(() => {
+    if (selectedNode) {
+      const color = getNodeCustomColor(selectedNode)
+      const actualNotes = getNodeActualNotes(selectedNode.notes)
+      setNodeColor(color)
+      setNodeNotes(actualNotes)
+      setNodeLat(selectedNode.latitude)
+      setNodeLng(selectedNode.longitude)
+    } else {
+      setNodeColor('')
+      setNodeNotes('')
+      setNodeLat(0)
+      setNodeLng(0)
+    }
+  }, [selectedNode])
+
+  useEffect(() => {
+    if (selectedRoute) {
+      const color = getRouteCustomColor(selectedRoute)
+      const cable = initialData.cables.find(c => c.route_id === selectedRoute.id)
+      const actualNotes = getRouteActualNotes(cable?.notes || '')
+      setRouteColor(color)
+      setRouteNotes(actualNotes)
+
+      // Sync route coordinates
+      const routeSegs = initialData.segments.filter(s => s.route_id === selectedRoute.id)
+      const sortedSegs = [...routeSegs].sort((a, b) => a.segment_index - b.segment_index)
+      const points: google.maps.LatLngLiteral[] = []
+      sortedSegs.forEach((seg, idx) => {
+        if (idx === 0) {
+          points.push({ lat: seg.start_latitude, lng: seg.start_longitude })
+        }
+        points.push({ lat: seg.end_latitude, lng: seg.end_longitude })
+      })
+      setEditedRoutePoints(points)
+    } else {
+      setRouteColor('')
+      setRouteNotes('')
+      setEditedRoutePoints([])
+    }
+  }, [selectedRoute, initialData.cables, initialData.segments])
 
   // Handle selectedNodeId / selectedRouteId from query parameters on load
   useEffect(() => {
@@ -312,13 +417,14 @@ export default function FiberMapCanvas({
       const gMap = new google.maps.Map(mapRef.current, {
         center: { lat: defaultLatitude || 33.7490, lng: defaultLongitude || -84.3880 },
         zoom: defaultZoom || 15,
-        mapTypeId: 'hybrid',
+        mapTypeId: activeLayer,
         tilt: 0,
         streetViewControl: false,
         mapTypeControl: false,
         fullscreenControl: false,
         styles: [
-          { featureType: 'all', elementType: 'labels.text.fill', stylers: [{ color: '#ffffff' }] }
+          { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+          { featureType: 'transit', elementType: 'labels', stylers: [{ visibility: 'off' }] }
         ]
       })
 
@@ -335,11 +441,29 @@ export default function FiberMapCanvas({
         if (currentMode === 'select') return
 
         if (currentMode === 'draw_route') {
+          let finalLat = lat
+          let finalLng = lng
+
+          let closestNode = null
+          let minDistance = Infinity
+          initialData.nodes.forEach(n => {
+            const dist = haversineDistanceMeters(lat, lng, n.latitude, n.longitude)
+            if (dist < minDistance) {
+              minDistance = dist
+              closestNode = n
+            }
+          })
+
+          if (closestNode && minDistance < 15) {
+            finalLat = closestNode.latitude
+            finalLng = closestNode.longitude
+          }
+
           setTempRoutePoints(prev => {
-            if (prev.length > 0 && prev[prev.length - 1].lat === lat && prev[prev.length - 1].lng === lng) {
+            if (prev.length > 0 && prev[prev.length - 1].lat === finalLat && prev[prev.length - 1].lng === finalLng) {
               return prev
             }
-            return [...prev, { lat, lng }]
+            return [...prev, { lat: finalLat, lng: finalLng }]
           })
         } else {
           if (handleMapCanvasClickRef.current) {
@@ -376,6 +500,9 @@ export default function FiberMapCanvas({
     }
 
     const getRouteColor = (route: any) => {
+      const customCol = getRouteCustomColor(route)
+      if (customCol) return customCol
+
       const cable = initialData.cables.find(c => c.route_id === route.id)
       if (!cable) return '#eab308' // Planned (Yellow)
       if (cable.test_status === 'Passed') return '#10b981' // Green
@@ -412,16 +539,109 @@ export default function FiberMapCanvas({
         geodesic: true,
         strokeColor: strokeCol,
         strokeOpacity: 0.8,
-        strokeWeight: 4,
+        strokeWeight: 2.5,
         map: map
       })
 
       // Highlight selected route
       if (selectedRoute && selectedRoute.id === route.id) {
-        poly.setOptions({ strokeColor: '#38bdf8', strokeWeight: 6 })
+        poly.setOptions({ strokeColor: '#38bdf8', strokeWeight: 4, editable: true })
+
+        // Track path edits dynamically
+        const path = poly.getPath()
+        const updatePoints = () => {
+          const newPoints: google.maps.LatLngLiteral[] = []
+          for (let i = 0; i < path.getLength(); i++) {
+            const xy = path.getAt(i)
+            newPoints.push({ lat: xy.lat(), lng: xy.lng() })
+          }
+          setEditedRoutePoints(newPoints)
+          if (endMarker && newPoints.length > 0) {
+            endMarker.setPosition(newPoints[newPoints.length - 1])
+          }
+        }
+
+        let endMarker: google.maps.Marker | null = null
+        if (points.length > 0) {
+          const lastPoint = points[points.length - 1]
+          endMarker = new google.maps.Marker({
+            position: lastPoint,
+            map: map,
+            draggable: true,
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 7,
+              fillColor: '#ef4444',
+              fillOpacity: 1,
+              strokeColor: '#ffffff',
+              strokeWeight: 2
+            },
+            title: 'Arrastra para extender ruta',
+            zIndex: 9999
+          })
+
+          endMarker.addListener('dragstart', () => {
+            const currentPath = poly.getPath()
+            const len = currentPath.getLength()
+            if (len > 0) {
+              const lastVal = currentPath.getAt(len - 1)
+              currentPath.push(new google.maps.LatLng(lastVal.lat(), lastVal.lng()))
+              updatePoints()
+            }
+          })
+
+          endMarker.addListener('drag', () => {
+            const pos = endMarker?.getPosition()
+            if (pos) {
+              const currentPath = poly.getPath()
+              const len = currentPath.getLength()
+              if (len > 0) {
+                currentPath.setAt(len - 1, pos)
+                updatePoints()
+              }
+            }
+          })
+
+          endMarker.addListener('dragend', () => {
+            const pos = endMarker?.getPosition()
+            if (pos) {
+              let finalLat = pos.lat()
+              let finalLng = pos.lng()
+
+              let closestNode = null
+              let minDistance = Infinity
+              initialData.nodes.forEach(n => {
+                const dist = haversineDistanceMeters(pos.lat(), pos.lng(), n.latitude, n.longitude)
+                if (dist < minDistance) {
+                  minDistance = dist
+                  closestNode = n
+                }
+              })
+
+              if (closestNode && minDistance < 15) {
+                finalLat = closestNode.latitude
+                finalLng = closestNode.longitude
+                endMarker?.setPosition({ lat: finalLat, lng: finalLng })
+              }
+
+              const currentPath = poly.getPath()
+              const len = currentPath.getLength()
+              if (len > 0) {
+                currentPath.setAt(len - 1, new google.maps.LatLng(finalLat, finalLng))
+                updatePoints()
+              }
+            }
+          })
+
+          markersRef.current.push(endMarker)
+        }
+
+        path.addListener('set_at', updatePoints)
+        path.addListener('insert_at', updatePoints)
+        path.addListener('remove_at', updatePoints)
       }
 
-      poly.addListener('click', () => {
+      poly.addListener('click', (e: google.maps.PolyMouseEvent) => {
         setSelectedRoute(route)
         setSelectedNode(null)
         setActiveTab('properties')
@@ -431,51 +651,50 @@ export default function FiberMapCanvas({
         setConduitDiameter(Number(route.conduit_diameter_inches || 2.0))
         setRouteSlackPercentage(Number(route.slack_percentage || 10.0))
         setInstallationType(route.installation_type || 'underground')
-      })
 
-        poly.addListener('mouseover', (e: google.maps.PolyMouseEvent) => {
-          const cable = initialData.cables.find(c => c.route_id === route.id)
-          const fromNode = initialData.nodes.find(n => n.id === cable?.from_node_id)
-          const toNode = initialData.nodes.find(n => n.id === cable?.to_node_id)
+        const cable = initialData.cables.find(c => c.route_id === route.id)
+        const fromNode = initialData.nodes.find(n => n.id === cable?.from_node_id)
+        const toNode = initialData.nodes.find(n => n.id === cable?.to_node_id)
 
-          const contentString = `
-            <div style="padding: 8px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a; max-width: 220px;">
-              <div style="font-weight: bold; font-size: 12px; margin-bottom: 4px; border-b: 1px solid #e2e8f0; padding-bottom: 2px;">
-                Route: ${route.route_id_tag}
-              </div>
-              <div><strong>Measured Length:</strong> ${route.measured_length_feet} ft</div>
-              <div><strong>Installed Length:</strong> ${route.installed_length_feet} ft</div>
-              <div><strong>Type:</strong> ${route.installation_type}</div>
-              <div><strong>Conduit Size:</strong> ${route.conduit_diameter_inches} in</div>
-              <div><strong>Fill:</strong> ${route.fill_percentage}%</div>
-              ${cable ? `
-                <div style="margin-top: 6px; border-t: 1px dashed #cbd5e1; padding-top: 4px;">
-                  <strong>Cable:</strong> ${cable.cable_tag} (${cable.fiber_count}F)<br/>
-                  <strong>Install Status:</strong> ${cable.install_status}<br/>
-                  <strong>Test Status:</strong> ${cable.test_status}<br/>
-                  <strong>From:</strong> ${fromNode ? fromNode.node_tag : 'Start'}<br/>
-                  <strong>To:</strong> ${toNode ? toNode.node_tag : 'End'}
-                </div>
-              ` : '<div><em>No Cable Installed</em></div>'}
-              <div style="margin-top: 8px; padding-top: 6px; border-t: 1px solid #e2e8f0; display: flex;">
-                <button onclick="window.selectRouteForEditing('${route.id}')" style="display: inline-block; padding: 4px 8px; background-color: #4f46e5; color: white; border-radius: 6px; border: none; font-weight: bold; font-size: 9px; text-align: center; flex: 1; cursor: pointer;">Editar Ruta</button>
-              </div>
+        const contentString = `
+          <div style="padding: 4px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a; max-width: 220px;">
+            <div style="font-weight: bold; font-size: 12px; margin-bottom: 4px; border-bottom: 1px solid #e2e8f0; padding-bottom: 2px;">
+              Route: ${route.route_id_tag}
             </div>
-          `
+            <div><strong>Measured Length:</strong> ${route.measured_length_feet} ft</div>
+            <div><strong>Installed Length:</strong> ${route.installed_length_feet} ft</div>
+            <div><strong>Type:</strong> ${route.installation_type}</div>
+            <div><strong>Conduit Size:</strong> ${route.conduit_diameter_inches} in</div>
+            <div><strong>Fill:</strong> ${route.fill_percentage}%</div>
+            ${cable ? `
+              <div style="margin-top: 6px; border-top: 1px dashed #cbd5e1; padding-top: 4px;">
+                <strong>Cable:</strong> ${cable.cable_tag} (${cable.fiber_count}F)<br/>
+                <strong>Install Status:</strong> ${cable.install_status}<br/>
+                <strong>Test Status:</strong> ${cable.test_status}<br/>
+                <strong>From:</strong> ${fromNode ? fromNode.node_tag : 'Start'}<br/>
+                <strong>To:</strong> ${toNode ? toNode.node_tag : 'End'}
+              </div>
+            ` : '<div style="margin-top: 4px;"><em>No Cable Installed</em></div>'}
+            <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #e2e8f0; display: flex;">
+              <button onclick="window.selectRouteForEditing('${route.id}')" style="display: inline-block; padding: 4px 8px; background-color: #4f46e5; color: white; border-radius: 6px; border: none; font-weight: bold; font-size: 9px; text-align: center; flex: 1; cursor: pointer;">Editar Ruta</button>
+            </div>
+          </div>
+        `
 
-          if (infoWindow && e.latLng) {
-            infoWindow.setContent(contentString)
-            infoWindow.setPosition(e.latLng)
-            infoWindow.open(map)
-          }
-        })
+        if (infoWindow && e.latLng) {
+          infoWindow.setContent(contentString)
+          infoWindow.setPosition(e.latLng)
+          infoWindow.open(map)
+        }
+      })
 
       polylinesRef.current.push(poly)
     })
 
     // Draw Nodes (markers)
     initialData.nodes.forEach(node => {
-      const statusColor = getStatusColor(node.status)
+      const customNodeColor = getNodeCustomColor(node)
+      const statusColor = customNodeColor || getStatusColor(node.status)
       let svgShape = ''
       const typeLower = node.node_type ? node.node_type.toLowerCase() : ''
       
@@ -544,7 +763,6 @@ export default function FiberMapCanvas({
           </text>
         </svg>
       `
- 
       const marker = new google.maps.Marker({
         position: { lat: node.latitude, lng: node.longitude },
         map: map,
@@ -559,6 +777,17 @@ export default function FiberMapCanvas({
 
       // Click to select node
       marker.addListener('click', () => {
+        const currentMode = toolModeRef.current
+        if (currentMode === 'draw_route') {
+          setTempRoutePoints(prev => {
+            if (prev.length > 0 && prev[prev.length - 1].lat === node.latitude && prev[prev.length - 1].lng === node.longitude) {
+              return prev
+            }
+            return [...prev, { lat: node.latitude, lng: node.longitude }]
+          })
+          return
+        }
+
         setSelectedNode(node)
         setSelectedRoute(null)
         setActiveTab('properties')
@@ -575,10 +804,8 @@ export default function FiberMapCanvas({
           setNodeClosureType(enclosure.enclosure_type)
           setNodeCapacity(enclosure.capacity || 12)
         }
-      })
 
-      // Hover card for node
-      marker.addListener('mouseover', () => {
+        // Open InfoWindow on click
         const nodeEnclosures = initialData.enclosures.filter((e: any) => e.node_id === node.id)
         const nodeCables = initialData.cables.filter((c: any) => c.from_node_id === node.id || c.to_node_id === node.id)
         const servedAssignments = initialData.assignments.filter((a: any) => a.source_node_id === node.id)
@@ -589,8 +816,8 @@ export default function FiberMapCanvas({
         }).join(', ')
 
         const contentString = `
-          <div style="padding: 8px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a; max-width: 220px;">
-            <div style="font-weight: bold; font-size: 12px; margin-bottom: 4px; border-b: 1px solid #e2e8f0; padding-bottom: 2px;">
+          <div style="padding: 4px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a; max-width: 220px;">
+            <div style="font-weight: bold; font-size: 12px; margin-bottom: 4px; border-bottom: 1px solid #e2e8f0; padding-bottom: 2px;">
               ${node.node_tag}
             </div>
             <div><strong>Type:</strong> ${node.node_type}</div>
@@ -598,7 +825,7 @@ export default function FiberMapCanvas({
             <div><strong>Cables:</strong> ${nodeCables.length > 0 ? nodeCables.map((c: any) => c.cable_tag).join(', ') : 'None'}</div>
             <div><strong>Enclosures:</strong> ${nodeEnclosures.length}</div>
             <div><strong>Served Cameras:</strong> ${servedCamTags || 'None'}</div>
-            <div style="margin-top: 8px; padding-top: 6px; border-t: 1px solid #e2e8f0; display: flex;">
+            <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #e2e8f0; display: flex;">
               <button onclick="window.selectNodeForEditing('${node.id}')" style="display: inline-block; padding: 4px 8px; background-color: #4f46e5; color: white; border-radius: 6px; border: none; font-weight: bold; font-size: 9px; text-align: center; flex: 1; cursor: pointer;">Editar Nodo</button>
             </div>
           </div>
@@ -615,20 +842,30 @@ export default function FiberMapCanvas({
         const pos = marker.getPosition()
         if (!pos) return
 
+        const newLat = pos.lat()
+        const newLng = pos.lng()
+
         try {
           const supabase = await createClient()
           const { error } = await supabase
             .from('fiber_nodes')
             .update({
-              latitude: pos.lat(),
-              longitude: pos.lng()
+              latitude: newLat,
+              longitude: newLng
             })
             .eq('id', node.id)
 
           if (error) {
             showNotification('error', `Failed to move node: ${error.message}`)
+            marker.setPosition({ lat: node.latitude, lng: node.longitude })
           } else {
-            showNotification('success', `Moved node ${node.node_tag}`)
+            showNotification('success', `Moved node ${node.node_tag} to new coordinates.`)
+            node.latitude = newLat
+            node.longitude = newLng
+            if (selectedNode && selectedNode.id === node.id) {
+              setNodeLat(newLat)
+              setNodeLng(newLng)
+            }
             await loadDesignData()
           }
         } catch (err) {
@@ -697,15 +934,11 @@ export default function FiberMapCanvas({
           }
         })
 
-        marker.addListener('mouseover', () => {
+        marker.addListener('click', () => {
           if (infoWindow) {
             infoWindow.setContent(tooltipContent)
             infoWindow.open(map, marker)
           }
-        })
-
-        marker.addListener('mouseout', () => {
-          if (infoWindow) infoWindow.close()
         })
 
         markersRef.current.push(marker)
@@ -742,19 +975,19 @@ export default function FiberMapCanvas({
           map: map
         })
 
-        // Hover tooltip for drop cable
-        poly.addListener('mouseover', (e: google.maps.PolyMouseEvent) => {
+        // Click tooltip for drop cable
+        poly.addListener('click', (e: google.maps.PolyMouseEvent) => {
           const cable = initialData.cables.find(c => c.id === assignment.drop_cable_id)
           const contentString = `
-            <div style="padding: 8px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a; max-width: 220px;">
-              <div style="font-weight: bold; font-size: 12px; margin-bottom: 4px; border-b: 1px solid #e2e8f0; padding-bottom: 2px;">
+            <div style="padding: 4px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a; max-width: 220px;">
+              <div style="font-weight: bold; font-size: 12px; margin-bottom: 4px; border-bottom: 1px solid #e2e8f0; padding-bottom: 2px;">
                 Camera Drop: ${camera.camera_id_tag}
               </div>
               <div><strong>Path Status:</strong> <span style="color: ${getStatusColor(assignment.fiber_path_status)}; font-weight: bold;">${assignment.fiber_path_status}</span></div>
               <div><strong>Splice Status:</strong> ${assignment.splice_status}</div>
               <div><strong>Test Status:</strong> ${assignment.test_status}</div>
               ${cable ? `
-                <div style="margin-top: 4px; border-t: 1px dashed #cbd5e1; padding-top: 4px;">
+                <div style="margin-top: 4px; border-top: 1px dashed #cbd5e1; padding-top: 4px;">
                   <strong>Cable Tag:</strong> ${cable.cable_tag}<br/>
                   <strong>Length:</strong> ${cable.length_ft} ft
                 </div>
@@ -766,10 +999,6 @@ export default function FiberMapCanvas({
             infoWindow.setPosition(e.latLng)
             infoWindow.open(map)
           }
-        })
-
-        poly.addListener('mouseout', () => {
-          if (infoWindow) infoWindow.close()
         })
 
         polylinesRef.current.push(poly)
@@ -790,7 +1019,7 @@ export default function FiberMapCanvas({
         path: tempRoutePoints,
         strokeColor: '#f43f5e',
         strokeOpacity: 0.9,
-        strokeWeight: 3,
+        strokeWeight: 2,
         map: map
       })
       setTempPolyline(poly)
@@ -805,6 +1034,18 @@ export default function FiberMapCanvas({
     setTimeout(() => {
       setNotifyMessage(null)
     }, 4000)
+  }
+
+  const triggerConfirm = (title: string, message: string, onConfirm: () => void) => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      onConfirm: () => {
+        onConfirm()
+        setConfirmModal(null)
+      }
+    })
   }
 
   // Handle map click events based on active mode
@@ -928,30 +1169,38 @@ export default function FiberMapCanvas({
 
   // Delete node handler
   const handleDeleteNode = async (id: string, tag: string) => {
-    if (!confirm(`Are you sure you want to delete ${tag}? This will cascade delete its automatic BOM parts.`)) return
-
-    const res = await deleteFiberNode({ id, projectId })
-    if (res.error) {
-      showNotification('error', res.error)
-    } else {
-      showNotification('success', `Deleted node ${tag}`)
-      setSelectedNode(null)
-      await loadDesignData()
-    }
+    triggerConfirm(
+      'Confirm Node Deletion',
+      `Are you sure you want to delete ${tag}? This will cascade delete its automatic BOM parts.`,
+      async () => {
+        const res = await deleteFiberNode({ id, projectId })
+        if (res.error) {
+          showNotification('error', res.error)
+        } else {
+          showNotification('success', `Deleted node ${tag}`)
+          setSelectedNode(null)
+          await loadDesignData()
+        }
+      }
+    )
   }
 
   // Delete route handler
   const handleDeleteRoute = async (id: string, tag: string) => {
-    if (!confirm(`Are you sure you want to delete Route ${tag}? This will cascade delete its installed cables and BOM quantities.`)) return
-
-    const res = await deleteRoute({ id })
-    if (res.error) {
-      showNotification('error', res.error)
-    } else {
-      showNotification('success', `Deleted route ${tag}`)
-      setSelectedRoute(null)
-      await loadDesignData()
-    }
+    triggerConfirm(
+      'Confirm Route Deletion',
+      `Are you sure you want to delete Route ${tag}? This will cascade delete its installed cables and BOM quantities.`,
+      async () => {
+        const res = await deleteRoute({ id })
+        if (res.error) {
+          showNotification('error', res.error)
+        } else {
+          showNotification('success', `Deleted route ${tag}`)
+          setSelectedRoute(null)
+          await loadDesignData()
+        }
+      }
+    )
   }
 
   async function deleteRoute(params: { id: string }) {
@@ -966,6 +1215,7 @@ export default function FiberMapCanvas({
       const supabase = await createClient()
       
       // Update fiber_nodes
+      const finalNotes = nodeColor ? `[COLOR:${nodeColor}]` + (nodeNotes ? ` ${nodeNotes}` : '') : nodeNotes
       const { error: nodeErr } = await supabase
         .from('fiber_nodes')
         .update({
@@ -973,7 +1223,9 @@ export default function FiberMapCanvas({
           size_description: nodeSize,
           elevation_ft: nodeElevation,
           slack_loop_ft: nodeSlack,
-          notes: nodeNotes
+          notes: finalNotes,
+          latitude: nodeLat,
+          longitude: nodeLng
         })
         .eq('id', selectedNode.id)
 
@@ -1014,6 +1266,10 @@ export default function FiberMapCanvas({
         }
       }
 
+      if (map) {
+        map.panTo({ lat: nodeLat, lng: nodeLng })
+      }
+
       showNotification('success', 'Node specifications saved!')
       await loadDesignData()
     } catch (err) {
@@ -1024,21 +1280,56 @@ export default function FiberMapCanvas({
   const handleSaveRouteDetails = async () => {
     if (!selectedRoute) return
 
+    // Construct segments array from editedRoutePoints
+    const segmentsPayload = []
+    if (editedRoutePoints && editedRoutePoints.length > 1) {
+      for (let i = 0; i < editedRoutePoints.length - 1; i++) {
+        segmentsPayload.push({
+          startLat: editedRoutePoints[i].lat,
+          startLng: editedRoutePoints[i].lng,
+          endLat: editedRoutePoints[i + 1].lat,
+          endLng: editedRoutePoints[i + 1].lng
+        })
+      }
+    }
+
     const res = await updateFiberRoute({
       id: selectedRoute.id,
       projectId,
       routeIdTag,
       conduitDiameterInches: conduitDiameter,
       slackPercentage: routeSlackPercentage,
-      installationType: installationType
+      installationType: installationType,
+      segments: segmentsPayload.length > 0 ? segmentsPayload : undefined
     })
 
     if (res.error) {
       showNotification('error', res.error)
-    } else {
-      showNotification('success', 'Pathway specifications saved!')
-      await loadDesignData()
+      return
     }
+
+    try {
+      const supabase = await createClient()
+      const cable = initialData.cables.find(c => c.route_id === selectedRoute.id)
+      if (cable) {
+        const finalNotes = routeColor ? `[COLOR:${routeColor}]` + (routeNotes ? ` ${routeNotes}` : '') : routeNotes
+        const { error: cableNotesErr } = await supabase
+          .from('fiber_cables')
+          .update({
+            notes: finalNotes
+          })
+          .eq('id', cable.id)
+
+        if (cableNotesErr) {
+          console.error('Failed to update cable custom notes/color:', cableNotesErr.message)
+        }
+      }
+    } catch (err) {
+      console.error(err)
+    }
+
+    showNotification('success', 'Pathway specifications saved!')
+    await loadDesignData()
   }
 
   // Splice matrix load/save handlers
@@ -1242,20 +1533,24 @@ export default function FiberMapCanvas({
   }
 
   const handleRemoveCameraFiber = async (camId: string, _linkRole: string) => {
-    if (!confirm('Are you sure you want to remove this camera fiber assignment?')) return
+    triggerConfirm(
+      'Remove Fiber Assignment',
+      'Are you sure you want to remove this camera fiber assignment?',
+      async () => {
+        const res = await updateCameraFiberAssignment({
+          cameraId: camId,
+          projectId,
+          fiberPathStatus: 'Planned',
+        })
 
-    const res = await updateCameraFiberAssignment({
-      cameraId: camId,
-      projectId,
-      fiberPathStatus: 'Planned',
-    })
-
-    if (res.error) {
-      showNotification('error', res.error)
-    } else {
-      showNotification('success', 'Fiber assignment cleared.')
-      await loadDesignData()
-    }
+        if (res.error) {
+          showNotification('error', res.error)
+        } else {
+          showNotification('success', 'Fiber assignment cleared.')
+          await loadDesignData()
+        }
+      }
+    )
   }
 
   // Field Technician Mode Event Handlers
@@ -1324,20 +1619,25 @@ export default function FiberMapCanvas({
   }
 
   const handleRemoveTechAssignment = async (camId: string) => {
-    if (!confirm('Are you sure you want to remove this camera fiber assignment and clear all OSP splices?')) return
-    setTechLoading(true)
-    try {
-      const supabase = createClient()
-      await supabase.from('fiber_splice_records').delete().eq('assigned_camera_id', camId)
-      await clearStrandAssignmentsForCamera({ projectId, cameraId: camId })
-      await supabase.from('camera_fiber_assignments').delete().eq('camera_id', camId)
-      showNotification('success', 'Camera assignment and splices cleared.')
-      await loadDesignData()
-    } catch (err: any) {
-      showNotification('error', `Failed to remove assignment: ${err.message}`)
-    } finally {
-      setTechLoading(false)
-    }
+    triggerConfirm(
+      'Clear Assignment & Splices',
+      'Are you sure you want to remove this camera fiber assignment and clear all OSP splices?',
+      async () => {
+        setTechLoading(true)
+        try {
+          const supabase = createClient()
+          await supabase.from('fiber_splice_records').delete().eq('assigned_camera_id', camId)
+          await clearStrandAssignmentsForCamera({ projectId, cameraId: camId })
+          await supabase.from('camera_fiber_assignments').delete().eq('camera_id', camId)
+          showNotification('success', 'Camera assignment and splices cleared.')
+          await loadDesignData()
+        } catch (err: any) {
+          showNotification('error', `Failed to remove assignment: ${err.message}`)
+        } finally {
+          setTechLoading(false)
+        }
+      }
+    )
   }
 
   return (
@@ -1347,8 +1647,8 @@ export default function FiberMapCanvas({
       {notifyMessage && (
         <div className={`absolute top-4 left-1/2 -translate-x-1/2 px-4 py-2.5 rounded-xl border text-xs font-bold z-50 shadow-xl backdrop-blur-md transition-all flex items-center gap-2 ${
           notifyMessage.type === 'success' 
-            ? 'bg-emerald-950/90 text-emerald-450 border-emerald-500/20' 
-            : 'bg-rose-950/90 text-rose-450 border-rose-500/20'
+            ? 'bg-emerald-900/95 text-emerald-50 border-emerald-500/30' 
+            : 'bg-rose-900/95 text-rose-50 border-rose-500/30'
         }`}>
           <span className={`w-2 h-2 rounded-full ${notifyMessage.type === 'success' ? 'bg-emerald-400' : 'bg-rose-400'}`} />
           {notifyMessage.text}
@@ -1440,6 +1740,25 @@ export default function FiberMapCanvas({
 
           {/* Map canvas container */}
           <div className="w-full h-full min-h-0 bg-slate-950 flex-1 relative">
+            {/* Map layer toggle UI */}
+            {!errorMessage && (
+              <div className="absolute top-3 right-3 z-10 flex bg-slate-950/70 border border-slate-805 rounded-xl p-1 gap-1 backdrop-blur-md">
+                {(['hybrid', 'roadmap', 'satellite'] as const).map(layer => (
+                  <button
+                    key={layer}
+                    onClick={() => handleLayerChange(layer)}
+                    className={`px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider rounded-lg transition-all ${
+                      activeLayer === layer
+                        ? 'bg-indigo-650 text-white font-bold'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {layer === 'roadmap' ? 'Road' : layer === 'hybrid' ? 'Hybrid' : 'Sat'}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {errorMessage ? (
               <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center text-rose-450 bg-rose-950/10 font-mono text-xs max-w-md mx-auto relative z-10 border border-dashed border-rose-900/30 rounded-2xl my-auto">
                 <svg className="mb-2 shrink-0 animate-bounce" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -1658,6 +1977,29 @@ export default function FiberMapCanvas({
                         />
                       </div>
 
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Latitude</label>
+                          <input
+                            type="number"
+                            step="0.00000001"
+                            value={nodeLat}
+                            onChange={e => setNodeLat(Number(e.target.value))}
+                            className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none font-mono text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Longitude</label>
+                          <input
+                            type="number"
+                            step="0.00000001"
+                            value={nodeLng}
+                            onChange={e => setNodeLng(Number(e.target.value))}
+                            className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none font-mono text-xs"
+                          />
+                        </div>
+                      </div>
+
                       <div>
                         <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Dimensions (Size)</label>
                         <input
@@ -1719,6 +2061,42 @@ export default function FiberMapCanvas({
                           </div>
                         </>
                       )}
+
+                      <div>
+                        <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1.5">Custom Icon Color</label>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {[
+                            { name: 'Default', value: '' },
+                            { name: 'Blue', value: '#3b82f6' },
+                            { name: 'Green', value: '#10b981' },
+                            { name: 'Red', value: '#ef4444' },
+                            { name: 'Yellow', value: '#eab308' },
+                            { name: 'Orange', value: '#f97316' },
+                            { name: 'Purple', value: '#a855f7' },
+                            { name: 'Pink', value: '#ec4899' },
+                            { name: 'Sky', value: '#0ea5e9' }
+                          ].map(col => (
+                            <button
+                              key={col.value || 'default'}
+                              type="button"
+                              onClick={() => setNodeColor(col.value)}
+                              className={`w-7 h-7 rounded-full border transition-all flex items-center justify-center ${
+                                nodeColor === col.value
+                                  ? 'border-white scale-110 shadow-lg'
+                                  : 'border-slate-800 hover:border-slate-650'
+                              }`}
+                              style={{
+                                backgroundColor: col.value || '#475569'
+                              }}
+                              title={col.name}
+                            >
+                              {nodeColor === col.value && (
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="4"><polyline points="20 6 9 17 4 12"/></svg>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
 
                       <div>
                         <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Notes</label>
@@ -1832,6 +2210,53 @@ export default function FiberMapCanvas({
                           </div>
                         </div>
                       )}
+
+                      <div>
+                        <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1.5">Custom Route Color (Fiber Type)</label>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {[
+                            { name: 'Default', value: '' },
+                            { name: 'Blue', value: '#3b82f6' },
+                            { name: 'Green', value: '#10b981' },
+                            { name: 'Red', value: '#ef4444' },
+                            { name: 'Yellow', value: '#eab308' },
+                            { name: 'Orange', value: '#f97316' },
+                            { name: 'Purple', value: '#a855f7' },
+                            { name: 'Pink', value: '#ec4899' },
+                            { name: 'Sky', value: '#0ea5e9' }
+                          ].map(col => (
+                            <button
+                              key={col.value || 'default'}
+                              type="button"
+                              onClick={() => setRouteColor(col.value)}
+                              className={`w-7 h-7 rounded-full border transition-all flex items-center justify-center ${
+                                routeColor === col.value
+                                  ? 'border-white scale-110 shadow-lg'
+                                  : 'border-slate-800 hover:border-slate-650'
+                              }`}
+                              style={{
+                                backgroundColor: col.value || '#eab308'
+                              }}
+                              title={col.name}
+                            >
+                              {routeColor === col.value && (
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="4"><polyline points="20 6 9 17 4 12"/></svg>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Route Notes</label>
+                        <textarea
+                          rows={2}
+                          value={routeNotes}
+                          onChange={e => setRouteNotes(e.target.value)}
+                          className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white text-[11px] focus:outline-none"
+                          placeholder="Fiber type, cable model, installation notes..."
+                        />
+                      </div>
 
                       <button
                         onClick={handleSaveRouteDetails}
@@ -3081,6 +3506,36 @@ export default function FiberMapCanvas({
         </aside>
       </div>
 
+      {/* Confirm Modal Backdrop & Dialog */}
+      {confirmModal && confirmModal.isOpen && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-3">
+              <span className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="17"/></svg>
+              </span>
+              <div>
+                <h3 className="text-sm font-black text-white uppercase tracking-wider">{confirmModal.title}</h3>
+                <p className="text-xs text-slate-400 mt-2 leading-relaxed">{confirmModal.message}</p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setConfirmModal(null)}
+                className="px-4 py-2 bg-slate-950 border border-slate-850 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl text-xs font-bold transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmModal.onConfirm}
+                className="px-4 py-2 bg-rose-650 hover:bg-rose-600 text-white rounded-xl text-xs font-bold transition-all shadow-md"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

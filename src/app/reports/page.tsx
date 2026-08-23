@@ -66,7 +66,8 @@ export default function GlobalReportsPage() {
       
       {/* Toast alert */}
       {toastMessage && (
-        <div className="fixed top-4 right-4 z-50 bg-slate-900 border border-slate-800 text-sky-400 px-4 py-3 rounded-xl shadow-2xl animate-in slide-in-from-top-4 duration-200 text-xs font-bold font-mono">
+        <div className="fixed top-4 right-4 z-50 bg-slate-900 border border-slate-750 text-white px-4 py-3 rounded-xl shadow-2xl animate-in slide-in-from-top-4 duration-200 text-xs font-bold font-mono flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
           {toastMessage}
         </div>
       )}

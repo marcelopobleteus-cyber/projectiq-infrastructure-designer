@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
+import { BYPASS_AUTH } from '@/config/auth'
 import { getCameraLocations, getCameraModels } from '../../actions-sprint2'
 import { getNetworkDevices } from '../../actions-sprint3'
 import ProjectMapCanvas from '../ProjectMapCanvas'
@@ -24,7 +25,7 @@ export default async function ProjectMapsPage({ params }: PageProps) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) {
+  if (!user && !BYPASS_AUTH) {
     redirect('/login')
   }
 

@@ -1,8 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { BYPASS_AUTH } from '@/config/auth'
-import { getFieldTasksWithCamera, getProfiles } from '../../actions-sprint2'
-import ProjectTasksBoard from './ProjectTasksBoard'
+import HelpCenterClient from './HelpCenterClient'
 
 interface PageProps {
   params: Promise<{
@@ -10,7 +9,7 @@ interface PageProps {
   }>
 }
 
-export default async function ProjectTasksPage({ params }: PageProps) {
+export default async function ProjectHelpPage({ params }: PageProps) {
   const { projectId } = await params
   const supabase = await createClient()
 
@@ -22,7 +21,7 @@ export default async function ProjectTasksPage({ params }: PageProps) {
     redirect('/login')
   }
 
-  // Load project details to verify project exists
+  // Load project details
   const { data: project } = await supabase
     .from('projects')
     .select('*')
@@ -33,17 +32,10 @@ export default async function ProjectTasksPage({ params }: PageProps) {
     notFound()
   }
 
-  // Fetch real database field tasks with linked camera details
-  const tasks = await getFieldTasksWithCamera(projectId)
-
-  // Fetch real profile records for assignee options
-  const profiles = await getProfiles()
-
   return (
-    <ProjectTasksBoard
+    <HelpCenterClient
       projectId={projectId}
-      initialTasks={tasks as any}
-      profiles={profiles}
+      projectName={project.name}
     />
   )
 }

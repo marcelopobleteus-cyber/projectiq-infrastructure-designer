@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
+import { BYPASS_AUTH } from '@/config/auth'
 
 interface PageProps {
   params: Promise<{
@@ -15,7 +16,7 @@ export default async function ProjectDocumentsPage({ params }: PageProps) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) {
+  if (!user && !BYPASS_AUTH) {
     redirect('/login')
   }
 

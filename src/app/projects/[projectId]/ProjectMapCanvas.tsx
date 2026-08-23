@@ -596,6 +596,10 @@ export default function ProjectMapCanvas({
         mapTypeControl: true,
         streetViewControl: false,
         fullscreenControl: true,
+        styles: [
+          { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+          { featureType: 'transit', elementType: 'labels', stylers: [{ visibility: 'off' }] }
+        ]
       })
 
       newMap.addListener('click', () => {
@@ -656,12 +660,9 @@ export default function ProjectMapCanvas({
 
         cameraMarkerStateRef.current[cam.id] = { isSelected, status: cam.status, tag: cam.camera_id_tag }
 
-        marker.addListener('click', () => {
+        marker.addListener('click', (e: google.maps.MapMouseEvent) => {
           setSelectedCamera(cam)
-        })
 
-        // Hover card – show on mouseover
-        marker.addListener('mouseover', (e: google.maps.MapMouseEvent) => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const domEvent = (e as any).domEvent as MouseEvent
           let rect = mapRectRef.current
@@ -669,21 +670,12 @@ export default function ProjectMapCanvas({
             rect = mapRef.current.getBoundingClientRect()
             mapRectRef.current = rect
           }
-          if (rect) {
+          if (rect && domEvent) {
             setHoverPosition({ x: domEvent.clientX - rect.left, y: domEvent.clientY - rect.top })
+          } else {
+            setHoverPosition({ x: 300, y: 200 })
           }
           setHoveredCamera(cam)
-          if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
-        })
-
-        // Hover card – delayed hide on mouseout (allows mouse to enter card)
-        marker.addListener('mouseout', () => {
-          hoverTimerRef.current = setTimeout(() => {
-            if (!isHoveringCardRef.current) {
-              setHoveredCamera(null)
-              setHoverPosition(null)
-            }
-          }, 350)
         })
 
         marker.addListener('dragend', async () => {
@@ -860,10 +852,10 @@ export default function ProjectMapCanvas({
         map: map
       })
 
-      poly.addListener('mouseover', (e: google.maps.PolyMouseEvent) => {
+      poly.addListener('click', (e: google.maps.PolyMouseEvent) => {
         const content = `
-          <div style="padding: 8px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a; min-width: 160px;">
-            <div style="font-weight: bold; font-size: 12px; margin-bottom: 4px; border-b: 1px solid #e2e8f0; padding-bottom: 2px;">
+          <div style="padding: 4px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a; min-width: 160px;">
+            <div style="font-weight: bold; font-size: 12px; margin-bottom: 4px; border-bottom: 1px solid #e2e8f0; padding-bottom: 2px;">
               Wireless Link: ${cam.camera_id_tag}
             </div>
             <div><strong>Type:</strong> ${method}</div>
@@ -877,10 +869,6 @@ export default function ProjectMapCanvas({
           infoWindow.setPosition(e.latLng)
           infoWindow.open(map)
         }
-      })
-
-      poly.addListener('mouseout', () => {
-        if (infoWindow) infoWindow.close()
       })
 
       wirelessRoutePolylinesRef.current.push(poly)
@@ -1015,8 +1003,8 @@ export default function ProjectMapCanvas({
           }
         })
 
-        // Hover Card
-        marker.addListener('mouseover', () => {
+        // Click Card
+        marker.addListener('click', () => {
           const enclosures = fiberEnclosures.filter((e: any) => e.node_id === node.id)
           const cables = fiberCables.filter((c: any) => c.from_node_id === node.id || c.to_node_id === node.id)
           const served = fiberAssignments.filter((a: any) => a.source_node_id === node.id)
@@ -1026,15 +1014,15 @@ export default function ProjectMapCanvas({
           }).join(', ')
 
           const content = `
-            <div style="padding: 8px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a; max-width: 200px;">
-              <div style="font-weight: bold; font-size: 12px; margin-bottom: 4px; border-b: 1px solid #e2e8f0; padding-bottom: 2px;">
+            <div style="padding: 4px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a; max-width: 200px;">
+              <div style="font-weight: bold; font-size: 12px; margin-bottom: 4px; border-bottom: 1px solid #e2e8f0; padding-bottom: 2px;">
                 ${node.node_tag}
               </div>
               <div><strong>Type:</strong> ${node.node_type}</div>
               <div><strong>Status:</strong> <span style="color: ${statusColor}; font-weight: bold;">${node.status}</span></div>
               <div><strong>Cables:</strong> ${cables.length > 0 ? cables.map((c: any) => c.cable_tag).join(', ') : 'None'}</div>
               <div><strong>Served Cams:</strong> ${servedTags || 'None'}</div>
-              <div style="margin-top: 8px; padding-top: 6px; border-t: 1px solid #e2e8f0; display: flex;">
+              <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #e2e8f0; display: flex;">
                 <a href="/projects/${projectId}/fiber?selectedNodeId=${node.id}" style="display: inline-block; padding: 4px 8px; background-color: #4f46e5; color: white; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 9px; text-align: center; flex: 1;">Editar Nodo</a>
               </div>
             </div>
@@ -1072,17 +1060,17 @@ export default function ProjectMapCanvas({
           map: map
         })
 
-        poly.addListener('mouseover', (e: google.maps.PolyMouseEvent) => {
+        poly.addListener('click', (e: google.maps.PolyMouseEvent) => {
           const cable = fiberCables.find(c => c.route_id === route.id)
           const content = `
-            <div style="padding: 8px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a; min-width: 150px;">
-              <div style="font-weight: bold; font-size: 12px; margin-bottom: 4px; border-b: 1px solid #e2e8f0; padding-bottom: 2px;">
+            <div style="padding: 4px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a; min-width: 150px;">
+              <div style="font-weight: bold; font-size: 12px; margin-bottom: 4px; border-bottom: 1px solid #e2e8f0; padding-bottom: 2px;">
                 Route: ${route.route_id_tag}
               </div>
               <div><strong>Length:</strong> ${route.measured_length_feet} ft</div>
               <div><strong>Conduit Size:</strong> ${route.conduit_diameter_inches} in</div>
               <div><strong>Cable:</strong> ${cable ? `${cable.cable_tag} (${cable.fiber_count}F)` : 'No cable'}</div>
-              <div style="margin-top: 8px; padding-top: 6px; border-t: 1px solid #e2e8f0; display: flex;">
+              <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #e2e8f0; display: flex;">
                 <a href="/projects/${projectId}/fiber?selectedRouteId=${route.id}" style="display: inline-block; padding: 4px 8px; background-color: #4f46e5; color: white; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 9px; text-align: center; flex: 1;">Editar Ruta</a>
               </div>
             </div>
@@ -1125,9 +1113,9 @@ export default function ProjectMapCanvas({
             map: map
           })
 
-          poly.addListener('mouseover', (e: google.maps.PolyMouseEvent) => {
+          poly.addListener('click', (e: google.maps.PolyMouseEvent) => {
             const content = `
-              <div style="padding: 8px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a;">
+              <div style="padding: 4px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a; min-width: 150px;">
                 <strong>Camera Drop: ${camera.camera_id_tag}</strong><br/>
                 Status: ${assignment.fiber_path_status}<br/>
                 Splicing: ${assignment.splice_status}<br/>
@@ -1139,10 +1127,6 @@ export default function ProjectMapCanvas({
               infoWindow.setPosition(e.latLng)
               infoWindow.open(map)
             }
-          })
-
-          poly.addListener('mouseout', () => {
-            if (infoWindow) infoWindow.close()
           })
 
           fiberRoutePolylinesRef.current.push(poly)

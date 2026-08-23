@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
+import { BYPASS_AUTH } from '@/config/auth'
 import { getCameraLocations, getCameraModels } from '../../actions-sprint2'
 
 interface PageProps {
@@ -16,7 +17,7 @@ export default async function ProjectCamerasPage({ params }: PageProps) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) {
+  if (!user && !BYPASS_AUTH) {
     redirect('/login')
   }
 

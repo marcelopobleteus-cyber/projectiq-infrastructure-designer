@@ -92,10 +92,10 @@ export default function GlobalSettingsPage() {
       {toast && (
         <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border flex items-center gap-2 shadow-2xl animate-in slide-in-from-top-4 duration-200 ${
           toast.type === 'success' 
-            ? 'bg-emerald-950/90 border-emerald-500/30 text-emerald-400' 
+            ? 'bg-emerald-900 border-emerald-500/30 text-emerald-50' 
             : toast.type === 'error'
-              ? 'bg-rose-950/90 border-rose-500/30 text-rose-450'
-              : 'bg-slate-900/90 border-slate-800 text-slate-300'
+              ? 'bg-rose-900 border-rose-500/30 text-rose-50'
+              : 'bg-slate-800 border-slate-700 text-slate-100'
         }`}>
           {toast.type === 'success' ? (
             <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>

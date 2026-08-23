@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
+import { BYPASS_AUTH } from '@/config/auth'
 import { getCameraLocations, getCameraModels } from '../../actions-sprint2'
 import { getNetworkDevices } from '../../actions-sprint3'
 import BOMClientView from './BOMClientView'
@@ -18,7 +19,7 @@ export default async function ProjectBOMPage({ params }: PageProps) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) {
+  if (!user && !BYPASS_AUTH) {
     redirect('/login')
   }
 

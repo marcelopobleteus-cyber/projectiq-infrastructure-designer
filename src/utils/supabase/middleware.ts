@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { Database } from '@/types/supabase'
+import { BYPASS_AUTH } from '@/config/auth'
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -35,6 +36,16 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const path = request.nextUrl.pathname
+
+  if (BYPASS_AUTH) {
+    // When password access is disabled, redirect root, login, and register directly to /projects
+    if (path === '/' || path === '/login' || path === '/register') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/projects'
+      return NextResponse.redirect(url)
+    }
+    return supabaseResponse
+  }
 
   // Protect /projects routes
   if (path.startsWith('/projects') && !user) {
