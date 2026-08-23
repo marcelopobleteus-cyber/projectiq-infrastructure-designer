@@ -28,7 +28,7 @@ export default async function ProjectsPage() {
         .from('projects')
         .select('*')
         .in('organization_id', orgIds)
-        .order('created_at', { ascending: false })
+        .order('updated_at', { ascending: false })
       projects = data || []
     }
   }
@@ -37,9 +37,16 @@ export default async function ProjectsPage() {
     const { data } = await supabase
       .from('projects')
       .select('*')
-      .order('created_at', { ascending: false })
+      .order('updated_at', { ascending: false })
     projects = (data && data.length > 0) ? data : [DEMO_PROJECT]
   }
+
+  // Ensure strict descending order by last updated timestamp (updated_at || created_at)
+  projects.sort((a, b) => {
+    const timeA = new Date(a.updated_at || a.created_at).getTime()
+    const timeB = new Date(b.updated_at || b.created_at).getTime()
+    return timeB - timeA
+  })
 
   return (
     <div className="space-y-8 relative z-10 w-full px-6 py-8 flex-1 overflow-y-auto h-full scrollbar-thin">

@@ -55,7 +55,7 @@ export default function ProjectsPage() {
       try {
         const { data: { user } } = await supabase.auth.getUser()
 
-        let projectsQuery = supabase.from('projects').select('*').order('created_at', { ascending: false })
+        let projectsQuery = supabase.from('projects').select('*').order('updated_at', { ascending: false })
 
         if (user) {
           const { data: memberships } = await supabase
@@ -69,12 +69,17 @@ export default function ProjectsPage() {
               .from('projects')
               .select('*')
               .in('organization_id', orgIds)
-              .order('created_at', { ascending: false })
+              .order('updated_at', { ascending: false })
           }
         }
 
         const { data: projectsData } = await projectsQuery
-        const projectsList = (projectsData && projectsData.length > 0) ? projectsData : [DEMO_PROJECT]
+        let projectsList = (projectsData && projectsData.length > 0) ? projectsData : [DEMO_PROJECT]
+        projectsList.sort((a, b) => {
+          const timeA = new Date(a.updated_at || a.created_at).getTime()
+          const timeB = new Date(b.updated_at || b.created_at).getTime()
+          return timeB - timeA
+        })
         setProjects(projectsList)
 
         // Fetch camera and device counts

@@ -9,6 +9,7 @@ interface Project {
   name: string
   description: string | null
   created_at: string
+  updated_at?: string | null
   default_latitude: number
   default_longitude: number
 }
@@ -18,7 +19,13 @@ interface ProjectGridClientProps {
 }
 
 export default function ProjectGridClient({ initialProjects }: ProjectGridClientProps) {
-  const [projects, setProjects] = useState<Project[]>(initialProjects)
+  const sortedProjects = [...initialProjects].sort((a, b) => {
+    const timeA = new Date(a.updated_at || a.created_at).getTime()
+    const timeB = new Date(b.updated_at || b.created_at).getTime()
+    return timeB - timeA
+  })
+
+  const [projects, setProjects] = useState<Project[]>(sortedProjects)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
