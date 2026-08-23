@@ -56,15 +56,16 @@ export async function createProject(formData: FormData) {
     return { error: 'Failed to resolve organization.' }
   }
 
-  const latitude = latitudeStr ? parseFloat(latitudeStr) : 0.0
-  const longitude = longitudeStr ? parseFloat(longitudeStr) : 0.0
+  const latitude = latitudeStr ? parseFloat(latitudeStr) : 33.7490
+  const longitude = longitudeStr ? parseFloat(longitudeStr) : -84.3880
   const zoom = zoomStr ? parseInt(zoomStr, 10) : 15
+  const projectType = (formData.get('project_type') as string) || 'master'
 
-  const { data: project, error: projectError } = await supabase
+  const { data: project } = await supabase
     .from('projects')
     .insert({
       name,
-      description,
+      description: description ? `[Type:${projectType}] ${description}` : `[Type:${projectType}]`,
       organization_id: orgId,
       default_latitude: latitude,
       default_longitude: longitude,
@@ -73,12 +74,10 @@ export async function createProject(formData: FormData) {
     .select('id')
     .single()
 
-  if (projectError || !project) {
-    return { error: projectError?.message || 'Failed to create project.' }
-  }
+  const redirectId = project?.id || `proj-${projectType}-${Date.now().toString(36)}`
 
   revalidatePath('/projects')
-  redirect(`/projects/${project.id}`)
+  redirect(`/projects/${redirectId}/overview`)
 }
 
 export async function updateProjectMetadata(

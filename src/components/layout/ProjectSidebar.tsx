@@ -210,10 +210,16 @@ export default function ProjectSidebar({ projectId, projectName }: ProjectSideba
   return (
     <aside className="w-[240px] bg-slate-900 border-r border-slate-800 flex flex-col shrink-0 h-full overflow-hidden relative z-10 font-sans">
       {/* Brand logo identity header */}
-      <div className="p-4 border-b border-slate-800 bg-slate-950/40 shrink-0 flex flex-col gap-1">
+      <div className="p-4 border-b border-slate-800 bg-slate-950/40 shrink-0 flex flex-col gap-1.5">
         <div className="flex items-center gap-1.5">
           <span className="text-sm font-black text-sky-400 tracking-wider">NextQ</span>
-          <span className="text-[10px] text-slate-500 font-medium">Infrastructure Designer</span>
+          <span className="text-[10px] text-slate-500 font-medium">Infrastructure Suite</span>
+        </div>
+
+        {/* Multi-discipline specialty indicator badge */}
+        <div className="flex items-center gap-1.5 px-2.5 py-1 bg-sky-950/60 border border-sky-800/40 rounded-lg text-[10px] text-sky-300 font-semibold truncate">
+          <span className="shrink-0">🌐</span>
+          <span className="truncate">Multi-Discipline Project</span>
         </div>
       </div>
 
@@ -221,7 +227,7 @@ export default function ProjectSidebar({ projectId, projectName }: ProjectSideba
       <div className="p-3 pb-0 shrink-0">
         <Link href="/projects/create" className="w-full py-2 bg-slate-950 border border-slate-800 hover:border-sky-500/50 hover:text-sky-400 text-slate-300 rounded-xl font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-sm active:scale-98">
           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          New Project
+          + New Project
         </Link>
       </div>
 
