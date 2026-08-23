@@ -37,16 +37,19 @@ export default function CoordinateMap({
 
   // Initialize Map
   useEffect(() => {
-    if (!googleMapsApiKey || !mapContainerRef.current) return
+    const apiKey = googleMapsApiKey || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
+    if (!apiKey || !mapContainerRef.current) return
 
     setOptions({
-      key: googleMapsApiKey,
+      key: apiKey,
       v: 'weekly',
     })
 
     Promise.all([
       importLibrary('maps'),
-      importLibrary('marker')
+      importLibrary('marker'),
+      importLibrary('geometry'),
+      importLibrary('drawing')
     ]).then(([mapsLib]) => {
       if (!mapContainerRef.current) return
 

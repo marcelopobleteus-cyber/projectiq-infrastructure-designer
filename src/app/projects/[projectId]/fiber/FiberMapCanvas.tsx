@@ -255,14 +255,18 @@ export default function FiberMapCanvas({
   useEffect(() => {
     if (typeof window === 'undefined') return
 
+    const apiKey = googleMapsApiKey || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
+
     setOptions({
-      key: googleMapsApiKey || '',
+      key: apiKey,
       v: 'weekly'
     })
 
     Promise.all([
       importLibrary('maps'),
-      importLibrary('marker')
+      importLibrary('marker'),
+      importLibrary('geometry'),
+      importLibrary('drawing')
     ])
       .then(() => {
         setGoogleLoaded(true)

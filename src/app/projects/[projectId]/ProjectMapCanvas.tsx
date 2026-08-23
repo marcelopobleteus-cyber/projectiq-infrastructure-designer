@@ -575,16 +575,19 @@ export default function ProjectMapCanvas({
 
   // Initialize Map
   useEffect(() => {
-    if (!googleMapsApiKey || !mapRef.current) return
+    const apiKey = googleMapsApiKey || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
+    if (!apiKey || !mapRef.current) return
 
     setOptions({
-      key: googleMapsApiKey,
+      key: apiKey,
       v: 'weekly',
     })
 
     Promise.all([
       importLibrary('maps'),
-      importLibrary('marker')
+      importLibrary('marker'),
+      importLibrary('geometry'),
+      importLibrary('drawing')
     ]).then(([mapsLib]) => {
       if (!mapRef.current) return
       
