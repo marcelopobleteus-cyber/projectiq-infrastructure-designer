@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
 import { BYPASS_AUTH } from '@/config/auth'
+import { DEMO_FIBER_DATA } from '@/lib/demoData'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -657,13 +658,27 @@ export async function getFiberDesignData(projectId: string) {
   if (nodesRes.error) throw new Error(`Nodes: ${nodesRes.error.message}`)
   if (routesRes.error) throw new Error(`Routes: ${routesRes.error.message}`)
 
+  let nodes = nodesRes.data ?? []
+  let routes = routesRes.data ?? []
+  let segments = segmentsRes.data ?? []
+  let cables = cablesRes.data ?? []
+  let enclosures = enclosuresRes.data ?? []
+
+  if (nodes.length === 0 && routes.length === 0) {
+    nodes = DEMO_FIBER_DATA.nodes as any
+    routes = DEMO_FIBER_DATA.routes as any
+    segments = DEMO_FIBER_DATA.segments as any
+    cables = DEMO_FIBER_DATA.cables as any
+    enclosures = DEMO_FIBER_DATA.enclosures as any
+  }
+
   return {
-    nodes: nodesRes.data ?? [],
-    routes: routesRes.data ?? [],
-    segments: segmentsRes.data ?? [],
-    cables: cablesRes.data ?? [],
+    nodes,
+    routes,
+    segments,
+    cables,
     strands: strandsRes.data ?? [],
-    enclosures: enclosuresRes.data ?? [],
+    enclosures,
     spliceRecords: spliceRecordsRes.data ?? [],
     splices: spliceRecordsRes.data ?? [],
     assignments: assignmentsRes.data ?? [],

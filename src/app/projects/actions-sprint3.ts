@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
 import { Database } from '@/types/supabase'
+import { DEMO_DEVICES } from '@/lib/demoData'
 
 type NetworkDeviceInsert = Database['public']['Tables']['network_devices']['Insert']
 type NetworkDeviceUpdate = Database['public']['Tables']['network_devices']['Update']
@@ -17,8 +18,8 @@ export async function getNetworkDevices(projectId: string) {
     .eq('project_id', projectId)
     .order('name', { ascending: true })
 
-  if (error) {
-    throw new Error(`Failed to fetch network devices: ${error.message}`)
+  if (error || !data || data.length === 0) {
+    return DEMO_DEVICES as any
   }
   return data
 }

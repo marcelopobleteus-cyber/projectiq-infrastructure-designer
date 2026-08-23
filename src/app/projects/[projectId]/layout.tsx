@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { BYPASS_AUTH } from '@/config/auth'
+import { DEMO_PROJECT } from '@/lib/demoData'
 import ProjectTopBar from '@/components/layout/ProjectTopBar'
 import WorkspaceContent from '@/components/layout/WorkspaceContent'
 import ProjectSidebar from '@/components/layout/ProjectSidebar'
@@ -26,18 +27,14 @@ export default async function ProjectLayout({ children, params }: ProjectLayoutP
   }
 
   // Load project details to show name in top bar
-  const { data: project, error } = await supabase
+  let { data: project } = await supabase
     .from('projects')
     .select('*')
     .eq('id', projectId)
     .single()
 
-  if (error) {
-    console.error('ERROR LOADING PROJECT in layout.tsx:', error)
-  }
-
   if (!project) {
-    notFound()
+    project = DEMO_PROJECT as any
   }
 
   return (

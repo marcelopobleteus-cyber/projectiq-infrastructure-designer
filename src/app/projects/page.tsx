@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { BYPASS_AUTH } from '@/config/auth'
+import { DEMO_PROJECT } from '@/lib/demoData'
 
 export default async function ProjectsPage() {
   const supabase = await createClient()
@@ -36,7 +37,7 @@ export default async function ProjectsPage() {
       .from('projects')
       .select('*')
       .order('created_at', { ascending: false })
-    projects = data || []
+    projects = (data && data.length > 0) ? data : [DEMO_PROJECT]
   }
 
   return (

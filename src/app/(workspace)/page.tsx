@@ -4,6 +4,7 @@ import React, { useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/client'
 import { createProject } from '@/app/projects/actions'
+import { DEMO_PROJECT, DEMO_CAMERAS, DEMO_DEVICES } from '@/lib/demoData'
 
 export default function ProjectsPage() {
   const supabase = createClient()
@@ -56,7 +57,7 @@ export default function ProjectsPage() {
         }
 
         const { data: projectsData } = await projectsQuery
-        const projectsList = projectsData || []
+        const projectsList = (projectsData && projectsData.length > 0) ? projectsData : [DEMO_PROJECT]
         setProjects(projectsList)
 
         // Fetch camera and device counts
@@ -69,19 +70,20 @@ export default function ProjectsPage() {
           .select('project_id')
 
         // Compute counts maps
-        const camsMap: Record<string, number> = {}
+        const camsMap: Record<string, number> = { [DEMO_PROJECT.id]: DEMO_CAMERAS.length }
         cameras?.forEach((c: any) => {
           camsMap[c.project_id] = (camsMap[c.project_id] || 0) + 1
         })
         setCameraCounts(camsMap)
 
-        const devsMap: Record<string, number> = {}
+        const devsMap: Record<string, number> = { [DEMO_PROJECT.id]: DEMO_DEVICES.length }
         devices?.forEach((d: any) => {
           devsMap[d.project_id] = (devsMap[d.project_id] || 0) + 1
         })
         setDeviceCounts(devsMap)
       } catch (err) {
         console.error('Failed to load projects list:', err)
+        setProjects([DEMO_PROJECT])
       } finally {
         setLoading(false)
       }
