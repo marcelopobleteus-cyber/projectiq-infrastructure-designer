@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
 import { Database } from '@/types/supabase'
 import { DEMO_DEVICES } from '@/lib/demoData'
+import { BYPASS_AUTH } from '@/config/auth'
 
 type NetworkDeviceInsert = Database['public']['Tables']['network_devices']['Insert']
 type NetworkDeviceUpdate = Database['public']['Tables']['network_devices']['Update']
@@ -12,6 +13,24 @@ type SwitchPortInsert = Database['public']['Tables']['switch_ports']['Insert']
 // Fetch all network devices for a project
 export async function getNetworkDevices(projectId: string) {
   const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user && !BYPASS_AUTH) return { error: 'Not authenticated' }
+
+  const { data: project } = await supabase.from('projects').select('organization_id').eq('id', projectId).single()
+  if (!project && projectId !== 'demo-metro-cctv') return { error: 'Project not found' }
+
+  if (user && project) {
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', project.organization_id)
+      .eq('profile_id', user.id)
+      .single()
+
+    if (!membership && !BYPASS_AUTH) return { error: 'Access denied' }
+  }
+
   const { data, error } = await supabase
     .from('network_devices')
     .select('*')
@@ -27,6 +46,28 @@ export async function getNetworkDevices(projectId: string) {
 // Fetch all switch ports for a network device, with assigned camera details
 export async function getSwitchPorts(networkDeviceId: string) {
   const supabase = await createClient()
+
+  const { data: dev } = await supabase.from('network_devices').select('project_id').eq('id', networkDeviceId).single()
+  if (!dev) throw new Error('Network device not found')
+
+  const projectId = dev.project_id
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user && !BYPASS_AUTH) throw new Error('Not authenticated')
+
+  const { data: project } = await supabase.from('projects').select('organization_id').eq('id', projectId).single()
+  if (!project) throw new Error('Project not found')
+
+  if (user) {
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', project.organization_id)
+      .eq('profile_id', user.id)
+      .single()
+
+    if (!membership && !BYPASS_AUTH) throw new Error('Access denied')
+  }
+
   const { data, error } = await supabase
     .from('switch_ports')
     .select(`
@@ -70,6 +111,23 @@ export async function createNetworkDevice(params: {
   status?: string
 }) {
   const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user && !BYPASS_AUTH) return { error: 'Not authenticated' }
+
+  const { data: project } = await supabase.from('projects').select('organization_id').eq('id', params.projectId).single()
+  if (!project) return { error: 'Project not found' }
+
+  if (user) {
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', project.organization_id)
+      .eq('profile_id', user.id)
+      .single()
+
+    if (!membership && !BYPASS_AUTH) return { error: 'Access denied' }
+  }
 
   // 1. Generate name sequence if not provided
   let name = params.name
@@ -180,6 +238,24 @@ export async function updateNetworkDeviceCoordinates(params: {
   longitude: number
 }) {
   const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user && !BYPASS_AUTH) return { error: 'Not authenticated' }
+
+  const { data: project } = await supabase.from('projects').select('organization_id').eq('id', params.projectId).single()
+  if (!project) return { error: 'Project not found' }
+
+  if (user) {
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', project.organization_id)
+      .eq('profile_id', user.id)
+      .single()
+
+    if (!membership && !BYPASS_AUTH) return { error: 'Access denied' }
+  }
+
   const { data, error } = await supabase
     .from('network_devices')
     .update({
@@ -217,6 +293,23 @@ export async function updateNetworkDeviceDetails(params: {
   }
 }) {
   const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user && !BYPASS_AUTH) return { error: 'Not authenticated' }
+
+  const { data: project } = await supabase.from('projects').select('organization_id').eq('id', params.projectId).single()
+  if (!project) return { error: 'Project not found' }
+
+  if (user) {
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', project.organization_id)
+      .eq('profile_id', user.id)
+      .single()
+
+    if (!membership && !BYPASS_AUTH) return { error: 'Access denied' }
+  }
 
   // 1. Fetch current device
   const { data: current, error: fetchError } = await supabase
@@ -329,6 +422,23 @@ export async function deleteNetworkDevice(params: {
 }) {
   const supabase = await createClient()
 
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user && !BYPASS_AUTH) return { error: 'Not authenticated' }
+
+  const { data: project } = await supabase.from('projects').select('organization_id').eq('id', params.projectId).single()
+  if (!project) return { error: 'Project not found' }
+
+  if (user) {
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', project.organization_id)
+      .eq('profile_id', user.id)
+      .single()
+
+    if (!membership && !BYPASS_AUTH) return { error: 'Access denied' }
+  }
+
   // Verify if any ports are currently assigned to cameras (to prevent breaking assignments)
   const { data: assigned, error: checkError } = await supabase
     .from('switch_ports')
@@ -365,6 +475,23 @@ export async function assignCameraToPort(params: {
   projectId: string
 }) {
   const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user && !BYPASS_AUTH) return { error: 'Not authenticated' }
+
+  const { data: project } = await supabase.from('projects').select('organization_id').eq('id', params.projectId).single()
+  if (!project) return { error: 'Project not found' }
+
+  if (user) {
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', project.organization_id)
+      .eq('profile_id', user.id)
+      .single()
+
+    if (!membership && !BYPASS_AUTH) return { error: 'Access denied' }
+  }
   
   // Call transactional database function
   const { error } = await (supabase as any).rpc('assign_camera_to_switch_port', {
@@ -387,6 +514,23 @@ export async function unassignCameraFromPort(params: {
   projectId: string
 }) {
   const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user && !BYPASS_AUTH) return { error: 'Not authenticated' }
+
+  const { data: project } = await supabase.from('projects').select('organization_id').eq('id', params.projectId).single()
+  if (!project) return { error: 'Project not found' }
+
+  if (user) {
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', project.organization_id)
+      .eq('profile_id', user.id)
+      .single()
+
+    if (!membership && !BYPASS_AUTH) return { error: 'Access denied' }
+  }
 
   // Call transactional database function
   const { error } = await (supabase as any).rpc('unassign_camera_from_switch_port', {

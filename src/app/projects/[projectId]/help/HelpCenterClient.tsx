@@ -146,22 +146,22 @@ export default function HelpCenterClient({ projectId, projectName }: HelpCenterC
   }, [searchQuery, selectedCategory])
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden h-full w-full bg-[#0c0f1d] font-sans">
+    <div className="flex-1 flex flex-col overflow-hidden h-full w-full bg-slate-50 dark:bg-[#0c0f1d] font-sans">
       
       {/* Header Banner */}
-      <div className="border-b border-slate-900 bg-slate-950/20 px-8 py-6 shrink-0">
+      <div className="border-b border-slate-200 dark:border-slate-900 bg-white dark:bg-slate-950/20 px-8 py-6 shrink-0">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded-full text-[9.5px] font-mono font-bold uppercase bg-slate-900 text-sky-400 border border-sky-500/10">
+              <span className="px-2 py-0.5 rounded-full text-[9.5px] font-mono font-bold uppercase bg-slate-100 dark:bg-slate-900 text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-500/10">
                 Support & Guides
               </span>
             </div>
-            <h2 className="text-2.5xl font-black text-white mt-2 tracking-tight leading-none">
+            <h2 className="text-2.5xl font-black text-slate-900 dark:text-white mt-2 tracking-tight leading-none">
               ProjectIQ Help Center
             </h2>
-            <p className="text-xs text-slate-450 mt-1 font-medium">
-              Browse guides, lookup design workflows, and resolve layout issues for <span className="text-indigo-400 font-bold">{projectName}</span>.
+            <p className="text-xs text-slate-500 dark:text-slate-450 mt-1 font-medium">
+              Browse guides, lookup design workflows, and resolve layout issues for <span className="text-indigo-600 dark:text-indigo-400 font-bold">{projectName}</span>.
             </p>
           </div>
         </div>
@@ -171,9 +171,9 @@ export default function HelpCenterClient({ projectId, projectName }: HelpCenterC
       <div className="flex-1 overflow-y-auto p-8 scrollbar-thin space-y-6">
         
         {/* Search Bar Widget */}
-        <div className="bg-slate-950/40 border border-slate-850 rounded-2xl p-5 shadow-xl max-w-3xl">
+        <div className="bg-white dark:bg-slate-950/40 border border-slate-200 dark:border-slate-850 rounded-2xl p-5 shadow-xl max-w-3xl">
           <div className="relative">
-            <span className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500">
+            <span className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             </span>
             <input
@@ -181,12 +181,12 @@ export default function HelpCenterClient({ projectId, projectName }: HelpCenterC
               placeholder="Search help articles (e.g. 'delete camera', 'linea punteada', 'port matrix')..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-11 pr-12 py-3.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all font-mono"
+              className="w-full pl-11 pr-12 py-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all font-mono"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-500 hover:text-white"
+                className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-white"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
@@ -195,7 +195,7 @@ export default function HelpCenterClient({ projectId, projectName }: HelpCenterC
 
           {/* Quick Filter Categories */}
           <div className="flex flex-wrap items-center gap-1.5 mt-4">
-            <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider mr-2">Filter Category:</span>
+            <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 uppercase tracking-wider mr-2">Filter Category:</span>
             {[
               { id: 'all', label: 'All Articles' },
               { id: 'fiber', label: 'Fiber & GIS Map' },
@@ -209,7 +209,7 @@ export default function HelpCenterClient({ projectId, projectName }: HelpCenterC
                 className={`px-3 py-1 rounded-lg text-2xs font-bold uppercase transition-all ${
                   selectedCategory === cat.id
                     ? 'bg-indigo-600 text-white shadow-inner'
-                    : 'bg-slate-900/60 text-slate-400 hover:text-white border border-slate-800/40 hover:border-slate-700'
+                    : 'bg-slate-100 dark:bg-slate-900/60 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-800/40 hover:border-slate-300 dark:hover:border-slate-700'
                 }`}
               >
                 {cat.label}
@@ -219,42 +219,42 @@ export default function HelpCenterClient({ projectId, projectName }: HelpCenterC
         </div>
 
         {/* Results Info */}
-        <div className="text-xs text-slate-450 font-mono flex justify-between items-center max-w-3xl">
+        <div className="text-xs text-slate-500 dark:text-slate-450 font-mono flex justify-between items-center max-w-3xl">
           <span>Showing {filteredArticles.length} guides matching criteria</span>
         </div>
 
         {/* Articles List */}
         <div className="space-y-4 max-w-3xl">
           {filteredArticles.map(article => (
-            <div key={article.id} className="bg-slate-900/20 border border-slate-850 hover:border-slate-800 rounded-2xl p-6 transition-all shadow-sm space-y-4">
+            <div key={article.id} className="bg-white dark:bg-slate-900/20 border border-slate-200 dark:border-slate-850 hover:border-slate-300 dark:hover:border-slate-800 rounded-2xl p-6 transition-all shadow-sm space-y-4">
               
               {/* Category & Badge */}
               <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-slate-950 text-indigo-400 border border-indigo-900/20">
+                <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-slate-950 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-900/20">
                   {article.categoryLabel}
                 </span>
               </div>
 
               {/* Title & Description */}
               <div>
-                <h3 className="text-base font-extrabold text-white leading-tight">
+                <h3 className="text-base font-extrabold text-slate-900 dark:text-white leading-tight">
                   {article.title}
                 </h3>
-                <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-2 leading-relaxed">
                   {article.content}
                 </p>
               </div>
 
               {/* Step By Step Instructions */}
               {article.steps && article.steps.length > 0 && (
-                <div className="bg-slate-950/40 border border-slate-850/60 p-4 rounded-xl space-y-2">
-                  <h4 className="text-[10px] font-mono text-slate-500 uppercase tracking-widest border-b border-slate-900 pb-1.5 mb-2">
+                <div className="bg-slate-50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-850/60 p-4 rounded-xl space-y-2">
+                  <h4 className="text-[10px] font-mono text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-200 dark:border-slate-900 pb-1.5 mb-2">
                     Step-by-step Guide / Guía paso a paso
                   </h4>
                   <ol className="space-y-2 text-xs">
                     {article.steps.map((step, idx) => (
-                      <li key={idx} className="flex gap-2.5 text-slate-300 leading-relaxed">
-                        <span className="font-mono font-bold text-indigo-400 shrink-0 select-none">
+                      <li key={idx} className="flex gap-2.5 text-slate-700 dark:text-slate-300 leading-relaxed">
+                        <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400 shrink-0 select-none">
                           {idx + 1}.
                         </span>
                         <span>{step}</span>
@@ -267,12 +267,12 @@ export default function HelpCenterClient({ projectId, projectName }: HelpCenterC
           ))}
 
           {filteredArticles.length === 0 && (
-            <div className="bg-slate-900/10 border border-slate-850 border-dashed rounded-2xl p-12 text-center max-w-3xl">
-              <svg className="w-8 h-8 text-slate-700 mx-auto mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+            <div className="bg-slate-50 dark:bg-slate-900/10 border border-slate-200 dark:border-slate-850 border-dashed rounded-2xl p-12 text-center max-w-3xl">
+              <svg className="w-8 h-8 text-slate-400 dark:text-slate-700 mx-auto mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
-              <h5 className="text-sm font-bold text-slate-400">No matching articles found</h5>
-              <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">Try typing a different keyword like 'drop', 'punteada', 'switch', or check filters.</p>
+              <h5 className="text-sm font-bold text-slate-700 dark:text-slate-400">No matching articles found</h5>
+              <p className="text-xs text-slate-600 dark:text-slate-500 mt-1 max-w-sm mx-auto">Try typing a different keyword like 'drop', 'punteada', 'switch', or check filters.</p>
             </div>
           )}
         </div>

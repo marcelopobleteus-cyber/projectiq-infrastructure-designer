@@ -391,6 +391,8 @@ export async function deleteProject(projectId: string): Promise<{ success?: bool
       supabase.from('camera_tasks').delete().eq('project_id', projectId),
       supabase.from('camera_fiber_assignment_strands').delete().eq('project_id', projectId),
       supabase.from('camera_fiber_assignments').delete().eq('project_id', projectId),
+      supabase.from('fiber_assignment_strands').delete().eq('project_id', projectId),
+      supabase.from('fiber_assignments').delete().eq('project_id', projectId),
       supabase.from('fiber_splice_records').delete().eq('project_id', projectId),
       supabase.from('fiber_enclosures').delete().eq('project_id', projectId),
       supabase.from('fiber_cables').delete().eq('project_id', projectId),
@@ -406,7 +408,6 @@ export async function deleteProject(projectId: string): Promise<{ success?: bool
       supabase.from('fiber_patch_cords').delete().eq('project_id', projectId),
       supabase.from('bom_items').delete().eq('project_id', projectId),
       supabase.from('field_tasks').delete().eq('project_id', projectId),
-      supabase.from('coordinate_points').delete().eq('project_id', projectId),
     ])
 
     // 2. Delete the project row from projects table

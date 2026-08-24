@@ -32,7 +32,7 @@ export default function MainSidebar({ userEmail, userName, onSignOut }: MainSide
       ),
       href: '/projects',
       enabled: true,
-      active: pathname.startsWith('/projects') || pathname === '/projects/create' || pathname.startsWith('/design-review/projects'),
+      active: pathname.startsWith('/projects'),
     },
 
     {

@@ -346,11 +346,11 @@ export function getWorkflowSteps(stats: {
       order: 18,
       title: 'Site Photos & Evidence',
       description: 'Access field technician photo logs, mounting validations, and physical structures evidence.',
-      relatedRoute: 'documents',
+      relatedRoute: 'tasks',
       phaseAvailability: 'Active',
       status: stats.hasDocuments ? 'In Progress' : 'Not Started',
-      nextActionLabel: 'View Documents',
-      nextActionRoute: 'documents',
+      nextActionLabel: 'View Work Orders',
+      nextActionRoute: 'tasks',
       completionCriteria: 'Photo files attached to field checkpoints.',
       message: stats.hasDocuments
         ? 'Technician photos and attachments uploaded.'
