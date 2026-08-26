@@ -1,7 +1,13 @@
 'use client'
 
 import React, { useEffect, useRef, useState, useTransition } from 'react'
+import dynamic from 'next/dynamic'
 import { setOptions, importLibrary } from '@googlemaps/js-api-loader'
+
+const LeafletMapContainer = dynamic(() => import('@/components/map/LeafletMapContainer'), {
+  ssr: false,
+  loading: () => <div className="w-full h-full bg-slate-950 flex items-center justify-center text-slate-400 text-xs font-semibold animate-pulse">Cargando OpenStreetMap & Satélite Esri...</div>
+})
 import { Database } from '@/types/supabase'
 import {
   createCameraLocation,
@@ -574,6 +580,7 @@ export default function ProjectMapCanvas({
 
 
   const [mapsAuthError, setMapsAuthError] = useState(false)
+  const [useLeafletEngine, setUseLeafletEngine] = useState(false)
 
   // Initialize Map
   useEffect(() => {
@@ -1874,6 +1881,19 @@ export default function ProjectMapCanvas({
             </button>
 
             <button
+              onClick={() => setUseLeafletEngine(!useLeafletEngine)}
+              className={`flex items-center gap-1.5 px-3 py-2 border rounded-xl font-semibold text-[11px] transition-all cursor-pointer ${
+                useLeafletEngine || mapsAuthError
+                  ? 'bg-emerald-950/40 border-emerald-800 text-emerald-300'
+                  : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
+              }`}
+              title="Cambiar Motor de Mapa (Google Maps / OpenStreetMap Free)"
+            >
+              <span className={`w-2 h-2 rounded-full ${useLeafletEngine || mapsAuthError ? 'bg-emerald-400' : 'bg-blue-400'}`} />
+              <span>{useLeafletEngine || mapsAuthError ? 'OSM Free Mode' : 'Google Maps'}</span>
+            </button>
+
+            <button
               onClick={handleRefresh}
               className="flex items-center justify-center p-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700"
               title="Refresh Layout"
@@ -1900,15 +1920,38 @@ export default function ProjectMapCanvas({
 
         {/* Map Canvas Viewport */}
         <div className="flex-1 relative bg-slate-950 flex items-center justify-center overflow-hidden">
-          <div
-            ref={mapRef}
-            className="absolute inset-0 w-full h-full"
-            onMouseEnter={() => {
-              if (mapRef.current) {
-                mapRectRef.current = mapRef.current.getBoundingClientRect()
-              }
-            }}
-          />
+          {useLeafletEngine || mapsAuthError || !(googleMapsApiKey || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) ? (
+            <LeafletMapContainer
+              defaultLatitude={defaultLatitude}
+              defaultLongitude={defaultLongitude}
+              defaultZoom={defaultZoom}
+              cameras={cameras}
+              fiberNodes={fiberNodes}
+              networkDevices={networkDevices}
+              fiberRoutes={fiberRoutes}
+              selectedCamera={selectedCamera}
+              onSelectCamera={setSelectedCamera}
+              onCameraDragEnd={async (cam, newLat, newLng) => {
+                await updateCameraCoordinates({ id: cam.id, projectId, latitude: newLat, longitude: newLng })
+              }}
+              showCameras={showCameras}
+              showFiberNodes={showFiberNodes}
+              showFiberRoutes={showFiberRoutes}
+              showNetworkDevices={showNetworkDevices}
+              onToggleMapEngine={() => setUseLeafletEngine(false)}
+              activeEngineLabel={mapsAuthError ? 'OpenStreetMap & Satélite Esri (Fallback Activo)' : 'OpenStreetMap & Satélite Esri'}
+            />
+          ) : (
+            <div
+              ref={mapRef}
+              className="absolute inset-0 w-full h-full"
+              onMouseEnter={() => {
+                if (mapRef.current) {
+                  mapRectRef.current = mapRef.current.getBoundingClientRect()
+                }
+              }}
+            />
+          )}
 
           {/* OSP Fiber Layer Overlay Checkboxes */}
           <div className="absolute top-4 right-4 z-20 bg-slate-900/90 backdrop-blur-md border border-slate-800 p-2.5 rounded-xl shadow-xl flex flex-col gap-1.5 text-[10px] font-bold text-slate-300 font-sans pointer-events-auto">

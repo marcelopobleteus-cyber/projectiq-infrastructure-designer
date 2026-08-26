@@ -45,6 +45,23 @@ export async function createCameraLocation(params: {
 }) {
   const supabase = await createClient()
 
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user && !BYPASS_AUTH) return { error: 'Not authenticated' }
+
+  const { data: project } = await supabase.from('projects').select('organization_id').eq('id', params.projectId).single()
+  if (!project) return { error: 'Project not found' }
+
+  if (user) {
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', project.organization_id)
+      .eq('profile_id', user.id)
+      .single()
+
+    if (!membership && !BYPASS_AUTH) return { error: 'Access denied' }
+  }
+
   // 1. Get first available camera model if none specified
   let modelId = params.cameraModelId
   if (!modelId) {
@@ -121,6 +138,23 @@ export async function updateCameraCoordinates(params: {
 }) {
   const supabase = await createClient()
 
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user && !BYPASS_AUTH) return { error: 'Not authenticated' }
+
+  const { data: project } = await supabase.from('projects').select('organization_id').eq('id', params.projectId).single()
+  if (!project) return { error: 'Project not found' }
+
+  if (user) {
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', project.organization_id)
+      .eq('profile_id', user.id)
+      .single()
+
+    if (!membership && !BYPASS_AUTH) return { error: 'Access denied' }
+  }
+
   const { data, error } = await supabase
     .from('camera_locations')
     .update({
@@ -154,6 +188,23 @@ export async function updateCameraDetails(params: {
   }
 }) {
   const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user && !BYPASS_AUTH) return { error: 'Not authenticated' }
+
+  const { data: project } = await supabase.from('projects').select('organization_id').eq('id', params.projectId).single()
+  if (!project) return { error: 'Project not found' }
+
+  if (user) {
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', project.organization_id)
+      .eq('profile_id', user.id)
+      .single()
+
+    if (!membership && !BYPASS_AUTH) return { error: 'Access denied' }
+  }
 
   // Check unique camera_id_tag within project (except current camera)
   const { data: duplicate, error: checkError } = await supabase
@@ -201,6 +252,23 @@ export async function deleteCameraLocation(params: {
   projectId: string
 }) {
   const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user && !BYPASS_AUTH) return { error: 'Not authenticated' }
+
+  const { data: project } = await supabase.from('projects').select('organization_id').eq('id', params.projectId).single()
+  if (!project) return { error: 'Project not found' }
+
+  if (user) {
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', project.organization_id)
+      .eq('profile_id', user.id)
+      .single()
+
+    if (!membership && !BYPASS_AUTH) return { error: 'Access denied' }
+  }
 
   const { error } = await supabase
     .from('camera_locations')
@@ -253,6 +321,9 @@ export async function createCameraTask(params: {
 }) {
   const supabase = await createClient()
   
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user && !BYPASS_AUTH) return { error: 'Not authenticated' }
+
   const { data: project, error: projError } = await supabase
     .from('projects')
     .select('organization_id')
@@ -261,6 +332,17 @@ export async function createCameraTask(params: {
 
   if (projError || !project) {
     return { error: `Failed to resolve organization: ${projError?.message || 'Project not found'}` }
+  }
+
+  if (user) {
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', project.organization_id)
+      .eq('profile_id', user.id)
+      .single()
+
+    if (!membership && !BYPASS_AUTH) return { error: 'Access denied' }
   }
 
   const { data, error } = await supabase
@@ -297,6 +379,23 @@ export async function updateCameraTaskStatus(params: {
 }) {
   const supabase = await createClient()
   
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user && !BYPASS_AUTH) return { error: 'Not authenticated' }
+
+  const { data: project } = await supabase.from('projects').select('organization_id').eq('id', params.projectId).single()
+  if (!project) return { error: 'Project not found' }
+
+  if (user) {
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', project.organization_id)
+      .eq('profile_id', user.id)
+      .single()
+
+    if (!membership && !BYPASS_AUTH) return { error: 'Access denied' }
+  }
+
   const { data, error } = await supabase
     .from('camera_tasks')
     .update({
@@ -324,6 +423,23 @@ export async function deleteCameraTask(params: {
 }) {
   const supabase = await createClient()
   
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user && !BYPASS_AUTH) return { error: 'Not authenticated' }
+
+  const { data: project } = await supabase.from('projects').select('organization_id').eq('id', params.projectId).single()
+  if (!project) return { error: 'Project not found' }
+
+  if (user) {
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', project.organization_id)
+      .eq('profile_id', user.id)
+      .single()
+
+    if (!membership && !BYPASS_AUTH) return { error: 'Access denied' }
+  }
+
   const { error } = await supabase
     .from('camera_tasks')
     .delete()
@@ -344,6 +460,9 @@ export async function generateScopeTemplateTasks(params: {
 }) {
   const supabase = await createClient()
 
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user && !BYPASS_AUTH) return { error: 'Not authenticated' }
+
   // Fetch organization_id from project
   const { data: project } = await supabase
     .from('projects')
@@ -353,6 +472,17 @@ export async function generateScopeTemplateTasks(params: {
 
   if (!project) {
     return { error: 'Failed to resolve organization: Project not found' }
+  }
+
+  if (user) {
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', project.organization_id)
+      .eq('profile_id', user.id)
+      .single()
+
+    if (!membership && !BYPASS_AUTH) return { error: 'Access denied' }
   }
 
   // 1. Define checklists based on communication type
@@ -831,6 +961,23 @@ export async function createFieldTask(params: {
 }) {
   const supabase = await createClient()
   
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user && !BYPASS_AUTH) return { error: 'Not authenticated' }
+
+  const { data: project } = await supabase.from('projects').select('organization_id').eq('id', params.projectId).single()
+  if (!project) return { error: 'Project not found' }
+
+  if (user) {
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', project.organization_id)
+      .eq('profile_id', user.id)
+      .single()
+
+    if (!membership && !BYPASS_AUTH) return { error: 'Access denied' }
+  }
+
   const { data, error } = await supabase
     .from('field_tasks')
     .insert({
@@ -861,6 +1008,23 @@ export async function updateFieldTask(params: {
 }) {
   const supabase = await createClient()
   
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user && !BYPASS_AUTH) return { error: 'Not authenticated' }
+
+  const { data: project } = await supabase.from('projects').select('organization_id').eq('id', params.projectId).single()
+  if (!project) return { error: 'Project not found' }
+
+  if (user) {
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', project.organization_id)
+      .eq('profile_id', user.id)
+      .single()
+
+    if (!membership && !BYPASS_AUTH) return { error: 'Access denied' }
+  }
+
   const { data, error } = await supabase
     .from('field_tasks')
     .update({
@@ -889,6 +1053,23 @@ export async function deleteFieldTask(params: {
 }) {
   const supabase = await createClient()
   
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user && !BYPASS_AUTH) return { error: 'Not authenticated' }
+
+  const { data: project } = await supabase.from('projects').select('organization_id').eq('id', params.projectId).single()
+  if (!project) return { error: 'Project not found' }
+
+  if (user) {
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', project.organization_id)
+      .eq('profile_id', user.id)
+      .single()
+
+    if (!membership && !BYPASS_AUTH) return { error: 'Access denied' }
+  }
+
   const { error } = await supabase
     .from('field_tasks')
     .delete()
