@@ -33,17 +33,17 @@ export default function FiberPathToolbar({
     <div
       className={`
         absolute top-4 right-16 z-50
-        bg-slate-900/90 backdrop-blur-xl border rounded-2xl shadow-2xl
+        bg-[var(--surface-1)]/90 backdrop-blur-xl border rounded-2xl shadow-2xl
         transition-all duration-200
         ${isDrawMode
-          ? 'border-indigo-500/50 ring-1 ring-indigo-500/20'
+          ? 'border-[var(--accent)]/50 ring-1 ring-indigo-500/20'
           : 'border-slate-700/60'
         }
       `}
       style={{ width: 260 }}
     >
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-800/60">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border)]/60">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="13"
@@ -59,12 +59,12 @@ export default function FiberPathToolbar({
           <circle cx="3" cy="17" r="2" />
           <circle cx="21" cy="7" r="2" />
         </svg>
-        <span className={`text-[11px] font-bold tracking-wide uppercase ${isDrawMode ? 'text-indigo-300' : 'text-slate-400'}`}>
+        <span className={`text-[11px] font-bold tracking-wide uppercase ${isDrawMode ? 'text-indigo-300' : 'text-[var(--text-secondary)]'}`}>
           Fiber Path Design
         </span>
 
         {/* Node count badge */}
-        <span className="ml-auto text-[9px] bg-slate-800 border border-slate-700 text-slate-400 px-1.5 py-0.5 rounded-full font-mono">
+        <span className="ml-auto text-[9px] bg-slate-800 border border-slate-700 text-[var(--text-secondary)] px-1.5 py-0.5 rounded-full font-mono">
           {fiberNodeCount} node{fiberNodeCount !== 1 ? 's' : ''}
         </span>
       </div>
@@ -79,8 +79,8 @@ export default function FiberPathToolbar({
             w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl font-bold text-[11px] tracking-wide
             transition-all border shadow-lg
             ${isDrawMode
-              ? 'bg-indigo-600 border-indigo-500 text-white hover:bg-indigo-500 hover:shadow-indigo-500/10'
-              : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-indigo-500/40 hover:text-indigo-300'
+              ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white border-[var(--accent)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:shadow-indigo-500/10'
+              : 'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text-primary)] hover:border-[var(--accent)]/40 hover:text-indigo-300'
             }
           `}
         >
@@ -102,12 +102,12 @@ export default function FiberPathToolbar({
           <div className="space-y-3">
             {/* Ordered node path list */}
             <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1 select-none">
-              <span className="text-[9px] text-slate-500 uppercase tracking-widest font-bold block">
+              <span className="text-[9px] text-[var(--text-tertiary)] uppercase tracking-widest font-bold block">
                 Selected Path Sequence ({pathNodes.length})
               </span>
 
               {pathNodes.length === 0 ? (
-                <div className="text-[11px] text-slate-500 italic py-4 text-center bg-slate-950/40 border border-slate-850 rounded-xl">
+                <div className="text-[11px] text-[var(--text-tertiary)] italic py-4 text-center bg-[var(--surface-2)] border border-[var(--border)] rounded-xl">
                   Click nodes on the map in order
                 </div>
               ) : (
@@ -115,13 +115,13 @@ export default function FiberPathToolbar({
                   {pathNodes.map((node, index) => (
                     <div
                       key={node.id}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-slate-950/60 border border-slate-800 rounded-lg text-xs"
+                      className="flex items-center gap-2 px-3 py-1.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-xs"
                     >
-                      <span className="flex items-center justify-center w-4 h-4 rounded-full bg-indigo-600/20 text-indigo-400 text-[9px] font-bold font-mono">
+                      <span className="flex items-center justify-center w-4 h-4 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white/20 text-[var(--accent-text)] text-[9px] font-bold font-mono">
                         {index + 1}
                       </span>
                       <span className="font-mono text-white font-medium truncate flex-1">{node.node_tag}</span>
-                      <span className="text-[9px] text-slate-500 uppercase tracking-tight">{node.node_type}</span>
+                      <span className="text-[9px] text-[var(--text-tertiary)] uppercase tracking-tight">{node.node_type}</span>
                     </div>
                   ))}
                 </div>
@@ -135,7 +135,7 @@ export default function FiberPathToolbar({
                   id="fiber-draw-undo-node"
                   type="button"
                   onClick={onUndo}
-                  className="px-2.5 py-1.5 bg-slate-950 border border-slate-850 hover:border-slate-700 text-slate-400 hover:text-white text-[10px] font-semibold rounded-lg transition-all text-center flex items-center justify-center gap-1.5"
+                  className="px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--border)] hover:border-slate-700 text-[var(--text-secondary)] hover:text-white text-[10px] font-semibold rounded-lg transition-all text-center flex items-center justify-center gap-1.5"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
                   Undo Last
@@ -144,7 +144,7 @@ export default function FiberPathToolbar({
                   id="fiber-draw-clear-path"
                   type="button"
                   onClick={onClear}
-                  className="px-2.5 py-1.5 bg-slate-950 border border-slate-850 hover:border-red-900/50 text-slate-400 hover:text-red-400 text-[10px] font-semibold rounded-lg transition-all text-center flex items-center justify-center gap-1.5"
+                  className="px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--border)] hover:border-red-900/50 text-[var(--text-secondary)] hover:text-red-400 text-[10px] font-semibold rounded-lg transition-all text-center flex items-center justify-center gap-1.5"
                 >
                   ✕ Clear Path
                 </button>
@@ -158,7 +158,7 @@ export default function FiberPathToolbar({
                 type="button"
                 onClick={onConfigure}
                 disabled={isConfiguring}
-                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-700/30 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-bold text-[11px] rounded-xl transition-all shadow-md"
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-700/30 disabled:text-[var(--text-tertiary)] disabled:cursor-not-allowed text-white font-bold text-[11px] rounded-xl transition-all shadow-md"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                 {isConfiguring ? 'Drawer Open' : 'Configure Route'}

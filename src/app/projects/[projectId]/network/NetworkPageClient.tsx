@@ -25,34 +25,34 @@ export default function NetworkPageClient({
   const [activeTab, setActiveTab] = useState<'ports' | 'topology'>('ports')
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden h-full w-full">
+    <div className="flex-1 flex flex-col overflow-hidden h-full w-full font-sans bg-[var(--bg)]">
       {/* Tab Navigation Header */}
-      <div className="bg-slate-950/80 border-b border-slate-900 px-6 py-2 flex items-center justify-between no-print">
+      <div className="bg-[var(--surface-1)] border-b border-[var(--border)] px-6 py-2 flex items-center justify-between no-print shadow-xs">
         <div className="flex items-center gap-1">
           <button
             onClick={() => setActiveTab('ports')}
-            className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${
+            className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer border ${
               activeTab === 'ports'
-                ? 'bg-slate-900 text-white border border-slate-800'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900/30'
+                ? 'bg-[var(--surface-2)] text-[var(--text-primary)] border-[var(--accent-border)]'
+                : 'bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] border-transparent'
             }`}
           >
             Port Matrix
           </button>
           <button
             onClick={() => setActiveTab('topology')}
-            className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${
+            className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer border ${
               activeTab === 'topology'
-                ? 'bg-slate-900 text-white border border-slate-800'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900/30'
+                ? 'bg-[var(--surface-2)] text-[var(--text-primary)] border-[var(--accent-border)]'
+                : 'bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] border-transparent'
             }`}
           >
             Topology Diagram
           </button>
         </div>
 
-        <div className="text-[10px] text-slate-500 font-mono">
-          Network Section Options
+        <div className="text-[10px] text-[var(--text-tertiary)] font-mono">
+          Network Workspace Mode
         </div>
       </div>
 

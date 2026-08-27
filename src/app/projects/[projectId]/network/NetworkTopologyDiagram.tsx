@@ -398,7 +398,7 @@ export default function NetworkTopologyDiagram({
   }, [positions, routers, nvrs, switches, cameras, hoveredNodeId])
 
   return (
-    <div className="flex-1 flex flex-col md:flex-row overflow-hidden h-full w-full bg-slate-950 font-sans">
+    <div className="flex-1 flex flex-col md:flex-row overflow-hidden h-full w-full bg-[var(--surface-2)] font-sans">
       
       {/* Topology Canvas Left Column */}
       <div className="flex-1 flex flex-col overflow-hidden h-full p-6 relative">
@@ -406,13 +406,13 @@ export default function NetworkTopologyDiagram({
         {/* Canvas Toolbar Controls */}
         <div className="flex items-center justify-between mb-4 z-20">
           <div>
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider">Logical Network Topology</h3>
-            <p className="text-[11px] text-slate-450 mt-0.5">Drag and position switches or cameras to arrange the visual diagram.</p>
+            <h3 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider">Logical Network Topology</h3>
+            <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">Drag and position switches or cameras to arrange the visual diagram.</p>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={handleResetLayout}
-              className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 rounded-lg text-[10px] font-bold transition-all"
+              className="px-2.5 py-1 bg-[var(--surface-1)] hover:bg-slate-800 text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border)] rounded-lg text-[10px] font-bold transition-all"
             >
               Reset Layout
             </button>
@@ -420,7 +420,7 @@ export default function NetworkTopologyDiagram({
         </div>
 
         {/* SVG Drawing Canvas */}
-        <div className="flex-1 bg-slate-950/60 border border-slate-900 rounded-2xl overflow-hidden relative shadow-inner select-none">
+        <div className="flex-1 bg-[var(--surface-2)] border border-[var(--border)] rounded-2xl overflow-hidden relative shadow-inner select-none">
           <svg
             ref={canvasRef}
             width="100%"
@@ -580,12 +580,12 @@ export default function NetworkTopologyDiagram({
       </div>
 
       {/* Details Side Panel Right Column */}
-      <div className="w-full md:w-80 border-t md:border-t-0 md:border-l border-slate-900 bg-slate-950 p-6 flex flex-col h-full overflow-y-auto scrollbar-thin no-print">
+      <div className="w-full md:w-80 border-t md:border-t-0 md:border-l border-[var(--border)] bg-[var(--surface-2)] p-6 flex flex-col h-full overflow-y-auto scrollbar-thin no-print">
         {selectedNodeDetails ? (
           <div className="space-y-6">
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="px-2 py-0.5 rounded-full text-[9px] font-mono uppercase bg-slate-900 text-indigo-400 border border-indigo-500/10">
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-mono uppercase bg-[var(--surface-1)] text-[var(--accent-text)] border border-[var(--accent)]/10">
                   {selectedNodeDetails.device_type}
                 </span>
                 <span className={`w-2 h-2 rounded-full ${
@@ -597,46 +597,46 @@ export default function NetworkTopologyDiagram({
                     ? 'bg-rose-500'
                     : 'bg-amber-500'
                 }`} />
-                <span className="text-[10px] text-slate-500 uppercase font-mono">{selectedNodeDetails.status}</span>
+                <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-mono">{selectedNodeDetails.status}</span>
               </div>
-              <h4 className="text-lg font-black text-white mt-2 tracking-tight">{selectedNodeDetails.name}</h4>
-              <p className="text-xs text-slate-450 mt-1">{selectedNodeDetails.location || 'No physical location notes.'}</p>
+              <h4 className="text-lg font-black text-[var(--text-primary)] mt-2 tracking-tight">{selectedNodeDetails.name}</h4>
+              <p className="text-xs text-[var(--text-secondary)] mt-1">{selectedNodeDetails.location || 'No physical location notes.'}</p>
             </div>
 
-            <div className="border-t border-slate-900 pt-4 space-y-3 text-xs">
+            <div className="border-t border-[var(--border)] pt-4 space-y-3 text-xs">
               <div className="flex justify-between items-center">
-                <span className="text-slate-500">IP Address</span>
-                <span className="font-mono text-slate-300 font-bold">{selectedNodeDetails.ip_address || 'Unassigned'}</span>
+                <span className="text-[var(--text-tertiary)]">IP Address</span>
+                <span className="font-mono text-[var(--text-primary)] font-bold">{selectedNodeDetails.ip_address || 'Unassigned'}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-slate-500">Manufacturer</span>
-                <span className="text-slate-350">{selectedNodeDetails.manufacturer || 'N/A'}</span>
+                <span className="text-[var(--text-tertiary)]">Manufacturer</span>
+                <span className="text-[var(--text-secondary)]">{selectedNodeDetails.manufacturer || 'N/A'}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-slate-500">Model Number</span>
-                <span className="text-slate-350">{selectedNodeDetails.model_number || 'N/A'}</span>
+                <span className="text-[var(--text-tertiary)]">Model Number</span>
+                <span className="text-[var(--text-secondary)]">{selectedNodeDetails.model_number || 'N/A'}</span>
               </div>
 
               {selectedNodeDetails.type === 'device' && selectedNodeDetails.total_ports && (
                 <>
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-500">Total Ports</span>
-                    <span className="font-mono text-slate-350">{selectedNodeDetails.total_ports} ports</span>
+                    <span className="text-[var(--text-tertiary)]">Total Ports</span>
+                    <span className="font-mono text-[var(--text-secondary)]">{selectedNodeDetails.total_ports} ports</span>
                   </div>
                   {selectedNodeDetails.poe_budget_watts ? (
                     <div className="space-y-1.5 pt-2">
                       <div className="flex justify-between text-[11px]">
-                        <span className="text-slate-500">PoE Power Utilization</span>
-                        <span className="font-mono font-bold text-slate-300">
+                        <span className="text-[var(--text-tertiary)]">PoE Power Utilization</span>
+                        <span className="font-mono font-bold text-[var(--text-primary)]">
                           {selectedNodeDetails.poe_used}W / {selectedNodeDetails.poe_budget_watts}W
                         </span>
                       </div>
-                      <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden">
+                      <div className="w-full h-1.5 bg-[var(--surface-1)] rounded-full overflow-hidden">
                         <div
                           className={`h-full rounded-full ${
                             (selectedNodeDetails.poe_used / selectedNodeDetails.poe_budget_watts) > 1
                               ? 'bg-rose-500'
-                              : 'bg-indigo-500'
+                              : 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white'
                           }`}
                           style={{
                             width: `${Math.min(100, (selectedNodeDetails.poe_used / selectedNodeDetails.poe_budget_watts) * 100)}%`
@@ -650,20 +650,20 @@ export default function NetworkTopologyDiagram({
 
               {selectedNodeDetails.type === 'camera' && (
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-500">PoE Power Draw</span>
-                  <span className="font-mono text-indigo-400 font-bold">{(selectedNodeDetails as any).poe_draw} W</span>
+                  <span className="text-[var(--text-tertiary)]">PoE Power Draw</span>
+                  <span className="font-mono text-[var(--accent-text)] font-bold">{(selectedNodeDetails as any).poe_draw} W</span>
                 </div>
               )}
             </div>
 
             {selectedNodeDetails.connectedCount ? (
-              <div className="border-t border-slate-900 pt-4 space-y-2">
-                <h5 className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">
+              <div className="border-t border-[var(--border)] pt-4 space-y-2">
+                <h5 className="text-[10px] font-mono text-[var(--text-tertiary)] uppercase tracking-wider">
                   Connected Elements ({selectedNodeDetails.connectedCount})
                 </h5>
                 <div className="max-h-48 overflow-y-auto scrollbar-thin space-y-1">
                   {selectedNodeDetails.connectedDevices?.map((tag: string, idx: number) => (
-                    <div key={idx} className="px-2.5 py-1.5 bg-slate-900/40 border border-slate-900/60 rounded-lg text-xs font-mono font-bold text-slate-300">
+                    <div key={idx} className="px-2.5 py-1.5 bg-[var(--surface-1)] border border-[var(--border)]/60 rounded-lg text-xs font-mono font-bold text-[var(--text-primary)]">
                       {tag}
                     </div>
                   ))}
@@ -672,9 +672,9 @@ export default function NetworkTopologyDiagram({
             ) : null}
 
             {selectedNodeDetails.type === 'camera' && (selectedNodeDetails as any).parentSwitch ? (
-              <div className="border-t border-slate-900 pt-4 space-y-1.5">
-                <h5 className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Connected Switch Uplink</h5>
-                <div className="px-2.5 py-1.5 bg-slate-900/40 border border-slate-900/60 rounded-lg text-xs font-mono font-bold text-slate-300">
+              <div className="border-t border-[var(--border)] pt-4 space-y-1.5">
+                <h5 className="text-[10px] font-mono text-[var(--text-tertiary)] uppercase tracking-wider">Connected Switch Uplink</h5>
+                <div className="px-2.5 py-1.5 bg-[var(--surface-1)] border border-[var(--border)]/60 rounded-lg text-xs font-mono font-bold text-[var(--text-primary)]">
                   {(selectedNodeDetails as any).parentSwitch}
                 </div>
               </div>
@@ -686,8 +686,8 @@ export default function NetworkTopologyDiagram({
               <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 111.085 1.085l-.04.04m-2.122 0A2.25 2.25 0 119.75 9H12v2.25" />
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9 9 0 100-18 9 9 0 000 18z" />
             </svg>
-            <h5 className="text-xs font-bold text-slate-400">No element selected</h5>
-            <p className="text-[10px] text-slate-500 mt-1 max-w-[180px]">Click any node in the topology diagram to view detailed network and power specifications.</p>
+            <h5 className="text-xs font-bold text-[var(--text-secondary)]">No element selected</h5>
+            <p className="text-[10px] text-[var(--text-tertiary)] mt-1 max-w-[180px]">Click any node in the topology diagram to view detailed network and power specifications.</p>
           </div>
         )}
       </div>

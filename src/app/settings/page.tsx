@@ -407,7 +407,7 @@ export default function GlobalSettingsPage() {
       {/* Invite Modal */}
       {isInviteOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs" onClick={() => setIsInviteOpen(false)} />
+          <div className="absolute inset-0 bg-[var(--surface-1)] backdrop-blur-xs" onClick={() => setIsInviteOpen(false)} />
           <form onSubmit={handleInviteSubmit} className="relative bg-[var(--surface-1)] border border-[var(--border-strong)] p-6 rounded-xl w-full max-w-md space-y-4 shadow-2xl animate-in zoom-in-95 duration-150">
             <div>
               <h3 className="text-sm font-black uppercase text-[var(--accent-text)] tracking-wider">Invite Team Member</h3>
@@ -449,7 +449,7 @@ export default function GlobalSettingsPage() {
       {/* Delete Confirmation Modal */}
       {isDeleteConfirmOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs" onClick={() => setIsDeleteConfirmOpen(false)} />
+          <div className="absolute inset-0 bg-[var(--surface-1)] backdrop-blur-xs" onClick={() => setIsDeleteConfirmOpen(false)} />
           <div className="relative bg-[var(--surface-1)] border border-red-200 p-6 rounded-xl w-full max-w-md space-y-4 shadow-2xl animate-in zoom-in-95 duration-150">
             <div>
               <h3 className="text-sm font-black uppercase text-[var(--danger)] tracking-wider">Wipe Company Organization?</h3>

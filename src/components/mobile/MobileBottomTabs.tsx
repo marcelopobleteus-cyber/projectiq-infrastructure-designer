@@ -16,7 +16,6 @@ export default function MobileBottomTabs({
   isDrawerOpen,
 }: MobileBottomTabsProps) {
   const pathname = usePathname()
-
   const defaultProjectId = projectId || 'demo-metro-cctv'
 
   const tabs = [
@@ -50,15 +49,15 @@ export default function MobileBottomTabs({
   ]
 
   return (
-    <nav className="h-16 bg-slate-900 border-t border-slate-800 fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around px-2 shrink-0 font-sans shadow-2xl">
+    <nav className="h-16 bg-[var(--surface-1)] border-t border-[var(--border)] fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around px-2 shrink-0 font-sans shadow-xl">
       {tabs.map((tab) => (
         <Link
           key={tab.id}
           href={tab.href}
           className={`flex-1 min-h-[48px] flex flex-col items-center justify-center gap-1 rounded-xl transition-all ${
             tab.active
-              ? 'text-indigo-400 font-bold'
-              : 'text-slate-400 hover:text-slate-200'
+              ? 'text-[var(--accent-text)] font-extrabold'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
           {tab.icon}
@@ -66,12 +65,11 @@ export default function MobileBottomTabs({
         </Link>
       ))}
 
-      {/* Menu / Drawer Toggle Item (≥44px) */}
       <button
         type="button"
         onClick={onToggleDrawer}
         className={`flex-1 min-h-[48px] flex flex-col items-center justify-center gap-1 rounded-xl transition-all cursor-pointer ${
-          isDrawerOpen ? 'text-indigo-400 font-bold' : 'text-slate-400 hover:text-slate-200'
+          isDrawerOpen ? 'text-[var(--accent-text)] font-extrabold' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
         }`}
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>

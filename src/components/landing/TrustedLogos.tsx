@@ -65,7 +65,7 @@ function LogoItem({ logo }: { logo: typeof logos[0] }) {
   if (imgError) {
     return (
       <div 
-        className="flex items-center justify-center bg-slate-50 border border-dashed border-[#E5EAF0] rounded-xl px-4.5 py-2 text-[10px] text-slate-400 font-bold tracking-wide select-none h-6 md:h-8"
+        className="flex items-center justify-center bg-slate-50 border border-dashed border-[#E5EAF0] rounded-xl px-4.5 py-2 text-[10px] text-[var(--text-secondary)] font-bold tracking-wide select-none h-6 md:h-8"
         title={`${logo.name} logo asset is missing`}
       >
         <span className="w-1.5 h-1.5 rounded-full bg-slate-300 mr-2 shrink-0" />

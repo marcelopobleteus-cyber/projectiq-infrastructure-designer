@@ -6,7 +6,7 @@ import { setOptions, importLibrary } from '@googlemaps/js-api-loader'
 
 const LeafletMapContainer = dynamic(() => import('@/components/map/LeafletMapContainer'), {
   ssr: false,
-  loading: () => <div className="w-full h-full bg-slate-950 flex items-center justify-center text-slate-400 text-xs font-semibold animate-pulse">Cargando OpenStreetMap & Satélite Esri...</div>
+  loading: () => <div className="w-full h-full bg-[var(--surface-2)] flex items-center justify-center text-[var(--text-secondary)] text-xs font-semibold animate-pulse">Cargando OpenStreetMap & Satélite Esri...</div>
 })
 import { Database } from '@/types/supabase'
 import {
@@ -1739,10 +1739,10 @@ export default function ProjectMapCanvas({
   if (!googleMapsApiKey) {
     return (
       <div className="w-full max-w-4xl mx-auto py-8">
-        <div className="bg-slate-900/60 backdrop-blur-xl border border-amber-500/30 rounded-2xl p-8 text-center shadow-2xl relative overflow-hidden">
+        <div className="bg-[var(--surface-1)] backdrop-blur-xl border border-amber-500/30 rounded-2xl p-8 text-center shadow-2xl relative overflow-hidden">
           <div className="absolute top-0 left-0 right-0 h-[2px] bg-amber-500/50" />
           <h3 className="text-xl font-bold text-white tracking-tight">Google Maps API Key Missing</h3>
-          <p className="text-sm text-slate-400 mt-2">Enter your API key in .env.local to load visual layout designer.</p>
+          <p className="text-sm text-[var(--text-secondary)] mt-2">Enter your API key in .env.local to load visual layout designer.</p>
         </div>
       </div>
     )
@@ -1795,8 +1795,8 @@ export default function ProjectMapCanvas({
               }}
               className={`w-full flex items-center justify-between text-left px-2 py-1.5 rounded-lg text-xs transition-colors ${
                 selectedCamera?.id === cam.id
-                  ? 'bg-indigo-600/15 border border-indigo-500/30 text-white'
-                  : 'hover:bg-slate-800 text-slate-400 hover:text-white border border-transparent'
+                  ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white/15 border border-[var(--accent)]/30 text-white'
+                  : 'hover:bg-slate-800 text-[var(--text-secondary)] hover:text-white border border-transparent'
               }`}
             >
               <span className="flex items-center gap-1.5 truncate">
@@ -1804,7 +1804,7 @@ export default function ProjectMapCanvas({
                 {cam.camera_id_tag}
               </span>
               {cam.assigned_network_device_id && (
-                <span className="text-[9px] bg-slate-950 border border-slate-850 text-indigo-400 px-1 py-0.25 rounded">
+                <span className="text-[9px] bg-[var(--surface-2)] border border-[var(--border)] text-[var(--accent-text)] px-1 py-0.25 rounded">
                   Connected
                 </span>
               )}
@@ -1824,15 +1824,15 @@ export default function ProjectMapCanvas({
               }}
               className={`w-full flex items-center justify-between text-left px-2 py-1.5 rounded-lg text-xs transition-colors ${
                 selectedDevice?.id === dev.id
-                  ? 'bg-indigo-600/15 border border-indigo-500/30 text-white'
-                  : 'hover:bg-slate-800 text-slate-400 hover:text-white border border-transparent'
+                  ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white/15 border border-[var(--accent)]/30 text-white'
+                  : 'hover:bg-slate-800 text-[var(--text-secondary)] hover:text-white border border-transparent'
               }`}
             >
               <span className="flex items-center gap-1.5 truncate">
                 <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getNetworkDeviceColor(dev.device_type) }} />
                 {dev.name}
               </span>
-              <span className="text-[9px] text-slate-500 capitalize">{dev.device_type}</span>
+              <span className="text-[9px] text-[var(--text-tertiary)] capitalize">{dev.device_type}</span>
             </button>
           ))
         }
@@ -1842,7 +1842,7 @@ export default function ProjectMapCanvas({
       <div className="flex-1 flex flex-col overflow-hidden relative h-full">
         
         {/* Map Toolbar */}
-        <div className="p-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between shrink-0 relative z-10 gap-4">
+        <div className="p-4 bg-[var(--surface-1)] border-b border-[var(--border)] flex items-center justify-between shrink-0 relative z-10 gap-4">
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
@@ -1852,7 +1852,7 @@ export default function ProjectMapCanvas({
               className={`flex items-center gap-2 px-3.5 py-2 rounded-xl font-semibold text-[11px] tracking-wide transition-all border ${
                 addCameraMode
                   ? 'bg-amber-600 border-amber-500 hover:bg-amber-500 text-white'
-                  : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700 hover:text-white'
+                  : 'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text-primary)] hover:border-slate-700 hover:text-white'
               }`}
             >
               {addCameraMode ? 'Exit Add Camera' : 'Add Camera Mode'}
@@ -1866,7 +1866,7 @@ export default function ProjectMapCanvas({
               className={`flex items-center gap-2 px-3.5 py-2 rounded-xl font-semibold text-[11px] tracking-wide transition-all border ${
                 addDeviceMode
                   ? 'bg-blue-600 border-blue-500 hover:bg-blue-500 text-white'
-                  : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700 hover:text-white'
+                  : 'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text-primary)] hover:border-slate-700 hover:text-white'
               }`}
             >
               {addDeviceMode ? 'Exit Add Device' : 'Add Network Device'}
@@ -1875,7 +1875,7 @@ export default function ProjectMapCanvas({
             <button
               onClick={handleBackfillPreview}
               disabled={isBackfilling}
-              className="flex items-center gap-2 px-3.5 py-2 bg-slate-950 border border-slate-800 hover:border-indigo-500/50 hover:text-indigo-400 disabled:opacity-50 text-slate-300 rounded-xl font-semibold text-[11px] tracking-wide transition-all"
+              className="flex items-center gap-2 px-3.5 py-2 bg-[var(--surface-2)] border border-[var(--border)] hover:border-[var(--accent)]/50 hover:text-[var(--accent-text)] disabled:opacity-50 text-[var(--text-primary)] rounded-xl font-semibold text-[11px] tracking-wide transition-all"
             >
               {isBackfilling ? 'Analyzing...' : 'Preview Missing Checklists'}
             </button>
@@ -1885,7 +1885,7 @@ export default function ProjectMapCanvas({
               className={`flex items-center gap-1.5 px-3 py-2 border rounded-xl font-semibold text-[11px] transition-all cursor-pointer ${
                 useLeafletEngine || mapsAuthError
                   ? 'bg-emerald-950/40 border-emerald-800 text-emerald-300'
-                  : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
+                  : 'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text-primary)] hover:border-slate-700'
               }`}
               title="Cambiar Motor de Mapa (Google Maps / OpenStreetMap Free)"
             >
@@ -1895,7 +1895,7 @@ export default function ProjectMapCanvas({
 
             <button
               onClick={handleRefresh}
-              className="flex items-center justify-center p-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700"
+              className="flex items-center justify-center p-2 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-white hover:border-slate-700"
               title="Refresh Layout"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M16 3h5v5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 21H3v-5"/></svg>
@@ -1903,7 +1903,7 @@ export default function ProjectMapCanvas({
 
             <button
               onClick={handleFitToElements}
-              className="flex items-center justify-center p-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700"
+              className="flex items-center justify-center p-2 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-white hover:border-slate-700"
               title="Fit map to all elements"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>
@@ -1911,7 +1911,7 @@ export default function ProjectMapCanvas({
           </div>
 
           {/* Info Badge */}
-          <div className="flex items-center gap-3 text-[10px] text-slate-400 bg-slate-950 border border-slate-850 px-3 py-1.5 rounded-xl font-mono">
+          <div className="flex items-center gap-3 text-[10px] text-[var(--text-secondary)] bg-[var(--surface-2)] border border-[var(--border)] px-3 py-1.5 rounded-xl font-mono">
             <span>Cameras: <span className="text-white font-bold">{cameras.length}</span></span>
             <span className="w-1.5 h-1.5 rounded-full bg-slate-800" />
             <span>Devices: <span className="text-white font-bold">{networkDevices.length}</span></span>
@@ -1919,7 +1919,7 @@ export default function ProjectMapCanvas({
         </div>
 
         {/* Map Canvas Viewport */}
-        <div className="flex-1 relative bg-slate-950 flex items-center justify-center overflow-hidden">
+        <div className="flex-1 relative bg-[var(--surface-2)] flex items-center justify-center overflow-hidden">
           {useLeafletEngine || mapsAuthError || !(googleMapsApiKey || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) ? (
             <LeafletMapContainer
               defaultLatitude={defaultLatitude}
@@ -1954,14 +1954,14 @@ export default function ProjectMapCanvas({
           )}
 
           {/* OSP Fiber Layer Overlay Checkboxes */}
-          <div className="absolute top-4 right-4 z-20 bg-slate-900/90 backdrop-blur-md border border-slate-800 p-2.5 rounded-xl shadow-xl flex flex-col gap-1.5 text-[10px] font-bold text-slate-300 font-sans pointer-events-auto">
-            <div className="text-[9px] text-indigo-400 uppercase tracking-wider border-b border-slate-800 pb-1 mb-0.5">Fiber Layers</div>
+          <div className="absolute top-4 right-4 z-20 bg-[var(--surface-1)]/90 backdrop-blur-md border border-[var(--border)] p-2.5 rounded-xl shadow-xl flex flex-col gap-1.5 text-[10px] font-bold text-[var(--text-primary)] font-sans pointer-events-auto">
+            <div className="text-[9px] text-[var(--accent-text)] uppercase tracking-wider border-b border-[var(--border)] pb-1 mb-0.5">Fiber Layers</div>
             <label className="flex items-center gap-2 cursor-pointer hover:text-white transition-colors">
               <input
                 type="checkbox"
                 checked={showFiberNodes}
                 onChange={() => setShowFiberNodes(!showFiberNodes)}
-                className="rounded border-slate-800 bg-slate-950 text-indigo-500 focus:ring-0 focus:ring-offset-0 w-3 h-3 cursor-pointer"
+                className="rounded border-[var(--border)] bg-[var(--surface-2)] text-[var(--accent-text)] focus:ring-0 focus:ring-offset-0 w-3 h-3 cursor-pointer"
               />
               Nodes (HH/MH/ENC)
             </label>
@@ -1970,7 +1970,7 @@ export default function ProjectMapCanvas({
                 type="checkbox"
                 checked={showFiberRoutes}
                 onChange={() => setShowFiberRoutes(!showFiberRoutes)}
-                className="rounded border-slate-800 bg-slate-950 text-indigo-500 focus:ring-0 focus:ring-offset-0 w-3 h-3 cursor-pointer"
+                className="rounded border-[var(--border)] bg-[var(--surface-2)] text-[var(--accent-text)] focus:ring-0 focus:ring-offset-0 w-3 h-3 cursor-pointer"
               />
               Conduit & Drops
             </label>
@@ -1988,7 +1988,7 @@ export default function ProjectMapCanvas({
               in_progress: { label: 'In Progress',   cls: 'text-blue-400 bg-blue-400/10 border-blue-400/20' },
               complete:    { label: 'Complete',       cls: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' },
               issue:       { label: 'Issue / Alert', cls: 'text-red-400 bg-red-400/10 border-red-400/20' },
-              unknown:     { label: 'Unknown / TBD',  cls: 'text-slate-400 bg-slate-400/10 border-slate-400/20' },
+              unknown:     { label: 'Unknown / TBD',  cls: 'text-[var(--text-secondary)] bg-slate-400/10 border-slate-400/20' },
             }
             const statusInfo = statusMap[displayCam.status] ?? statusMap.unknown
             const mapW = mapRef.current?.offsetWidth ?? 600
@@ -2003,7 +2003,7 @@ export default function ProjectMapCanvas({
               <div
                 key={displayCam.id}
                 id="camera-hover-card"
-                className="absolute z-30 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden pointer-events-auto"
+                className="absolute z-30 bg-[var(--surface-1)] border border-slate-700 rounded-2xl shadow-2xl overflow-hidden pointer-events-auto"
                 style={{ left: cardX, top: cardY, width: `${cardW}px` }}
                 onMouseEnter={() => {
                   isHoveringCardRef.current = true
@@ -2019,7 +2019,7 @@ export default function ProjectMapCanvas({
                 <div className="h-[3px] w-full" style={{ backgroundColor: accentColor }} />
 
                 {/* Header */}
-                <div className="px-4 pt-3 pb-2.5 border-b border-slate-800 flex items-center justify-between gap-2">
+                <div className="px-4 pt-3 pb-2.5 border-b border-[var(--border)] flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: `${accentColor}20` }}>
                       <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: accentColor }}>
@@ -2028,7 +2028,7 @@ export default function ProjectMapCanvas({
                     </div>
                     <div className="min-w-0">
                       <h4 className="text-sm font-black text-white tracking-tight truncate">{displayCam.camera_id_tag}</h4>
-                      <p className="text-[9px] text-slate-500 font-mono">{displayCam.latitude.toFixed(5)}, {displayCam.longitude.toFixed(5)}</p>
+                      <p className="text-[9px] text-[var(--text-tertiary)] font-mono">{displayCam.latitude.toFixed(5)}, {displayCam.longitude.toFixed(5)}</p>
                     </div>
                   </div>
                   <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${statusInfo.cls}`}>
@@ -2040,35 +2040,35 @@ export default function ProjectMapCanvas({
                 <div className="px-4 py-3">
                   <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
                     <div>
-                      <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">Model</span>
-                      <span className="block text-[10px] text-slate-200 mt-0.5 truncate">
+                      <span className="block text-[9px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Model</span>
+                      <span className="block text-[10px] text-[var(--text-primary)] mt-0.5 truncate">
                         {camModel ? `${camModel.manufacturer} ${camModel.model_number}` : <span className="italic text-slate-600">Not Assigned</span>}
                       </span>
                     </div>
                     <div>
-                      <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">IP Address</span>
+                      <span className="block text-[9px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">IP Address</span>
                       <span className="block text-[10px] italic text-slate-600 mt-0.5">Not Assigned</span>
                     </div>
                     <div>
-                      <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">Comm Type</span>
-                      <span className="block text-[10px] text-slate-200 mt-0.5 capitalize">{displayCam.communication_type}</span>
+                      <span className="block text-[9px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Comm Type</span>
+                      <span className="block text-[10px] text-[var(--text-primary)] mt-0.5 capitalize">{displayCam.communication_type}</span>
                     </div>
                     <div>
-                      <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">Power</span>
-                      <span className="block text-[10px] text-slate-200 mt-0.5 uppercase">{displayCam.power_type}</span>
+                      <span className="block text-[9px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Power</span>
+                      <span className="block text-[10px] text-[var(--text-primary)] mt-0.5 uppercase">{displayCam.power_type}</span>
                     </div>
                     <div className="col-span-2">
-                      <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">Connected Switch</span>
+                      <span className="block text-[9px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Connected Switch</span>
                       <span className="block text-[10px] mt-0.5">
                         {connSwitch
-                          ? <span className="text-indigo-400">{connSwitch.name}</span>
+                          ? <span className="text-[var(--accent-text)]">{connSwitch.name}</span>
                           : <span className="italic text-slate-600">Not Assigned</span>}
                       </span>
                     </div>
                     {(displayCam.structure_reference || displayCam.address_reference) && (
                       <div className="col-span-2">
-                        <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">Location Ref</span>
-                        <span className="block text-[10px] text-slate-200 mt-0.5">
+                        <span className="block text-[9px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Location Ref</span>
+                        <span className="block text-[10px] text-[var(--text-primary)] mt-0.5">
                           {displayCam.structure_reference || displayCam.address_reference}
                         </span>
                       </div>
@@ -2078,15 +2078,15 @@ export default function ProjectMapCanvas({
 
                 {/* Task Stats inside Hover Card */}
                 {stats && (
-                  <div className="mx-4 pb-3 pt-2.5 border-t border-slate-800/60 space-y-1.5">
-                    <div className="flex justify-between items-center text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                  <div className="mx-4 pb-3 pt-2.5 border-t border-[var(--border)]/60 space-y-1.5">
+                    <div className="flex justify-between items-center text-[9px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">
                       <span>Task Progress</span>
-                      <span className="text-slate-300 font-mono">{stats.ratio}% ({stats.complete}/{stats.total})</span>
+                      <span className="text-[var(--text-primary)] font-mono">{stats.ratio}% ({stats.complete}/{stats.total})</span>
                     </div>
-                    <div className="w-full bg-slate-950 rounded-full h-1">
-                      <div className="bg-indigo-500 h-1 rounded-full" style={{ width: `${stats.ratio}%` }} />
+                    <div className="w-full bg-[var(--surface-2)] rounded-full h-1">
+                      <div className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white h-1 rounded-full" style={{ width: `${stats.ratio}%` }} />
                     </div>
-                    <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[9px] text-slate-400 font-mono mt-1 leading-snug">
+                    <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[9px] text-[var(--text-secondary)] font-mono mt-1 leading-snug">
                       <span>Open: <span className="text-white font-bold">{stats.open}</span></span>
                       <span>•</span>
                       <span>Blocked: <span className="text-red-400 font-bold">{stats.blocked}</span></span>
@@ -2099,7 +2099,7 @@ export default function ProjectMapCanvas({
                 )}
 
                 {/* Actions */}
-                <div className="px-4 pb-3 pt-1 flex gap-2 border-t border-slate-800/60">
+                <div className="px-4 pb-3 pt-1 flex gap-2 border-t border-[var(--border)]/60">
                   <button
                     id="hover-card-edit-btn"
                     onClick={() => {
@@ -2107,7 +2107,7 @@ export default function ProjectMapCanvas({
                       setHoveredCamera(null)
                       setHoverPosition(null)
                     }}
-                    className="flex-1 py-1.5 text-[10px] font-bold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors"
+                    className="flex-1 py-1.5 text-[10px] font-bold bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-white rounded-lg transition-colors"
                   >
                     Edit Camera
                   </button>
@@ -2117,7 +2117,7 @@ export default function ProjectMapCanvas({
                       setHoveredCamera(null)
                       setHoverPosition(null)
                     }}
-                    className="py-1.5 px-3 text-[10px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors"
+                    className="py-1.5 px-3 text-[10px] font-bold bg-slate-800 hover:bg-slate-700 text-[var(--text-primary)] rounded-lg transition-colors"
                   >
                     Center
                   </button>
@@ -2127,16 +2127,16 @@ export default function ProjectMapCanvas({
           })()}
 
           {(addCameraMode || addDeviceMode) && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-indigo-500/90 backdrop-blur-md text-slate-950 text-xs px-4 py-2 rounded-full font-bold shadow-lg z-10 flex items-center gap-2 pointer-events-none">
-              <span className="w-2 h-2 rounded-full bg-slate-950 animate-ping" />
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white/90 backdrop-blur-md text-slate-950 text-xs px-4 py-2 rounded-full font-bold shadow-lg z-10 flex items-center gap-2 pointer-events-none">
+              <span className="w-2 h-2 rounded-full bg-[var(--surface-2)] animate-ping" />
               Click anywhere on the map to place a {addCameraMode ? 'Camera Node' : 'Network Switch'}
             </div>
           )}
 
           {isPending && (
-            <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center z-20">
-              <div className="flex items-center gap-3 px-6 py-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-xl">
-                <svg className="animate-spin text-indigo-500" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+            <div className="absolute inset-0 bg-[var(--surface-2)] backdrop-blur-sm flex items-center justify-center z-20">
+              <div className="flex items-center gap-3 px-6 py-4 bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl shadow-xl">
+                <svg className="animate-spin text-[var(--accent-text)]" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
                 <span className="text-sm font-medium text-white">Updating spatial layout...</span>
               </div>
             </div>
@@ -2166,23 +2166,23 @@ export default function ProjectMapCanvas({
         const completeCount = cameraTasks.filter(t => t.status === 'Complete').length
 
         return (
-          <div className="w-80 bg-slate-900 border-l border-slate-800 flex flex-col justify-between shrink-0 h-full p-6 relative z-10 overflow-hidden shadow-2xl">
+          <div className="w-80 bg-[var(--surface-1)] border-l border-[var(--border)] flex flex-col justify-between shrink-0 h-full p-6 relative z-10 overflow-hidden shadow-2xl">
             <form onSubmit={handleSaveCamera} className="flex flex-col h-full justify-between overflow-hidden">
               <div className="space-y-4 overflow-y-auto pr-1 flex-1 scrollbar-thin pb-4">
                 
                 {/* Header Section */}
-                <div className="flex justify-between items-start border-b border-slate-850 pb-4 shrink-0">
+                <div className="flex justify-between items-start border-b border-[var(--border)] pb-4 shrink-0">
                   <div>
                     <h3 className="font-bold text-white tracking-tight flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: getCameraStatusColor(cameraStatus) }} />
                       {cameraTag || selectedCamera.camera_id_tag || 'Camera'} Specs
                     </h3>
-                    <p className="text-[10px] text-slate-400 mt-0.5 font-mono">ID: {selectedCamera.id.substring(0, 8)}...</p>
+                    <p className="text-[10px] text-[var(--text-secondary)] mt-0.5 font-mono">ID: {selectedCamera.id.substring(0, 8)}...</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => setSelectedCamera(null)}
-                    className="p-1.5 rounded bg-slate-950 hover:bg-slate-850 text-slate-400 hover:text-white transition-colors"
+                    className="p-1.5 rounded bg-[var(--surface-2)] hover:bg-slate-850 text-[var(--text-secondary)] hover:text-white transition-colors"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                   </button>
@@ -2199,12 +2199,12 @@ export default function ProjectMapCanvas({
                 )}
 
                 {/* 1. Connectivity Method Selector (Guided First) */}
-                <div className="space-y-1.5 bg-indigo-950/20 border border-indigo-900/30 p-3.5 rounded-xl shadow-inner">
-                  <label className="block text-[10px] font-black text-indigo-400 uppercase tracking-wider">Connectivity Backhaul</label>
+                <div className="space-y-1.5 bg-[var(--accent-soft)] border border-indigo-900/30 p-3.5 rounded-xl shadow-inner">
+                  <label className="block text-[10px] font-black text-[var(--accent-text)] uppercase tracking-wider">Connectivity Backhaul</label>
                   <select
                     value={cameraDetailedConn}
                     onChange={e => handleDetailedConnChange(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-white text-xs focus:outline-none focus:border-indigo-500 font-semibold cursor-pointer hover:border-slate-700 transition"
+                    className="w-full px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-white text-xs focus:outline-none focus:border-[var(--accent)] font-semibold cursor-pointer hover:border-slate-700 transition"
                   >
                     <option value="Fiber">Fiber (Spliced Drop)</option>
                     <option value="Ethernet / Copper">Ethernet / Copper (Local PoE)</option>
@@ -2218,9 +2218,9 @@ export default function ProjectMapCanvas({
                 </div>
 
                 {/* 2. Asset Readiness Checklist */}
-                <div className="bg-slate-950/25 border border-slate-850 rounded-xl p-3.5 space-y-3">
+                <div className="bg-[var(--surface-2)]/25 border border-[var(--border)] rounded-xl p-3.5 space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Readiness Status</span>
+                    <span className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">Readiness Status</span>
                     <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase font-mono tracking-wider ${
                       readiness.overallStatus === 'Ready'
                         ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
@@ -2232,12 +2232,12 @@ export default function ProjectMapCanvas({
                     </span>
                   </div>
                   {readiness.overallStatus !== 'Ready' ? (
-                    <div className="bg-slate-950/40 p-2.5 rounded-lg border border-slate-900 text-[10px] text-amber-400/90 font-medium flex items-start gap-1.5">
+                    <div className="bg-[var(--surface-2)] p-2.5 rounded-lg border border-[var(--border)] text-[10px] text-amber-400/90 font-medium flex items-start gap-1.5">
                       <span className="text-[8px] mt-0.5 text-amber-500">⚠️</span>
                       <span>{readiness.nextAction}</span>
                     </div>
                   ) : (
-                    <div className="text-[10px] text-slate-400 bg-slate-950/40 p-2 rounded-lg border border-slate-900/60 flex items-center gap-1.5 font-medium">
+                    <div className="text-[10px] text-[var(--text-secondary)] bg-[var(--surface-2)] p-2 rounded-lg border border-[var(--border)]/60 flex items-center gap-1.5 font-medium">
                       <span className="text-emerald-400">✓</span>
                       <span>All engineering preconditions satisfied.</span>
                     </div>
@@ -2245,34 +2245,34 @@ export default function ProjectMapCanvas({
                 </div>
 
                 {/* 3. Accordion: Specs (Device & Local Details) */}
-                <div className="border border-slate-850 rounded-xl overflow-hidden bg-slate-950/10">
+                <div className="border border-[var(--border)] rounded-xl overflow-hidden bg-[var(--surface-2)]/10">
                   <button
                     type="button"
                     onClick={() => setIsSpecsOpen(!isSpecsOpen)}
-                    className="w-full flex justify-between items-center p-3.5 bg-slate-950/40 text-left hover:bg-slate-950/60 transition-colors border-b border-slate-850/40"
+                    className="w-full flex justify-between items-center p-3.5 bg-[var(--surface-2)] text-left hover:bg-[var(--surface-2)] transition-colors border-b border-[var(--border)]"
                   >
-                    <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
-                      <svg className="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+                    <span className="text-[10px] font-bold text-[var(--accent-text)] uppercase tracking-wider flex items-center gap-2">
+                      <svg className="w-3.5 h-3.5 text-[var(--accent-text)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
                       Specs & Details
                     </span>
-                    <span className="text-slate-400">{isSpecsOpen ? '▲' : '▼'}</span>
+                    <span className="text-[var(--text-secondary)]">{isSpecsOpen ? '▲' : '▼'}</span>
                   </button>
 
                   {isSpecsOpen && (
-                    <div className="p-3.5 space-y-3.5 bg-slate-900/40">
+                    <div className="p-3.5 space-y-3.5 bg-[var(--surface-1)]">
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Camera Tag</label>
+                        <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Camera Tag</label>
                         <input
                           type="text" required value={cameraTag} onChange={e => setCameraTag(e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+                          className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)]"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Camera Model</label>
+                        <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Camera Model</label>
                         <select
                           value={cameraModelId} onChange={e => setCameraModelId(e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                          className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                         >
                           <option value="">Select Model...</option>
                           {cameraModels.map(model => (
@@ -2285,10 +2285,10 @@ export default function ProjectMapCanvas({
 
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Status</label>
+                          <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Status</label>
                           <select
                             value={cameraStatus} onChange={e => setCameraStatus(e.target.value as any)}
-                            className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                            className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                           >
                             <option value="planned">Planned</option>
                             <option value="in_progress">In Progress</option>
@@ -2298,10 +2298,10 @@ export default function ProjectMapCanvas({
                         </div>
 
                         <div>
-                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Power Type</label>
+                          <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Power Type</label>
                           <select
                             value={cameraPowerType} onChange={e => setCameraPowerType(e.target.value as any)}
-                            className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                            className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                           >
                             <option value="poe">PoE (Standard)</option>
                             <option value="poe_plus">PoE+ (30W)</option>
@@ -2316,28 +2316,28 @@ export default function ProjectMapCanvas({
                       </div>
 
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Address Reference</label>
+                        <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Address Reference</label>
                         <input
                           type="text" value={cameraAddressRef} onChange={e => setCameraAddressRef(e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+                          className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)]"
                           placeholder="e.g., 100 Main St Pole 4"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Structure Reference</label>
+                        <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Structure Reference</label>
                         <input
                           type="text" value={cameraStructureRef} onChange={e => setCameraStructureRef(e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+                          className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)]"
                           placeholder="e.g., Pole 4B, Wall Mount"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Notes</label>
+                        <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Notes</label>
                         <textarea
                           value={cameraNotes} onChange={e => setCameraNotes(e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 min-h-[50px] resize-y"
+                          className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] min-h-[50px] resize-y"
                           placeholder="General specs, mounting requirements..."
                         />
                       </div>
@@ -2346,38 +2346,38 @@ export default function ProjectMapCanvas({
                 </div>
 
                 {/* 4. Accordion: Checklist (Camera Checklist) */}
-                <div className="border border-slate-850 rounded-xl overflow-hidden bg-slate-950/10">
+                <div className="border border-[var(--border)] rounded-xl overflow-hidden bg-[var(--surface-2)]/10">
                   <button
                     type="button"
                     onClick={() => setIsChecklistOpen(!isChecklistOpen)}
-                    className="w-full flex justify-between items-center p-3.5 bg-slate-950/40 text-left hover:bg-slate-950/60 transition-colors border-b border-slate-850/40"
+                    className="w-full flex justify-between items-center p-3.5 bg-[var(--surface-2)] text-left hover:bg-[var(--surface-2)] transition-colors border-b border-[var(--border)]"
                   >
-                    <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
-                      <svg className="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                    <span className="text-[10px] font-bold text-[var(--accent-text)] uppercase tracking-wider flex items-center gap-2">
+                      <svg className="w-3.5 h-3.5 text-[var(--accent-text)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
                       Guided Checklist
                     </span>
                     <div className="flex items-center gap-2">
                       {totalCount > 0 && (
-                        <span className="text-[9.5px] text-slate-300 bg-slate-950 border border-slate-850 px-1.5 py-0.25 rounded-full font-bold">
+                        <span className="text-[9.5px] text-[var(--text-primary)] bg-[var(--surface-2)] border border-[var(--border)] px-1.5 py-0.25 rounded-full font-bold">
                           {completeCount}/{totalCount}
                         </span>
                       )}
-                      <span className="text-slate-400">{isChecklistOpen ? '▲' : '▼'}</span>
+                      <span className="text-[var(--text-secondary)]">{isChecklistOpen ? '▲' : '▼'}</span>
                     </div>
                   </button>
 
                   {isChecklistOpen && (
-                    <div className="p-3.5 space-y-3.5 bg-slate-900/40">
+                    <div className="p-3.5 space-y-3.5 bg-[var(--surface-1)]">
                       {loadingTasks ? (
-                        <div className="text-xs text-slate-500 animate-pulse">Loading checklist...</div>
+                        <div className="text-xs text-[var(--text-tertiary)] animate-pulse">Loading checklist...</div>
                       ) : cameraTasks.length === 0 ? (
-                        <div className="bg-slate-950/40 border border-slate-800 p-3 rounded-xl text-center space-y-2">
-                          <p className="text-[11px] text-slate-400">No tasks checklist generated for this camera.</p>
+                        <div className="bg-[var(--surface-2)] border border-[var(--border)] p-3 rounded-xl text-center space-y-2">
+                          <p className="text-[11px] text-[var(--text-secondary)]">No tasks checklist generated for this camera.</p>
                           <button
                             type="button"
                             onClick={handleInitializeChecklist}
                             disabled={isInitializingChecklist}
-                            className="py-1.5 px-3 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-700 text-white rounded-lg text-[10px] font-semibold transition"
+                            className="py-1.5 px-3 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white disabled:bg-indigo-700 text-white rounded-lg text-[10px] font-semibold transition"
                           >
                             {isInitializingChecklist ? 'Initializing...' : `Initialize Checklist`}
                           </button>
@@ -2385,9 +2385,9 @@ export default function ProjectMapCanvas({
                       ) : (
                         <div className="space-y-3">
                           {/* Progress Bar */}
-                          <div className="w-full bg-slate-950 rounded-full h-1.5">
+                          <div className="w-full bg-[var(--surface-2)] rounded-full h-1.5">
                             <div
-                              className="bg-indigo-500 h-1.5 rounded-full transition-all duration-300"
+                              className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white h-1.5 rounded-full transition-all duration-300"
                               style={{
                                 width: `${Math.round((completeCount / Math.max(totalCount, 1)) * 100)}%`
                               }}
@@ -2397,16 +2397,16 @@ export default function ProjectMapCanvas({
                           {/* Task List (flows naturally in drawer scroll) */}
                           <div className="space-y-2 max-h-56 overflow-y-auto scrollbar-thin pr-1">
                             {cameraTasks.map(task => (
-                              <div key={task.id} className="group border border-slate-800/80 bg-slate-950/40 p-2.5 rounded-xl flex flex-col gap-2 hover:border-slate-700/60 transition-all">
+                              <div key={task.id} className="group border border-[var(--border)]/80 bg-[var(--surface-2)] p-2.5 rounded-xl flex flex-col gap-2 hover:border-slate-700/60 transition-all">
                                 <div className="flex items-start gap-2.5 justify-between">
                                   <label className="flex items-start gap-2 cursor-pointer select-none grow">
                                     <input
                                       type="checkbox"
                                       checked={task.status === 'Complete'}
                                       onChange={() => handleToggleTaskStatus(task)}
-                                      className="mt-0.5 rounded border-slate-800 bg-slate-950 text-indigo-600 focus:ring-indigo-500 w-3 h-3 shrink-0"
+                                      className="mt-0.5 rounded border-[var(--border)] bg-[var(--surface-2)] text-indigo-600 focus:ring-indigo-500 w-3 h-3 shrink-0"
                                     />
-                                    <span className={`text-[11px] font-bold text-slate-200 leading-snug group-hover:text-white transition-colors ${task.status === 'Complete' ? 'line-through text-slate-500 group-hover:text-slate-500 font-medium' : ''}`}>
+                                    <span className={`text-[11px] font-bold text-[var(--text-primary)] leading-snug group-hover:text-white transition-colors ${task.status === 'Complete' ? 'line-through text-[var(--text-tertiary)] group-hover:text-[var(--text-tertiary)] font-medium' : ''}`}>
                                       {task.title}
                                     </span>
                                   </label>
@@ -2414,21 +2414,21 @@ export default function ProjectMapCanvas({
                                   <button
                                     type="button"
                                     onClick={() => handleDeleteTask(task.id)}
-                                    className="text-slate-500 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 shrink-0"
+                                    className="text-[var(--text-tertiary)] hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 shrink-0"
                                   >
                                     <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                                   </button>
                                 </div>
 
-                                <div className="flex items-center justify-between border-t border-slate-900/60 pt-2 mt-0.5">
-                                  <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider bg-slate-950 border border-slate-850 px-1 py-0.5 rounded shrink-0">{task.task_type}</span>
+                                <div className="flex items-center justify-between border-t border-[var(--border)]/60 pt-2 mt-0.5">
+                                  <span className="text-[8px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider bg-[var(--surface-2)] border border-[var(--border)] px-1 py-0.5 rounded shrink-0">{task.task_type}</span>
                                   
                                   <div className="flex items-center gap-1.5 shrink-0">
                                     {/* Status Select */}
                                     <select
                                       value={task.status}
                                       onChange={e => handleTaskStatusChange(task.id, e.target.value)}
-                                      className="bg-slate-950 border border-slate-800 text-slate-300 rounded px-1.5 py-0.5 text-[9px] focus:outline-none focus:border-indigo-500 cursor-pointer"
+                                      className="bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-primary)] rounded px-1.5 py-0.5 text-[9px] focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                                     >
                                       <option value="Not Started">Not Started</option>
                                       <option value="In Progress">In Progress</option>
@@ -2443,17 +2443,17 @@ export default function ProjectMapCanvas({
                                     <select
                                       value={task.priority}
                                       onChange={e => handleTaskPriorityChange(task.id, e.target.value)}
-                                      className={`rounded px-1.5 py-0.5 text-[9px] font-extrabold focus:outline-none border border-slate-800 cursor-pointer ${
+                                      className={`rounded px-1.5 py-0.5 text-[9px] font-extrabold focus:outline-none border border-[var(--border)] cursor-pointer ${
                                         task.priority === 'Critical' ? 'bg-red-500/10 text-red-400' :
                                         task.priority === 'High' ? 'bg-amber-500/10 text-amber-400' :
-                                        task.priority === 'Medium' ? 'bg-indigo-500/10 text-indigo-400' :
-                                        'bg-slate-500/10 text-slate-400'
+                                        task.priority === 'Medium' ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white/10 text-[var(--accent-text)]' :
+                                        'bg-slate-500/10 text-[var(--text-secondary)]'
                                       }`}
                                     >
-                                      <option value="Low" className="bg-slate-950 text-white">Low</option>
-                                      <option value="Medium" className="bg-slate-950 text-white">Medium</option>
-                                      <option value="High" className="bg-slate-950 text-white">High</option>
-                                      <option value="Critical" className="bg-slate-950 text-white">Critical</option>
+                                      <option value="Low" className="bg-[var(--surface-2)] text-white">Low</option>
+                                      <option value="Medium" className="bg-[var(--surface-2)] text-white">Medium</option>
+                                      <option value="High" className="bg-[var(--surface-2)] text-white">High</option>
+                                      <option value="Critical" className="bg-[var(--surface-2)] text-white">Critical</option>
                                     </select>
                                   </div>
                                 </div>
@@ -2462,21 +2462,21 @@ export default function ProjectMapCanvas({
                           </div>
 
                           {/* Add Manual Task Inline Form */}
-                          <div className="bg-slate-950/20 border border-slate-850 p-2.5 rounded-xl space-y-2">
-                            <span className="block text-[8.5px] font-bold text-slate-400 uppercase tracking-wider">Add Custom Task</span>
+                          <div className="bg-[var(--surface-2)] border border-[var(--border)] p-2.5 rounded-xl space-y-2">
+                            <span className="block text-[8.5px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">Add Custom Task</span>
                             <div className="flex gap-1.5">
                               <input
                                 type="text"
                                 placeholder="Task title..."
                                 value={newTaskTitle}
                                 onChange={e => setNewTaskTitle(e.target.value)}
-                                className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-slate-200 text-xs grow focus:outline-none focus:border-indigo-500"
+                                className="bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-2 py-1 text-[var(--text-primary)] text-xs grow focus:outline-none focus:border-[var(--accent)]"
                               />
                               <button
                                 type="button"
                                 onClick={handleCreateTask}
                                 disabled={isCreatingTask || !newTaskTitle.trim()}
-                                className="px-2 py-1 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-900 text-white text-xs font-semibold rounded-lg shrink-0"
+                                className="px-2 py-1 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white disabled:bg-indigo-900 text-white text-xs font-semibold rounded-lg shrink-0"
                               >
                                 Add
                               </button>
@@ -2485,7 +2485,7 @@ export default function ProjectMapCanvas({
                               <select
                                 value={newTaskType}
                                 onChange={e => setNewTaskType(e.target.value)}
-                                className="bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5 text-[9px] text-slate-400 focus:outline-none cursor-pointer"
+                                className="bg-[var(--surface-2)] border border-[var(--border)] rounded px-1.5 py-0.5 text-[9px] text-[var(--text-secondary)] focus:outline-none cursor-pointer"
                               >
                                 <option value="Cabling">Cabling</option>
                                 <option value="Mounting">Mounting</option>
@@ -2504,7 +2504,7 @@ export default function ProjectMapCanvas({
                               <select
                                 value={newTaskPriority}
                                 onChange={e => setNewTaskPriority(e.target.value)}
-                                className="bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5 text-[9px] text-slate-400 focus:outline-none cursor-pointer"
+                                className="bg-[var(--surface-2)] border border-[var(--border)] rounded px-1.5 py-0.5 text-[9px] text-[var(--text-secondary)] focus:outline-none cursor-pointer"
                               >
                                 <option value="Low">Low</option>
                                 <option value="Medium">Medium</option>
@@ -2518,7 +2518,7 @@ export default function ProjectMapCanvas({
                             <button
                               type="button"
                               onClick={() => setIsFullChecklistOpen(true)}
-                              className="text-[9.5px] text-indigo-400 hover:text-indigo-300 font-bold transition underline"
+                              className="text-[9.5px] text-[var(--accent-text)] hover:text-indigo-300 font-bold transition underline"
                             >
                               Open Full Project Checklist
                             </button>
@@ -2531,30 +2531,30 @@ export default function ProjectMapCanvas({
 
                 {/* Wireless Backhaul Specs Accordion */}
                 {['Wireless PTP', 'Wireless PTMP', 'Wi-Fi Bridge', 'LTE / 5G'].includes(cameraDetailedConn) && (
-                  <div className="border border-slate-850 rounded-xl overflow-hidden bg-slate-950/10">
+                  <div className="border border-[var(--border)] rounded-xl overflow-hidden bg-[var(--surface-2)]/10">
                     <button
                       type="button"
                       onClick={() => setIsWirelessSpecsOpen(!isWirelessSpecsOpen)}
-                      className="w-full flex justify-between items-center p-3.5 bg-slate-950/40 text-left hover:bg-slate-950/60 transition-colors border-b border-slate-850/40"
+                      className="w-full flex justify-between items-center p-3.5 bg-[var(--surface-2)] text-left hover:bg-[var(--surface-2)] transition-colors border-b border-[var(--border)]"
                     >
-                      <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
-                        <svg className="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <span className="text-[10px] font-bold text-[var(--accent-text)] uppercase tracking-wider flex items-center gap-2">
+                        <svg className="w-3.5 h-3.5 text-[var(--accent-text)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 100-6 3 3 0 000 6z" />
                         </svg>
                         Wireless Backhaul Specs
                       </span>
-                      <span className="text-slate-400">{isWirelessSpecsOpen ? '▲' : '▼'}</span>
+                      <span className="text-[var(--text-secondary)]">{isWirelessSpecsOpen ? '▲' : '▼'}</span>
                     </button>
 
                     {isWirelessSpecsOpen && (
-                      <div className="p-3.5 space-y-3.5 bg-slate-900/40">
+                      <div className="p-3.5 space-y-3.5 bg-[var(--surface-1)]">
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Radio / Antenna</label>
+                            <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Radio / Antenna</label>
                             <select
                               value={wirelessRadio}
                               onChange={e => setWirelessRadio(e.target.value)}
-                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                             >
                               <option value="TBD">TBD / Planned</option>
                               <option value="Base Station (AP)">Base Station (AP)</option>
@@ -2565,11 +2565,11 @@ export default function ProjectMapCanvas({
                           </div>
 
                           <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Link Target</label>
+                            <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Link Target</label>
                             <select
                               value={assignedSwitchId}
                               onChange={e => setAssignedSwitchId(e.target.value)}
-                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                             >
                               <option value="">Select Receiver...</option>
                               {networkDevices.map(dev => (
@@ -2583,11 +2583,11 @@ export default function ProjectMapCanvas({
 
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Frequency</label>
+                            <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Frequency</label>
                             <select
                               value={wirelessFrequency}
                               onChange={e => setWirelessFrequency(e.target.value)}
-                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                             >
                               <option value="5.8 GHz">5.8 GHz</option>
                               <option value="60 GHz">60 GHz (V-Band)</option>
@@ -2599,48 +2599,48 @@ export default function ProjectMapCanvas({
                           </div>
 
                           <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Signal Strength</label>
+                            <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Signal Strength</label>
                             <input
                               type="text"
                               value={wirelessSignal}
                               onChange={e => setWirelessSignal(e.target.value)}
                               placeholder="e.g., -65 dBm"
-                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)]"
                             />
                           </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Link Capacity</label>
+                            <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Link Capacity</label>
                             <input
                               type="text"
                               value={wirelessCapacity}
                               onChange={e => setWirelessCapacity(e.target.value)}
                               placeholder="e.g., 500 Mbps"
-                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)]"
                             />
                           </div>
 
                           <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Latency</label>
+                            <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Latency</label>
                             <input
                               type="text"
                               value={wirelessLatency}
                               onChange={e => setWirelessLatency(e.target.value)}
                               placeholder="e.g., 2 ms"
-                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)]"
                             />
                           </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Line of Sight (LoS)</label>
+                            <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Line of Sight (LoS)</label>
                             <select
                               value={wirelessLos}
                               onChange={e => setWirelessLos(e.target.value)}
-                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                             >
                               <option value="Clear">Clear LoS</option>
                               <option value="Partially Obstructed">Partially Obstructed</option>
@@ -2650,11 +2650,11 @@ export default function ProjectMapCanvas({
                           </div>
 
                           <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Link Validation</label>
+                            <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Link Validation</label>
                             <select
                               value={wirelessValidation}
                               onChange={e => setWirelessValidation(e.target.value)}
-                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                             >
                               <option value="Validated">Validated</option>
                               <option value="Pending">Pending Validation</option>
@@ -2669,30 +2669,30 @@ export default function ProjectMapCanvas({
                 )}
 
                 {/* 5. Accordion: Connectivity Chain */}
-                <div className="border border-slate-850 rounded-xl overflow-hidden bg-slate-950/10">
+                <div className="border border-[var(--border)] rounded-xl overflow-hidden bg-[var(--surface-2)]/10">
                   <button
                     type="button"
                     onClick={() => setIsChainOpen(!isChainOpen)}
-                    className="w-full flex justify-between items-center p-3.5 bg-slate-950/40 text-left hover:bg-slate-950/60 transition-colors border-b border-slate-850/40"
+                    className="w-full flex justify-between items-center p-3.5 bg-[var(--surface-2)] text-left hover:bg-[var(--surface-2)] transition-colors border-b border-[var(--border)]"
                   >
-                    <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
-                      <svg className="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+                    <span className="text-[10px] font-bold text-[var(--accent-text)] uppercase tracking-wider flex items-center gap-2">
+                      <svg className="w-3.5 h-3.5 text-[var(--accent-text)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
                       Connectivity Chain
                     </span>
-                    <span className="text-slate-400">{isChainOpen ? '▲' : '▼'}</span>
+                    <span className="text-[var(--text-secondary)]">{isChainOpen ? '▲' : '▼'}</span>
                   </button>
 
                   {isChainOpen && (
-                    <div className="p-3.5 space-y-3.5 bg-slate-900/40">
+                    <div className="p-3.5 space-y-3.5 bg-[var(--surface-1)]">
                       {cameraCommType === 'fiber' ? (
                         <>
-                          <div className="text-[10px] text-indigo-400 font-bold border-b border-slate-850 pb-1.5">OSP Fiber Properties</div>
+                          <div className="text-[10px] text-[var(--accent-text)] font-bold border-b border-[var(--border)] pb-1.5">OSP Fiber Properties</div>
                           
                           <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Source Fiber Node</label>
+                            <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Source Fiber Node</label>
                             <select
                               value={cameraSourceNodeId} onChange={e => setCameraSourceNodeId(e.target.value)}
-                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                             >
                               <option value="">Select Node...</option>
                               {fiberNodes.map(node => (
@@ -2704,10 +2704,10 @@ export default function ProjectMapCanvas({
                           </div>
 
                           <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Fiber Enclosure</label>
+                            <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Fiber Enclosure</label>
                             <select
                               value={cameraEnclosureId} onChange={e => setCameraEnclosureId(e.target.value)}
-                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                             >
                               <option value="">Select Enclosure...</option>
                               {fiberEnclosures
@@ -2721,10 +2721,10 @@ export default function ProjectMapCanvas({
                           </div>
 
                           <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Drop Cable</label>
+                            <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Drop Cable</label>
                             <select
                               value={cameraDropCableId} onChange={e => setCameraDropCableId(e.target.value)}
-                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                             >
                               <option value="">Select Cable...</option>
                               {fiberCables
@@ -2738,10 +2738,10 @@ export default function ProjectMapCanvas({
                           </div>
 
                           <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Backbone Cable</label>
+                            <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Backbone Cable</label>
                             <select
                               value={cameraBackboneCableId} onChange={e => setCameraBackboneCableId(e.target.value)}
-                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                             >
                               <option value="">Select Backbone...</option>
                               {fiberCables
@@ -2754,12 +2754,12 @@ export default function ProjectMapCanvas({
                             </select>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-3 border-t border-slate-800/60 pt-3">
+                          <div className="grid grid-cols-2 gap-3 border-t border-[var(--border)]/60 pt-3">
                             <div>
-                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">TX Strand</label>
+                              <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">TX Strand</label>
                               <select
                                 value={assignedStrandTxId} onChange={e => setAssignedStrandTxId(e.target.value)}
-                                className="w-full px-2 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                                className="w-full px-2 py-1.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                               >
                                 <option value="">None</option>
                                 {fiberStrands
@@ -2776,10 +2776,10 @@ export default function ProjectMapCanvas({
                             </div>
 
                             <div>
-                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">RX Strand</label>
+                              <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">RX Strand</label>
                               <select
                                 value={assignedStrandRxId} onChange={e => setAssignedStrandRxId(e.target.value)}
-                                className="w-full px-2 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                                className="w-full px-2 py-1.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                               >
                                 <option value="">None</option>
                                 {fiberStrands
@@ -2796,12 +2796,12 @@ export default function ProjectMapCanvas({
                             </div>
                           </div>
 
-                          <div className="space-y-3 border-t border-slate-800/60 pt-3">
+                          <div className="space-y-3 border-t border-[var(--border)]/60 pt-3">
                             <div>
-                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Fiber Path Status</label>
+                              <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Fiber Path Status</label>
                               <select
                                 value={cameraFiberPathStatus} onChange={e => setCameraFiberPathStatus(e.target.value)}
-                                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                                className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                               >
                                 <option value="Planned">Planned</option>
                                 <option value="Pulled">Pulled</option>
@@ -2813,10 +2813,10 @@ export default function ProjectMapCanvas({
 
                             <div className="grid grid-cols-2 gap-3">
                               <div>
-                                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Splice Status</label>
+                                <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Splice Status</label>
                                 <select
                                   value={cameraSpliceStatus} onChange={e => setCameraSpliceStatus(e.target.value)}
-                                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                                  className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                                 >
                                   <option value="Not Spliced">Not Spliced</option>
                                   <option value="In Progress">In Progress</option>
@@ -2825,10 +2825,10 @@ export default function ProjectMapCanvas({
                               </div>
 
                               <div>
-                                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Test Status</label>
+                                <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Test Status</label>
                                 <select
                                   value={cameraTestStatus} onChange={e => setCameraTestStatus(e.target.value)}
-                                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                                  className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                                 >
                                   <option value="Not Tested">Not Tested</option>
                                   <option value="Passed">Passed</option>
@@ -2840,14 +2840,14 @@ export default function ProjectMapCanvas({
                         </>
                       ) : (
                         <>
-                          <div className="text-[10px] text-indigo-400 font-bold border-b border-slate-850 pb-1.5">Copper / Switch Port Properties</div>
+                          <div className="text-[10px] text-[var(--accent-text)] font-bold border-b border-[var(--border)] pb-1.5">Copper / Switch Port Properties</div>
 
                           <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Assigned Switch</label>
+                            <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Assigned Switch</label>
                             <select
                               value={assignedSwitchId}
                               onChange={e => setAssignedSwitchId(e.target.value)}
-                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                             >
                               <option value="">Select Switch...</option>
                               {networkDevices
@@ -2861,12 +2861,12 @@ export default function ProjectMapCanvas({
                           </div>
 
                           <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Switch Port</label>
+                            <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Switch Port</label>
                             <select
                               value={assignedPortId}
                               onChange={e => setAssignedPortId(e.target.value)}
                               disabled={loadingPorts || !assignedSwitchId}
-                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 disabled:opacity-50 cursor-pointer"
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] disabled:opacity-50 cursor-pointer"
                             >
                               <option value="">{loadingPorts ? 'Loading Ports...' : 'Select Port...'}</option>
                               {switchPorts.map(port => {
@@ -2889,32 +2889,32 @@ export default function ProjectMapCanvas({
                 </div>
 
                 {/* 6. Accordion: History / Audit Log */}
-                <div className="border border-slate-850 rounded-xl overflow-hidden bg-slate-950/10">
+                <div className="border border-[var(--border)] rounded-xl overflow-hidden bg-[var(--surface-2)]/10">
                   <button
                     type="button"
                     onClick={() => setIsHistoryOpen(!isHistoryOpen)}
-                    className="w-full flex justify-between items-center p-3.5 bg-slate-950/40 text-left hover:bg-slate-950/60 transition-colors border-b border-slate-850/40"
+                    className="w-full flex justify-between items-center p-3.5 bg-[var(--surface-2)] text-left hover:bg-[var(--surface-2)] transition-colors border-b border-[var(--border)]"
                   >
-                    <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
-                      <svg className="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span className="text-[10px] font-bold text-[var(--accent-text)] uppercase tracking-wider flex items-center gap-2">
+                      <svg className="w-3.5 h-3.5 text-[var(--accent-text)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                       History & Audit Log
                     </span>
-                    <span className="text-slate-400">{isHistoryOpen ? '▲' : '▼'}</span>
+                    <span className="text-[var(--text-secondary)]">{isHistoryOpen ? '▲' : '▼'}</span>
                   </button>
 
                   {isHistoryOpen && (
-                    <div className="p-3.5 space-y-2 bg-slate-900/40 max-h-48 overflow-y-auto scrollbar-thin">
+                    <div className="p-3.5 space-y-2 bg-[var(--surface-1)] max-h-48 overflow-y-auto scrollbar-thin">
                       {cameraTaskHistory.length === 0 ? (
-                        <div className="text-[10px] text-slate-500 italic">No history logged yet.</div>
+                        <div className="text-[10px] text-[var(--text-tertiary)] italic">No history logged yet.</div>
                       ) : (
                         <div className="space-y-2.5 text-[10px]">
                           {cameraTaskHistory.map(h => (
                             <div key={h.id} className="border-l-2 border-slate-700 pl-2.5 py-0.5 space-y-0.5">
-                              <div className="flex justify-between items-center text-slate-400">
-                                <span className="font-semibold text-slate-300">{h.event_type.replace('_', ' ')}</span>
+                              <div className="flex justify-between items-center text-[var(--text-secondary)]">
+                                <span className="font-semibold text-[var(--text-primary)]">{h.event_type.replace('_', ' ')}</span>
                                 <span>{new Date(h.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                               </div>
-                              <p className="text-slate-400 text-[9.5px] leading-snug">{h.note}</p>
+                              <p className="text-[var(--text-secondary)] text-[9.5px] leading-snug">{h.note}</p>
                             </div>
                           ))}
                         </div>
@@ -2926,7 +2926,7 @@ export default function ProjectMapCanvas({
               </div>
 
               {/* Action Buttons (Sticky Bottom) */}
-              <div className="pt-4 border-t border-slate-850 mt-4 flex gap-3 shrink-0">
+              <div className="pt-4 border-t border-[var(--border)] mt-4 flex gap-3 shrink-0">
                 <button
                   type="button" onClick={handleDeleteCameraClick} disabled={isPending}
                   className="flex-1 py-2.5 px-4 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-900/50 text-rose-300 font-semibold rounded-xl text-xs transition"
@@ -2935,7 +2935,7 @@ export default function ProjectMapCanvas({
                 </button>
                 <button
                   type="submit" disabled={isPending}
-                  className="flex-[2] py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-700 text-white font-semibold rounded-xl text-xs shadow-md shadow-indigo-600/10 transition"
+                  className="flex-[2] py-2.5 px-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white disabled:bg-indigo-700 text-white font-semibold rounded-xl text-xs shadow-md shadow-indigo-600/10 transition"
                 >
                   {isPending ? 'Saving...' : 'Save Specs'}
                 </button>
@@ -2946,21 +2946,21 @@ export default function ProjectMapCanvas({
       })()}
       
       {selectedDevice && (
-        <div className="w-80 bg-slate-900 border-l border-slate-800 flex flex-col justify-between shrink-0 h-full p-6 relative z-10 overflow-hidden shadow-2xl">
+        <div className="w-80 bg-[var(--surface-1)] border-l border-[var(--border)] flex flex-col justify-between shrink-0 h-full p-6 relative z-10 overflow-hidden shadow-2xl">
           <form onSubmit={handleSaveDevice} className="flex flex-col h-full justify-between">
             <div className="space-y-4 overflow-y-auto pr-1 flex-1 scrollbar-thin">
-              <div className="flex justify-between items-start border-b border-slate-850 pb-4">
+              <div className="flex justify-between items-start border-b border-[var(--border)] pb-4">
                 <div>
                   <h3 className="font-bold text-white tracking-tight flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getNetworkDeviceColor(selectedDevice.device_type) }} />
                     {selectedDevice.name} Settings
                   </h3>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Edit network node specs and ports matrix</p>
+                  <p className="text-[10px] text-[var(--text-secondary)] mt-0.5">Edit network node specs and ports matrix</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setSelectedDevice(null)}
-                  className="p-1 rounded bg-slate-950 hover:bg-slate-850 text-slate-400 hover:text-white"
+                  className="p-1 rounded bg-[var(--surface-2)] hover:bg-slate-850 text-[var(--text-secondary)] hover:text-white"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
@@ -2979,18 +2979,18 @@ export default function ProjectMapCanvas({
               {/* Form fields */}
               <div className="space-y-3.5">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Device Name</label>
+                  <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Device Name</label>
                   <input
                     type="text" required value={deviceName} onChange={e => setDeviceName(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none"
+                    className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Device Type</label>
+                  <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Device Type</label>
                   <select
                     value={deviceType} onChange={e => setDeviceType(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none"
+                    className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none"
                   >
                     <option value="switch">Switch</option>
                     <option value="cabinet_device">Cabinet Device</option>
@@ -3002,35 +3002,35 @@ export default function ProjectMapCanvas({
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Brand</label>
+                    <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Brand</label>
                     <input
                       type="text" placeholder="e.g. Cisco" value={deviceBrand} onChange={e => setDeviceBrand(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs"
+                      className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Model</label>
+                    <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Model</label>
                     <input
                       type="text" placeholder="e.g. C1000" value={deviceModel} onChange={e => setDeviceModel(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs"
+                      className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs"
                     />
                   </div>
                 </div>
 
                 {(deviceType === 'switch' || deviceType === 'Industrial Switch') && (
-                  <div className="grid grid-cols-2 gap-3 border border-slate-850 p-3 rounded-xl bg-slate-950/20">
+                  <div className="grid grid-cols-2 gap-3 border border-[var(--border)] p-3 rounded-xl bg-[var(--surface-2)]">
                     <div>
-                      <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Total Ports</label>
+                      <label className="block text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Total Ports</label>
                       <input
                         type="number" min={1} max={96} value={deviceTotalPorts} onChange={e => setDeviceTotalPorts(parseInt(e.target.value, 10))}
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none"
+                        className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none"
                       />
                     </div>
                     <div>
-                      <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">PoE Budget (W)</label>
+                      <label className="block text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">PoE Budget (W)</label>
                       <input
                         type="number" min={0} value={devicePoeBudget} onChange={e => setDevicePoeBudget(parseInt(e.target.value, 10))}
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none"
+                        className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none"
                       />
                     </div>
                   </div>
@@ -3038,35 +3038,35 @@ export default function ProjectMapCanvas({
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">IP Address</label>
+                    <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">IP Address</label>
                     <input
                       type="text" placeholder="10.0.0.1" value={deviceIp} onChange={e => setDeviceIp(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs"
+                      className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Rack Unit</label>
+                    <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Rack Unit</label>
                     <input
                       type="text" placeholder="e.g. RU 4" value={deviceRackUnit} onChange={e => setDeviceRackUnit(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs"
+                      className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Location Ref</label>
+                  <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Location Ref</label>
                   <input
                     type="text" placeholder="MDF Room, Rack cabinet..." value={deviceLocRef} onChange={e => setDeviceLocRef(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs"
+                    className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs"
                   />
                 </div>
 
                 {/* Show switch ports matrix quick summary list inside panel */}
                 {(deviceType === 'switch' || deviceType === 'Industrial Switch') && (
-                  <div className="space-y-2 border-t border-slate-850 pt-4">
-                    <span className="block text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Ports Status Matrix</span>
+                  <div className="space-y-2 border-t border-[var(--border)] pt-4">
+                    <span className="block text-[10px] font-bold text-[var(--accent-text)] uppercase tracking-wider">Ports Status Matrix</span>
                     {loadingPorts ? (
-                      <div className="text-[10px] text-slate-500 animate-pulse">Loading ports details...</div>
+                      <div className="text-[10px] text-[var(--text-tertiary)] animate-pulse">Loading ports details...</div>
                     ) : (
                       <div className="space-y-1.5 max-h-40 overflow-y-auto scrollbar-thin">
                         {switchPorts.map(port => {
@@ -3074,19 +3074,19 @@ export default function ProjectMapCanvas({
                           const isAssigned = camera !== null
 
                           return (
-                            <div key={port.id} className="flex items-center justify-between p-2 rounded-lg bg-slate-950/60 border border-slate-850 text-[10px]">
-                              <span className="font-semibold text-slate-300">
+                            <div key={port.id} className="flex items-center justify-between p-2 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-[10px]">
+                              <span className="font-semibold text-[var(--text-primary)]">
                                 Port {port.port_number} ({port.port_type.toUpperCase()})
                               </span>
                               <div className="flex items-center gap-1.5">
                                 {isAssigned ? (
                                   <>
                                     <span className="text-emerald-400 font-bold">{camera.camera_id_tag}</span>
-                                    <span className="text-slate-500">({camera.camera_models?.default_poe_draw || 7.5}W)</span>
+                                    <span className="text-[var(--text-tertiary)]">({camera.camera_models?.default_poe_draw || 7.5}W)</span>
                                     <button
                                       type="button"
                                       onClick={() => handleDisconnectPort(camera.id)}
-                                      className="p-1 text-slate-500 hover:text-rose-400"
+                                      className="p-1 text-[var(--text-tertiary)] hover:text-rose-400"
                                       title="Unassign camera"
                                     >
                                       <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -3106,7 +3106,7 @@ export default function ProjectMapCanvas({
               </div>
             </div>
 
-            <div className="pt-4 border-t border-slate-850 mt-4 flex gap-3">
+            <div className="pt-4 border-t border-[var(--border)] mt-4 flex gap-3">
               <button
                 type="button" onClick={handleDeleteDeviceClick} disabled={isPending}
                 className="flex-1 py-2.5 px-4 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-900/50 text-rose-300 font-semibold rounded-xl text-xs"
@@ -3115,7 +3115,7 @@ export default function ProjectMapCanvas({
               </button>
               <button
                 type="submit" disabled={isPending}
-                className="flex-[2] py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-700 text-white font-semibold rounded-xl text-xs shadow-md shadow-indigo-600/10"
+                className="flex-[2] py-2.5 px-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white disabled:bg-indigo-700 text-white font-semibold rounded-xl text-xs shadow-md shadow-indigo-600/10"
               >
                 {isPending ? 'Saving...' : 'Save Settings'}
               </button>
@@ -3127,17 +3127,17 @@ export default function ProjectMapCanvas({
 
     {/* Backfill Preview Modal */}
     {isBackfillPreviewOpen && backfillPreviewData && (
-      <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+      <div className="fixed inset-0 bg-[var(--surface-2)] backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-lg bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
           {/* Header */}
-          <div className="p-5 border-b border-slate-850 flex items-center justify-between">
+          <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
             <div>
               <h3 className="text-sm font-bold text-white uppercase tracking-wider">Checklist Backfill Preview</h3>
-              <p className="text-[10px] text-slate-400 mt-0.5">Dry-run summary of legacy project upgrade actions</p>
+              <p className="text-[10px] text-[var(--text-secondary)] mt-0.5">Dry-run summary of legacy project upgrade actions</p>
             </div>
             <button
               onClick={() => setIsBackfillPreviewOpen(false)}
-              className="p-1 rounded bg-slate-950 hover:bg-slate-850 text-slate-400 hover:text-white"
+              className="p-1 rounded bg-[var(--surface-2)] hover:bg-slate-850 text-[var(--text-secondary)] hover:text-white"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
@@ -3148,41 +3148,41 @@ export default function ProjectMapCanvas({
             {!backfillLog ? (
               <div className="space-y-3.5">
                 <div className="grid grid-cols-2 gap-3.5">
-                  <div className="bg-slate-950/40 border border-slate-850 p-3 rounded-xl">
-                    <span className="block text-[9px] text-slate-500 font-bold uppercase tracking-wider">Cameras Scanned</span>
+                  <div className="bg-[var(--surface-2)] border border-[var(--border)] p-3 rounded-xl">
+                    <span className="block text-[9px] text-[var(--text-tertiary)] font-bold uppercase tracking-wider">Cameras Scanned</span>
                     <span className="text-base font-bold text-white font-mono">{backfillPreviewData.cameras_scanned}</span>
                   </div>
-                  <div className="bg-slate-950/40 border border-slate-850 p-3 rounded-xl">
-                    <span className="block text-[9px] text-slate-500 font-bold uppercase tracking-wider">Missing Checklists</span>
+                  <div className="bg-[var(--surface-2)] border border-[var(--border)] p-3 rounded-xl">
+                    <span className="block text-[9px] text-[var(--text-tertiary)] font-bold uppercase tracking-wider">Missing Checklists</span>
                     <span className="text-base font-bold text-white font-mono">{backfillPreviewData.cameras_missing_checklists}</span>
                   </div>
                 </div>
 
-                <div className="border border-slate-850 p-4 rounded-xl bg-slate-950/20 space-y-2.5">
+                <div className="border border-[var(--border)] p-4 rounded-xl bg-[var(--surface-2)] space-y-2.5">
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Existing checklist tasks:</span>
-                    <span className="font-mono text-slate-200">{backfillPreviewData.existing_tasks_found}</span>
+                    <span className="text-[var(--text-secondary)]">Existing checklist tasks:</span>
+                    <span className="font-mono text-[var(--text-primary)]">{backfillPreviewData.existing_tasks_found}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Template tasks to create:</span>
+                    <span className="text-[var(--text-secondary)]">Template tasks to create:</span>
                     <span className="font-mono text-emerald-400 font-bold">+{backfillPreviewData.tasks_to_create}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Tasks skipped (already exist):</span>
-                    <span className="font-mono text-slate-500">{backfillPreviewData.tasks_skipped}</span>
+                    <span className="text-[var(--text-secondary)]">Tasks skipped (already exist):</span>
+                    <span className="font-mono text-[var(--text-tertiary)]">{backfillPreviewData.tasks_skipped}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Sync repairs to perform:</span>
+                    <span className="text-[var(--text-secondary)]">Sync repairs to perform:</span>
                     <span className="font-mono text-amber-400 font-bold">{backfillPreviewData.sync_repairs_required}</span>
                   </div>
-                  <div className="border-t border-slate-800 pt-2.5 flex justify-between font-bold">
-                    <span className="text-slate-200">Est. Project Tasks added:</span>
-                    <span className="font-mono text-indigo-400">+{backfillPreviewData.estimated_project_tasks_added}</span>
+                  <div className="border-t border-[var(--border)] pt-2.5 flex justify-between font-bold">
+                    <span className="text-[var(--text-primary)]">Est. Project Tasks added:</span>
+                    <span className="font-mono text-[var(--accent-text)]">+{backfillPreviewData.estimated_project_tasks_added}</span>
                   </div>
                 </div>
 
-                <div className="text-[10px] text-slate-400 bg-slate-950/50 p-3 rounded-xl border border-slate-850/60 leading-normal">
-                  <p className="font-bold text-slate-300 mb-1">Preview/Dry Run Mode</p>
+                <div className="text-[10px] text-[var(--text-secondary)] bg-[var(--surface-2)] p-3 rounded-xl border border-[var(--border)]/60 leading-normal">
+                  <p className="font-bold text-[var(--text-primary)] mb-1">Preview/Dry Run Mode</p>
                   Confirming this action will safely generate missing checklist items and link unlinked tasks. No changes are applied yet.
                 </div>
               </div>
@@ -3190,29 +3190,29 @@ export default function ProjectMapCanvas({
               <div className="space-y-3.5">
                 <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-center space-y-1">
                   <div className="text-emerald-400 font-bold text-sm">Checklist Generation Successful!</div>
-                  <p className="text-[10px] text-slate-400">The project checklist upgrade is complete.</p>
+                  <p className="text-[10px] text-[var(--text-secondary)]">The project checklist upgrade is complete.</p>
                 </div>
 
-                <div className="border border-slate-850 p-4 rounded-xl bg-slate-950/20 space-y-2.5">
+                <div className="border border-[var(--border)] p-4 rounded-xl bg-[var(--surface-2)] space-y-2.5">
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Cameras Processed:</span>
-                    <span className="font-mono text-slate-200 font-bold">{backfillLog.cameras_scanned}</span>
+                    <span className="text-[var(--text-secondary)]">Cameras Processed:</span>
+                    <span className="font-mono text-[var(--text-primary)] font-bold">{backfillLog.cameras_scanned}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Tasks Created:</span>
+                    <span className="text-[var(--text-secondary)]">Tasks Created:</span>
                     <span className="font-mono text-emerald-400 font-bold">+{backfillLog.tasks_created}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Sync repairs resolved:</span>
+                    <span className="text-[var(--text-secondary)]">Sync repairs resolved:</span>
                     <span className="font-mono text-amber-400 font-bold">{backfillLog.sync_repaired}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Skipped (duplicates):</span>
-                    <span className="font-mono text-slate-500">{backfillLog.tasks_skipped}</span>
+                    <span className="text-[var(--text-secondary)]">Skipped (duplicates):</span>
+                    <span className="font-mono text-[var(--text-tertiary)]">{backfillLog.tasks_skipped}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Execution time:</span>
-                    <span className="font-mono text-indigo-400 font-bold">{backfillLog.duration_ms}ms</span>
+                    <span className="text-[var(--text-secondary)]">Execution time:</span>
+                    <span className="font-mono text-[var(--accent-text)] font-bold">{backfillLog.duration_ms}ms</span>
                   </div>
                 </div>
 
@@ -3231,19 +3231,19 @@ export default function ProjectMapCanvas({
           </div>
 
           {/* Footer */}
-          <div className="p-4 border-t border-slate-850 bg-slate-950/20 flex gap-3">
+          <div className="p-4 border-t border-[var(--border)] bg-[var(--surface-2)] flex gap-3">
             {!backfillLog ? (
               <>
                 <button
                   onClick={() => setIsBackfillPreviewOpen(false)}
-                  className="flex-1 py-2 px-4 bg-slate-950 hover:bg-slate-850 border border-slate-800 text-slate-400 font-bold rounded-xl text-xs transition"
+                  className="flex-1 py-2 px-4 bg-[var(--surface-2)] hover:bg-slate-850 border border-[var(--border)] text-[var(--text-secondary)] font-bold rounded-xl text-xs transition"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleBackfillConfirm}
                   disabled={isBackfilling}
-                  className="flex-[2] py-2 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-700 text-white font-bold rounded-xl text-xs transition flex items-center justify-center gap-1.5"
+                  className="flex-[2] py-2 px-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white disabled:bg-indigo-700 text-white font-bold rounded-xl text-xs transition flex items-center justify-center gap-1.5"
                 >
                   {isBackfilling ? 'Processing...' : 'Confirm Generate Missing Checklists'}
                 </button>
@@ -3254,7 +3254,7 @@ export default function ProjectMapCanvas({
                   setIsBackfillPreviewOpen(false)
                   window.location.reload()
                 }}
-                className="w-full py-2 px-4 bg-indigo-650 hover:bg-indigo-600 text-white font-bold rounded-xl text-xs transition"
+                className="w-full py-2 px-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-white font-bold rounded-xl text-xs transition"
               >
                 Reload Page & Apply
               </button>
@@ -3266,22 +3266,22 @@ export default function ProjectMapCanvas({
 
     {/* Fullscreen Split-Pane Checklist Modal */}
     {isFullChecklistOpen && selectedCamera && (
-      <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-        <div className="w-full max-w-5xl h-[80vh] bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden relative">
+      <div className="fixed inset-0 bg-[var(--surface-2)]/95 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+        <div className="w-full max-w-5xl h-[80vh] bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl shadow-2xl flex flex-col overflow-hidden relative">
           
           {/* Modal Header */}
-          <div className="p-5 border-b border-slate-850 flex items-center justify-between shrink-0">
+          <div className="p-5 border-b border-[var(--border)] flex items-center justify-between shrink-0">
             <div className="space-y-1">
               <div className="flex items-center gap-2.5">
                 <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getCameraStatusColor(cameraStatus) }} />
                 <h3 className="text-base font-black text-white tracking-tight">{selectedCamera.camera_id_tag} Full Checklist</h3>
-                <span className="text-[10px] text-slate-400 font-semibold font-mono bg-slate-950 border border-slate-850 px-2 py-0.5 rounded-full uppercase">{cameraCommType}</span>
+                <span className="text-[10px] text-[var(--text-secondary)] font-semibold font-mono bg-[var(--surface-2)] border border-[var(--border)] px-2 py-0.5 rounded-full uppercase">{cameraCommType}</span>
               </div>
-              <p className="text-[11px] text-slate-400">Detailed task controls, due dates, assignee configuration, and audit logs.</p>
+              <p className="text-[11px] text-[var(--text-secondary)]">Detailed task controls, due dates, assignee configuration, and audit logs.</p>
             </div>
             <button
               onClick={() => setIsFullChecklistOpen(false)}
-              className="p-2 rounded-xl bg-slate-950 border border-slate-850 hover:border-slate-700 text-slate-400 hover:text-white transition"
+              className="p-2 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] hover:border-slate-700 text-[var(--text-secondary)] hover:text-white transition"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
@@ -3290,10 +3290,10 @@ export default function ProjectMapCanvas({
           {/* Modal Split-Pane Content */}
           <div className="flex-1 flex overflow-hidden min-h-0">
             {/* Left Pane: Tasks Sidebar */}
-            <div className="w-2/5 border-r border-slate-800/60 overflow-y-auto p-4 space-y-2.5 bg-slate-950/10">
-              <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Tasks Checklist</span>
+            <div className="w-2/5 border-r border-[var(--border)]/60 overflow-y-auto p-4 space-y-2.5 bg-[var(--surface-2)]/10">
+              <span className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2.5">Tasks Checklist</span>
               {cameraTasks.length === 0 ? (
-                <div className="text-center p-8 italic text-slate-500 text-xs">No tasks found.</div>
+                <div className="text-center p-8 italic text-[var(--text-tertiary)] text-xs">No tasks found.</div>
               ) : (
                 cameraTasks.map(task => {
                   const isActive = task.id === (activeModalTaskId || cameraTasks[0]?.id)
@@ -3303,8 +3303,8 @@ export default function ProjectMapCanvas({
                       onClick={() => setActiveModalTaskId(task.id)}
                       className={`w-full flex items-center justify-between text-left p-3 rounded-xl border transition-all ${
                         isActive
-                          ? 'bg-indigo-600/10 border-indigo-500/40 text-white shadow-sm'
-                          : 'bg-slate-900/40 border-slate-850 text-slate-400 hover:border-slate-800 hover:text-slate-300'
+                          ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white/10 border-[var(--accent)]/40 text-white shadow-sm'
+                          : 'bg-[var(--surface-1)] border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--border)] hover:text-[var(--text-primary)]'
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
@@ -3315,9 +3315,9 @@ export default function ProjectMapCanvas({
                             e.stopPropagation()
                             handleToggleTaskStatus(task)
                           }}
-                          className="rounded border-slate-800 bg-slate-950 text-indigo-650 focus:ring-indigo-500 w-3.5 h-3.5 shrink-0"
+                          className="rounded border-[var(--border)] bg-[var(--surface-2)] text-[var(--accent-text)] focus:ring-indigo-500 w-3.5 h-3.5 shrink-0"
                         />
-                        <span className={`text-[12px] font-bold truncate leading-snug ${task.status === 'Complete' ? 'line-through text-slate-500' : ''}`}>
+                        <span className={`text-[12px] font-bold truncate leading-snug ${task.status === 'Complete' ? 'line-through text-[var(--text-tertiary)]' : ''}`}>
                           {task.title}
                         </span>
                       </div>
@@ -3325,8 +3325,8 @@ export default function ProjectMapCanvas({
                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
                           task.priority === 'Critical' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
                           task.priority === 'High' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                          task.priority === 'Medium' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
-                          'bg-slate-500/10 text-slate-400 border border-slate-800/30'
+                          task.priority === 'Medium' ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white/10 text-[var(--accent-text)] border border-[var(--accent)]/20' :
+                          'bg-slate-500/10 text-[var(--text-secondary)] border border-[var(--border)]/30'
                         }`}>
                           {task.priority[0]}
                         </span>
@@ -3345,12 +3345,12 @@ export default function ProjectMapCanvas({
             </div>
 
             {/* Right Pane: Selected Task Form details & History */}
-            <div className="w-3/5 overflow-y-auto p-6 bg-slate-900/30 flex flex-col justify-between">
+            <div className="w-3/5 overflow-y-auto p-6 bg-[var(--surface-1)] flex flex-col justify-between">
               {(() => {
                 const activeTask = cameraTasks.find(t => t.id === (activeModalTaskId || cameraTasks[0]?.id))
                 if (!activeTask) {
                   return (
-                    <div className="flex-1 flex items-center justify-center text-slate-500 italic text-xs">
+                    <div className="flex-1 flex items-center justify-center text-[var(--text-tertiary)] italic text-xs">
                       Select a task from the sidebar to view details.
                     </div>
                   )
@@ -3365,18 +3365,18 @@ export default function ProjectMapCanvas({
                       <div className="flex justify-between items-start gap-4">
                         <div className="space-y-1">
                           <h4 className="text-base font-bold text-white leading-tight">{activeTask.title}</h4>
-                          <span className="inline-block text-[9px] font-bold text-slate-400 uppercase tracking-wider bg-slate-950 border border-slate-800 px-2 py-0.5 rounded">
+                          <span className="inline-block text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wider bg-[var(--surface-2)] border border-[var(--border)] px-2 py-0.5 rounded">
                             {activeTask.task_type}
                           </span>
                         </div>
                         
                         <div className="flex items-center gap-2">
-                          <label className="flex items-center gap-1.5 text-xs text-slate-300 font-bold bg-slate-950 px-2.5 py-1 rounded-xl border border-slate-850 cursor-pointer">
+                          <label className="flex items-center gap-1.5 text-xs text-[var(--text-primary)] font-bold bg-[var(--surface-2)] px-2.5 py-1 rounded-xl border border-[var(--border)] cursor-pointer">
                             <input
                               type="checkbox"
                               checked={activeTask.status === 'Complete'}
                               onChange={() => handleToggleTaskStatus(activeTask)}
-                              className="rounded border-slate-800 bg-slate-950 text-indigo-650 focus:ring-indigo-500 w-3.5 h-3.5"
+                              className="rounded border-[var(--border)] bg-[var(--surface-2)] text-[var(--accent-text)] focus:ring-indigo-500 w-3.5 h-3.5"
                             />
                             <span>Complete</span>
                           </label>
@@ -3384,13 +3384,13 @@ export default function ProjectMapCanvas({
                       </div>
 
                       {/* Controls Grid */}
-                      <div className="grid grid-cols-2 gap-4 border-t border-b border-slate-850/60 py-4 mt-2">
+                      <div className="grid grid-cols-2 gap-4 border-t border-b border-[var(--border)]/60 py-4 mt-2">
                         <div className="space-y-1.5">
-                          <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Status</label>
+                          <label className="block text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">Status</label>
                           <select
                             value={activeTask.status}
                             onChange={(e) => handleTaskStatusChange(activeTask.id, e.target.value)}
-                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                            className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
                           >
                             <option value="Not Started">Not Started</option>
                             <option value="In Progress">In Progress</option>
@@ -3403,11 +3403,11 @@ export default function ProjectMapCanvas({
                         </div>
 
                         <div className="space-y-1.5">
-                          <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Priority</label>
+                          <label className="block text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">Priority</label>
                           <select
                             value={activeTask.priority}
                             onChange={(e) => handleTaskPriorityChange(activeTask.id, e.target.value)}
-                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                            className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
                           >
                             <option value="Low">Low</option>
                             <option value="Medium">Medium</option>
@@ -3417,7 +3417,7 @@ export default function ProjectMapCanvas({
                         </div>
 
                         <div className="space-y-1.5">
-                          <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Assigned To</label>
+                          <label className="block text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">Assigned To</label>
                           <select
                             value={activeTask.assigned_to || ''}
                             onChange={async (e) => {
@@ -3431,7 +3431,7 @@ export default function ProjectMapCanvas({
                                 await loadCameraTasksAndHistory(selectedCamera.id)
                               })
                             }}
-                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                            className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
                           >
                             <option value="">Unassigned</option>
                             {profiles.map(p => (
@@ -3441,7 +3441,7 @@ export default function ProjectMapCanvas({
                         </div>
 
                         <div className="space-y-1.5">
-                          <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Due Date</label>
+                          <label className="block text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">Due Date</label>
                           <input
                             type="date"
                             value={activeTask.due_date ? activeTask.due_date.substring(0, 10) : ''}
@@ -3456,14 +3456,14 @@ export default function ProjectMapCanvas({
                                 await loadCameraTasksAndHistory(selectedCamera.id)
                               })
                             }}
-                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                            className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
                           />
                         </div>
                       </div>
 
                       {/* Notes */}
                       <div className="space-y-1.5">
-                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Task Notes</label>
+                        <label className="block text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">Task Notes</label>
                         <textarea
                           rows={3}
                           placeholder="Add task description or remarks..."
@@ -3481,26 +3481,26 @@ export default function ProjectMapCanvas({
                               })
                             }
                           }}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white resize-none"
+                          className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-white resize-none"
                         />
                       </div>
                     </div>
 
                     {/* Task History Timeline */}
-                    <div className="border-t border-slate-850 pt-4 mt-2">
-                      <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Task Activity Log</span>
+                    <div className="border-t border-[var(--border)] pt-4 mt-2">
+                      <span className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2.5">Task Activity Log</span>
                       {taskHistory.length === 0 ? (
-                        <div className="text-[10px] text-slate-500 italic">No activity logged for this task yet.</div>
+                        <div className="text-[10px] text-[var(--text-tertiary)] italic">No activity logged for this task yet.</div>
                       ) : (
                         <div className="space-y-3 max-h-[150px] overflow-y-auto scrollbar-thin pr-1 text-[10px]">
                           {taskHistory.map(h => (
-                            <div key={h.id} className="border-l-2 border-slate-800 pl-3.5 py-0.5 space-y-0.5 relative">
-                              <div className="absolute left-[-5px] top-[6px] w-2.5 h-2.5 rounded-full bg-slate-900 border border-slate-800" />
-                              <div className="flex justify-between items-center text-slate-400">
-                                <span className="font-bold text-slate-300 uppercase text-[9px] tracking-wide">{h.event_type.replace('_', ' ')}</span>
+                            <div key={h.id} className="border-l-2 border-[var(--border)] pl-3.5 py-0.5 space-y-0.5 relative">
+                              <div className="absolute left-[-5px] top-[6px] w-2.5 h-2.5 rounded-full bg-[var(--surface-1)] border border-[var(--border)]" />
+                              <div className="flex justify-between items-center text-[var(--text-secondary)]">
+                                <span className="font-bold text-[var(--text-primary)] uppercase text-[9px] tracking-wide">{h.event_type.replace('_', ' ')}</span>
                                 <span>{new Date(h.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>
                               </div>
-                              <p className="text-slate-400 text-[10px] leading-snug">{h.note}</p>
+                              <p className="text-[var(--text-secondary)] text-[10px] leading-snug">{h.note}</p>
                             </div>
                           ))}
                         </div>

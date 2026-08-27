@@ -133,8 +133,8 @@ export default function OverviewEditPanel({ project, googleMapsApiKey }: Overvie
           onClick={() => (isOpen ? handleCancel() : setIsOpen(true))}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-xs tracking-wide transition-all border ${
             isOpen
-              ? 'bg-slate-100 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 hover:text-slate-900 dark:hover:text-white'
-              : 'bg-indigo-600 border-indigo-500 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20'
+              ? 'bg-slate-100 dark:bg-[var(--surface-2)] border-slate-200 dark:border-[var(--border)] text-slate-600 dark:text-[var(--text-secondary)] hover:border-slate-300 dark:hover:border-slate-700 hover:text-slate-900 dark:hover:text-white'
+              : 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white border-[var(--accent)] hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-white shadow-md shadow-indigo-600/20'
           }`}
         >
           {isOpen ? (
@@ -160,12 +160,12 @@ export default function OverviewEditPanel({ project, googleMapsApiKey }: Overvie
       {isOpen && (
         <div
           id="overview-edit-panel"
-          className="bg-white dark:bg-slate-900/60 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-2xl space-y-5 mb-6 text-slate-800 dark:text-slate-100"
+          className="bg-white dark:bg-[var(--surface-1)] backdrop-blur-md border border-slate-200 dark:border-[var(--border)] rounded-2xl p-6 shadow-2xl space-y-5 mb-6 text-slate-800 dark:text-slate-100"
         >
           {/* Panel header */}
-          <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
-            <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse shrink-0" />
-            <h3 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Edit Project Settings</h3>
+          <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-[var(--border)]">
+            <div className="w-2 h-2 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white animate-pulse shrink-0" />
+            <h3 className="text-xs font-bold text-indigo-600 dark:text-[var(--accent-text)] uppercase tracking-wider">Edit Project Settings</h3>
           </div>
 
           {/* Feedback message */}
@@ -195,8 +195,8 @@ export default function OverviewEditPanel({ project, googleMapsApiKey }: Overvie
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* Project Name */}
             <div className="md:col-span-2">
-              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                Project Name <span className="text-indigo-500">*</span>
+              <label className="block text-[10px] font-bold text-[var(--text-tertiary)] dark:text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
+                Project Name <span className="text-[var(--accent-text)]">*</span>
               </label>
               <input
                 id="edit-project-name"
@@ -204,15 +204,15 @@ export default function OverviewEditPanel({ project, googleMapsApiKey }: Overvie
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Downtown CCTV Phase 1"
-                className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none focus:border-indigo-500 transition-colors"
+                className="w-full px-3 py-2.5 bg-slate-50 dark:bg-[var(--surface-2)] border border-slate-200 dark:border-[var(--border)] rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none focus:border-[var(--accent)] transition-colors"
               />
             </div>
 
             {/* Address Search */}
             <div className="md:col-span-2">
-              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+              <label className="block text-[10px] font-bold text-[var(--text-tertiary)] dark:text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
                 Address Search
-                <span className="ml-2 text-slate-400 dark:text-slate-600 normal-case font-normal">auto-fills coordinates below</span>
+                <span className="ml-2 text-[var(--text-secondary)] dark:text-slate-600 normal-case font-normal">auto-fills coordinates below</span>
               </label>
               <div className="relative">
                 <input
@@ -223,23 +223,23 @@ export default function OverviewEditPanel({ project, googleMapsApiKey }: Overvie
                   onChange={(e) => setAddressDisplay(e.target.value)}
                   placeholder={placesAvailable ? 'Search address or place...' : 'Google Places not configured'}
                   disabled={!googleMapsApiKey}
-                  className="w-full px-3 py-2.5 pl-9 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none focus:border-indigo-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2.5 pl-9 bg-slate-50 dark:bg-[var(--surface-2)] border border-slate-200 dark:border-[var(--border)] rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none focus:border-[var(--accent)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 />
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-600 pointer-events-none">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] dark:text-slate-600 pointer-events-none">
                   <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
                   </svg>
                 </div>
               </div>
-              <p className="text-[9px] text-slate-500 dark:text-slate-600 mt-1">
+              <p className="text-[9px] text-[var(--text-tertiary)] dark:text-slate-600 mt-1">
                 Address is resolved for geocoding only — not stored in the database. Coordinates are what get saved.
               </p>
             </div>
 
             {/* Latitude */}
             <div>
-              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                Default Latitude <span className="text-slate-400 dark:text-slate-600 font-normal">(-90 to 90)</span>
+              <label className="block text-[10px] font-bold text-[var(--text-tertiary)] dark:text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
+                Default Latitude <span className="text-[var(--text-secondary)] dark:text-slate-600 font-normal">(-90 to 90)</span>
               </label>
               <input
                 id="edit-latitude"
@@ -249,14 +249,14 @@ export default function OverviewEditPanel({ project, googleMapsApiKey }: Overvie
                 max="90"
                 value={lat}
                 onChange={(e) => setLat(e.target.value)}
-                className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-indigo-500 transition-colors"
+                className="w-full px-3 py-2.5 bg-slate-50 dark:bg-[var(--surface-2)] border border-slate-200 dark:border-[var(--border)] rounded-xl text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-[var(--accent)] transition-colors"
               />
             </div>
 
             {/* Longitude */}
             <div>
-              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                Default Longitude <span className="text-slate-400 dark:text-slate-600 font-normal">(-180 to 180)</span>
+              <label className="block text-[10px] font-bold text-[var(--text-tertiary)] dark:text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
+                Default Longitude <span className="text-[var(--text-secondary)] dark:text-slate-600 font-normal">(-180 to 180)</span>
               </label>
               <input
                 id="edit-longitude"
@@ -266,14 +266,14 @@ export default function OverviewEditPanel({ project, googleMapsApiKey }: Overvie
                 max="180"
                 value={lng}
                 onChange={(e) => setLng(e.target.value)}
-                className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-indigo-500 transition-colors"
+                className="w-full px-3 py-2.5 bg-slate-50 dark:bg-[var(--surface-2)] border border-slate-200 dark:border-[var(--border)] rounded-xl text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-[var(--accent)] transition-colors"
               />
             </div>
 
             {/* Default Zoom */}
             <div>
-              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                Default Zoom <span className="text-slate-400 dark:text-slate-600 font-normal">(1–22)</span>
+              <label className="block text-[10px] font-bold text-[var(--text-tertiary)] dark:text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
+                Default Zoom <span className="text-[var(--text-secondary)] dark:text-slate-600 font-normal">(1–22)</span>
               </label>
               <input
                 id="edit-zoom"
@@ -282,27 +282,27 @@ export default function OverviewEditPanel({ project, googleMapsApiKey }: Overvie
                 max="22"
                 value={zoom}
                 onChange={(e) => setZoom(e.target.value)}
-                className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-indigo-500 transition-colors"
+                className="w-full px-3 py-2.5 bg-slate-50 dark:bg-[var(--surface-2)] border border-slate-200 dark:border-[var(--border)] rounded-xl text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-[var(--accent)] transition-colors"
               />
             </div>
 
             {/* Prepared For / Client — schema not yet supported */}
             <div>
-              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+              <label className="block text-[10px] font-bold text-[var(--text-tertiary)] dark:text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
                 Prepared For / Client{' '}
-                <span className="text-slate-400 dark:text-slate-700 font-normal normal-case">(future schema)</span>
+                <span className="text-[var(--text-secondary)] dark:text-slate-700 font-normal normal-case">(future schema)</span>
               </label>
               <input
                 type="text"
                 disabled
                 placeholder="Not yet configurable"
-                className="w-full px-3 py-2.5 bg-slate-100/50 dark:bg-slate-950/30 border border-slate-200 dark:border-slate-900 rounded-xl text-slate-400 dark:text-slate-700 text-xs cursor-not-allowed"
+                className="w-full px-3 py-2.5 bg-slate-100/50 dark:bg-[var(--surface-2)]/30 border border-slate-200 dark:border-[var(--border)] rounded-xl text-[var(--text-secondary)] dark:text-slate-700 text-xs cursor-not-allowed"
               />
             </div>
 
             {/* Notes / Description */}
             <div className="md:col-span-2">
-              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+              <label className="block text-[10px] font-bold text-[var(--text-tertiary)] dark:text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
                 Notes / Description
               </label>
               <textarea
@@ -311,13 +311,13 @@ export default function OverviewEditPanel({ project, googleMapsApiKey }: Overvie
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Project scope, objectives, special notes..."
-                className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none focus:border-indigo-500 transition-colors resize-none"
+                className="w-full px-3 py-2.5 bg-slate-50 dark:bg-[var(--surface-2)] border border-slate-200 dark:border-[var(--border)] rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none focus:border-[var(--accent)] transition-colors resize-none"
               />
             </div>
           </div>
 
           {/* Action buttons */}
-          <div className="flex flex-col sm:flex-row gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+          <div className="flex flex-col sm:flex-row gap-3 pt-2 border-t border-slate-100 dark:border-[var(--border)]">
             <button
               type="button"
               onClick={async () => {
@@ -345,7 +345,7 @@ export default function OverviewEditPanel({ project, googleMapsApiKey }: Overvie
                 type="button"
                 onClick={handleCancel}
                 disabled={saving}
-                className="flex-1 py-2.5 px-4 bg-slate-100 dark:bg-slate-950 hover:bg-slate-200 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-xl text-xs transition-all disabled:opacity-50"
+                className="flex-1 py-2.5 px-4 bg-slate-100 dark:bg-[var(--surface-2)] hover:bg-slate-200 dark:hover:bg-[var(--surface-1)] border border-slate-200 dark:border-[var(--border)] hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-[var(--text-primary)] font-semibold rounded-xl text-xs transition-all disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -354,7 +354,7 @@ export default function OverviewEditPanel({ project, googleMapsApiKey }: Overvie
                 type="button"
                 onClick={handleSave}
                 disabled={saving}
-                className="flex-[2] py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 disabled:text-indigo-400 text-white font-semibold rounded-xl text-xs shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2"
+                className="flex-[2] py-2.5 px-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white disabled:bg-indigo-800 disabled:text-[var(--accent-text)] text-white font-semibold rounded-xl text-xs shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2"
               >
                 {saving ? (
                   <>

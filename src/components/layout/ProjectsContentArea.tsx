@@ -11,7 +11,7 @@ export default function ProjectsContentArea({ children }: { children: React.Reac
   const isCatalogPage = pathname === '/projects' || pathname === '/projects/' || pathname?.startsWith('/projects/create')
 
   return (
-    <div className={`flex-1 flex flex-col bg-slate-950 ${isCatalogPage ? 'overflow-y-auto' : 'overflow-hidden'}`}>
+    <div className={`flex-1 flex flex-col bg-[var(--surface-2)] ${isCatalogPage ? 'overflow-y-auto' : 'overflow-hidden'}`}>
       {children}
     </div>
   )

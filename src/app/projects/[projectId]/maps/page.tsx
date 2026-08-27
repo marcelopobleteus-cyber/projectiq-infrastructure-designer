@@ -81,7 +81,7 @@ export default async function ProjectMapsPage({ params }: PageProps) {
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
       ),
-      color: 'text-indigo-400 border-indigo-950 bg-indigo-950/20',
+      color: 'text-[var(--accent-text)] border-[var(--border)] bg-[var(--surface-1)]',
     },
     {
       label: 'Network Devices',
@@ -89,7 +89,7 @@ export default async function ProjectMapsPage({ params }: PageProps) {
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M12 8v8"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/></svg>
       ),
-      color: 'text-blue-400 border-blue-950 bg-blue-950/20',
+      color: 'text-[var(--text-primary)] border-[var(--border)] bg-[var(--surface-1)]',
     },
     {
       label: 'Switches',
@@ -97,7 +97,7 @@ export default async function ProjectMapsPage({ params }: PageProps) {
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="6" y1="9" x2="6.01" y2="9"/><line x1="10" y1="9" x2="10.01" y2="9"/><line x1="14" y1="9" x2="14.01" y2="9"/><line x1="18" y1="9" x2="18.01" y2="9"/><line x1="6" y1="15" x2="18" y2="15"/></svg>
       ),
-      color: 'text-cyan-400 border-cyan-950 bg-cyan-950/20',
+      color: 'text-[var(--text-primary)] border-[var(--border)] bg-[var(--surface-1)]',
     },
     {
       label: 'Assigned Cameras',
@@ -105,7 +105,7 @@ export default async function ProjectMapsPage({ params }: PageProps) {
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       ),
-      color: 'text-emerald-400 border-emerald-950 bg-emerald-950/20',
+      color: 'text-[var(--success)] border-[var(--border)] bg-[var(--surface-1)]',
     },
     {
       label: 'Unassigned Cameras',
@@ -113,7 +113,7 @@ export default async function ProjectMapsPage({ params }: PageProps) {
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
       ),
-      color: 'text-slate-400 border-slate-900 bg-slate-900/20',
+      color: 'text-[var(--text-tertiary)] border-[var(--border)] bg-[var(--surface-1)]',
     },
     {
       label: 'PoE Warnings',
@@ -121,24 +121,24 @@ export default async function ProjectMapsPage({ params }: PageProps) {
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       ),
-      color: poeWarningsCount > 0 ? 'text-amber-400 border-amber-500/30 bg-amber-500/10 animate-pulse' : 'text-slate-500 border-slate-900 bg-slate-950/20',
+      color: poeWarningsCount > 0 ? 'text-[var(--warn)] border-amber-200 bg-[var(--warn-soft)]' : 'text-[var(--text-tertiary)] border-[var(--border)] bg-[var(--surface-1)]',
     },
   ]
 
   return (
-    <div className="space-y-4 relative z-10 w-full h-full px-6 py-4 flex-1 flex flex-col overflow-hidden">
+    <div className="space-y-4 relative z-10 w-full h-full px-6 py-4 flex-1 flex flex-col overflow-hidden bg-[var(--bg)] font-sans">
       {/* Metrics Banner */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 shrink-0">
         {metrics.map((m, idx) => (
           <div
             key={idx}
-            className={`border rounded-xl p-3 flex flex-col justify-between h-20 shadow-sm backdrop-blur-md ${m.color}`}
+            className={`border rounded-xl p-3 flex flex-col justify-between h-20 shadow-xs ${m.color}`}
           >
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-[10px] font-bold uppercase tracking-wider">{m.label}</span>
+            <div className="flex items-center justify-between text-[var(--text-tertiary)]">
+              <span className="text-[9.5px] font-bold uppercase tracking-wider">{m.label}</span>
               {m.icon}
             </div>
-            <span className="text-xl font-bold tracking-tight text-white font-mono mt-1">
+            <span className="text-xl font-black tracking-tight text-[var(--text-primary)] font-mono mt-1">
               {m.value}
             </span>
           </div>

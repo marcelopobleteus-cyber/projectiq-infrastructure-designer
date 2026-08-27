@@ -138,7 +138,7 @@ export default function GlobalReportsPage() {
       {/* Report Scope Modal */}
       {selectedReport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs" onClick={() => setSelectedReport(null)} />
+          <div className="absolute inset-0 bg-[var(--surface-1)] backdrop-blur-xs" onClick={() => setSelectedReport(null)} />
           <div className="relative bg-[var(--surface-1)] border border-[var(--border-strong)] p-6 rounded-xl w-full max-w-md space-y-4 shadow-2xl animate-in zoom-in-95 duration-150 font-sans">
             <div>
               <span className="text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider font-mono">Report Scope</span>
@@ -170,7 +170,7 @@ export default function GlobalReportsPage() {
       {/* Report Preview Modal */}
       {previewReport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs" onClick={() => setPreviewReport(null)} />
+          <div className="absolute inset-0 bg-[var(--surface-1)] backdrop-blur-xs" onClick={() => setPreviewReport(null)} />
           <div className="relative bg-[var(--surface-1)] border border-[var(--border-strong)] p-6 rounded-xl w-full max-w-2xl space-y-4 shadow-2xl animate-in zoom-in-95 duration-150 font-sans">
             <div>
               <span className="text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider font-mono">Mock Report Preview</span>

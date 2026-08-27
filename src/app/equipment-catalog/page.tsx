@@ -430,7 +430,7 @@ export default function EquipmentCatalogPage() {
                       alt={selectedItem.model}
                       className="w-full h-full object-contain p-2"
                     />
-                    <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition text-xs font-bold text-white uppercase tracking-wider">
+                    <div className="absolute inset-0 bg-[var(--surface-1)] opacity-0 group-hover:opacity-100 flex items-center justify-center transition text-xs font-bold text-white uppercase tracking-wider">
                       Replace Image
                     </div>
                   </>
@@ -495,7 +495,7 @@ export default function EquipmentCatalogPage() {
       {/* Import Rules Modal */}
       {isImportRulesOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs" onClick={() => setIsImportRulesOpen(false)} />
+          <div className="absolute inset-0 bg-[var(--surface-1)] backdrop-blur-xs" onClick={() => setIsImportRulesOpen(false)} />
           <div className="relative bg-[var(--surface-1)] border border-[var(--border-strong)] p-6 rounded-xl w-full max-w-lg space-y-4 shadow-2xl animate-in zoom-in-95 duration-150">
             <div>
               <h3 className="text-sm font-black uppercase text-[var(--accent-text)] tracking-wider">Import Rules</h3>

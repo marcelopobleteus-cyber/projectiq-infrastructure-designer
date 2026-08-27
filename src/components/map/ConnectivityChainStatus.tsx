@@ -66,7 +66,7 @@ export default function ConnectivityChainStatus({
       case 'Partial':
         return {
           dotClass: 'border-amber-500 bg-amber-950 text-amber-400',
-          textClass: 'text-slate-200',
+          textClass: 'text-[var(--text-primary)]',
           badge: <span className="text-[7px] font-bold px-1 py-0.25 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded uppercase tracking-wider shrink-0">Partial</span>
         }
       case 'Issue':
@@ -78,9 +78,9 @@ export default function ConnectivityChainStatus({
       case 'Missing':
       default:
         return {
-          dotClass: 'border-slate-800 bg-slate-900 text-slate-500',
-          textClass: 'text-slate-500 italic',
-          badge: <span className="text-[7px] font-bold px-1 py-0.25 bg-slate-850 border border-slate-800 text-slate-500 rounded uppercase tracking-wider shrink-0">Missing</span>
+          dotClass: 'border-[var(--border)] bg-[var(--surface-1)] text-[var(--text-tertiary)]',
+          textClass: 'text-[var(--text-tertiary)] italic',
+          badge: <span className="text-[7px] font-bold px-1 py-0.25 bg-slate-850 border border-[var(--border)] text-[var(--text-tertiary)] rounded uppercase tracking-wider shrink-0">Missing</span>
         }
     }
   }

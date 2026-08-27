@@ -282,31 +282,31 @@ export default function ProductMockup() {
 
             <div className="space-y-2.5 text-xs text-[#64748B] font-medium">
               <div>
-                <span className="block text-slate-400 font-bold uppercase text-[9px] tracking-wider mb-0.5">Camera Name</span>
+                <span className="block text-[var(--text-secondary)] font-bold uppercase text-[9px] tracking-wider mb-0.5">Camera Name</span>
                 <span className="text-[#0A1F44] font-bold text-sm">Cam 01A - West Gate</span>
               </div>
               <div>
-                <span className="block text-slate-400 font-bold uppercase text-[9px] tracking-wider mb-0.5">IP Address</span>
+                <span className="block text-[var(--text-secondary)] font-bold uppercase text-[9px] tracking-wider mb-0.5">IP Address</span>
                 <span className="font-mono text-[#0A1F44] font-semibold">192.168.12.115</span>
               </div>
               <div>
-                <span className="block text-slate-400 font-bold uppercase text-[9px] tracking-wider mb-0.5">Connectivity</span>
+                <span className="block text-[var(--text-secondary)] font-bold uppercase text-[9px] tracking-wider mb-0.5">Connectivity</span>
                 <span className="text-[#0A1F44] font-bold inline-flex items-center gap-1.5 mt-0.5">
                   <span className="w-2 h-2 rounded bg-[#00C896]" />
                   Fiber Optic
                 </span>
               </div>
               <div>
-                <span className="block text-slate-400 font-bold uppercase text-[9px] tracking-wider mb-0.5">Fiber Strand</span>
+                <span className="block text-[var(--text-secondary)] font-bold uppercase text-[9px] tracking-wider mb-0.5">Fiber Strand</span>
                 <span className="text-[#0A1F44] font-semibold">Tube 03 / Fiber 12</span>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <span className="block text-slate-400 font-bold uppercase text-[9px] tracking-wider mb-0.5">Latency</span>
+                  <span className="block text-[var(--text-secondary)] font-bold uppercase text-[9px] tracking-wider mb-0.5">Latency</span>
                   <span className="text-[#0A1F44] font-bold">11 ms</span>
                 </div>
                 <div>
-                  <span className="block text-slate-400 font-bold uppercase text-[9px] tracking-wider mb-0.5">Tx/Rx Power</span>
+                  <span className="block text-[var(--text-secondary)] font-bold uppercase text-[9px] tracking-wider mb-0.5">Tx/Rx Power</span>
                   <span className="text-[#0A1F44] font-bold">-4.5 dBm</span>
                 </div>
               </div>
@@ -324,7 +324,7 @@ export default function ProductMockup() {
 
           {/* Quick Metrics Bar Chart */}
           <div className="bg-[#F7FAFC] border border-[#E5EAF0] p-3 rounded-2xl space-y-2">
-            <span className="block text-[9px] font-black text-slate-500 uppercase tracking-wider">
+            <span className="block text-[9px] font-black text-[var(--text-tertiary)] uppercase tracking-wider">
               Optical Budget Loss
             </span>
             <div className="flex items-end gap-2 h-14 pt-2">

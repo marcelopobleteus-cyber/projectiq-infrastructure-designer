@@ -55,10 +55,10 @@ export default function GlobalLayoutWrapper({ children }: GlobalLayoutWrapperPro
 
   if (loading) {
     return (
-      <div className="flex h-screen w-screen bg-slate-950 items-center justify-center">
+      <div className="flex h-screen w-screen bg-[var(--surface-2)] items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
-          <p className="text-xs text-slate-500 font-mono tracking-wider">LOADING NEXTQ...</p>
+          <div className="w-8 h-8 rounded-full border-2 border-[var(--accent)] border-t-transparent animate-spin" />
+          <p className="text-xs text-[var(--text-tertiary)] font-mono tracking-wider">LOADING NEXTQ...</p>
         </div>
       </div>
     )

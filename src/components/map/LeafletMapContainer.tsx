@@ -283,22 +283,22 @@ export default function LeafletMapContainer({
   }, [L, fiberRoutes, showFiberRoutes])
 
   return (
-    <div className="relative w-full h-full bg-slate-950 overflow-hidden">
+    <div className="relative w-full h-full bg-[var(--surface-2)] overflow-hidden">
       {/* Map Element */}
       <div ref={mapRef} className="w-full h-full z-0" />
 
       {/* Top Banner: Hybrid Engine Indicator */}
-      <div className="absolute top-4 left-4 z-10 bg-slate-900/90 backdrop-blur-md border border-slate-800 px-3 py-1.5 rounded-xl shadow-xl flex items-center gap-3 text-xs">
+      <div className="absolute top-4 left-4 z-10 bg-[var(--surface-1)]/90 backdrop-blur-md border border-[var(--border)] px-3 py-1.5 rounded-xl shadow-xl flex items-center gap-3 text-xs">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="font-bold text-slate-200">Motor de Mapa:</span>
+          <span className="font-bold text-[var(--text-primary)]">Motor de Mapa:</span>
           <span className="text-emerald-400 font-semibold">{activeEngineLabel}</span>
         </div>
 
         {onToggleMapEngine && (
           <button
             onClick={onToggleMapEngine}
-            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold rounded-lg text-[10px] transition cursor-pointer"
+            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[var(--text-primary)] font-bold rounded-lg text-[10px] transition cursor-pointer"
           >
             Cambiar a Google Maps
           </button>
@@ -306,13 +306,13 @@ export default function LeafletMapContainer({
       </div>
 
       {/* Top Right: Tile Layer Switcher (Streets, Dark, Satellite) */}
-      <div className="absolute top-4 right-4 z-10 bg-slate-900/90 backdrop-blur-md border border-slate-800 p-1.5 rounded-xl shadow-xl flex gap-1">
+      <div className="absolute top-4 right-4 z-10 bg-[var(--surface-1)]/90 backdrop-blur-md border border-[var(--border)] p-1.5 rounded-xl shadow-xl flex gap-1">
         <button
           onClick={() => handleSwitchTileLayer('dark')}
           className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
             activeTileLayer === 'dark'
-              ? 'bg-indigo-600 text-white shadow-md'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-white shadow-md'
+              : 'text-[var(--text-secondary)] hover:text-white hover:bg-slate-800'
           }`}
         >
           Dark
@@ -321,8 +321,8 @@ export default function LeafletMapContainer({
           onClick={() => handleSwitchTileLayer('streets')}
           className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
             activeTileLayer === 'streets'
-              ? 'bg-indigo-600 text-white shadow-md'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-white shadow-md'
+              : 'text-[var(--text-secondary)] hover:text-white hover:bg-slate-800'
           }`}
         >
           Calles
@@ -331,8 +331,8 @@ export default function LeafletMapContainer({
           onClick={() => handleSwitchTileLayer('satellite')}
           className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
             activeTileLayer === 'satellite'
-              ? 'bg-indigo-600 text-white shadow-md'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-white shadow-md'
+              : 'text-[var(--text-secondary)] hover:text-white hover:bg-slate-800'
           }`}
         >
           Satélite Esri (Gratis)

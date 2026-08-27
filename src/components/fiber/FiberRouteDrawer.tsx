@@ -240,26 +240,26 @@ export default function FiberRouteDrawer({
     <div
       className={`
         absolute top-0 right-0 h-full w-80 z-40
-        bg-slate-900/95 backdrop-blur-xl border-l border-slate-800
+        bg-[var(--surface-1)]/95 backdrop-blur-xl border-l border-[var(--border)]
         flex flex-col shadow-2xl
         transition-transform duration-300 ease-out
         ${isOpen ? 'translate-x-0' : 'translate-x-full'}
       `}
     >
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 shrink-0">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] shrink-0">
         <div>
           <h3 className="text-[13px] font-bold text-white tracking-tight">
             {isCreating ? 'New Fiber Route' : `Route ${existingRoute?.route_id_tag ?? ''}`}
           </h3>
-          <p className="text-[10px] text-slate-500 mt-0.5">
+          <p className="text-[10px] text-[var(--text-tertiary)] mt-0.5">
             {isCreating ? 'Fiber Path Design Mode' : 'Route Details'}
           </p>
         </div>
         <button
           id="fiber-route-drawer-close"
           onClick={onClose}
-          className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+          className="p-1.5 text-[var(--text-tertiary)] hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
           title="Close"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
@@ -267,9 +267,9 @@ export default function FiberRouteDrawer({
       </div>
 
       {/* ── Distance & Summary metrics ──────────────────────────────────────── */}
-      <div className="px-4 py-3 border-b border-slate-800 bg-slate-950/40 shrink-0 space-y-2">
+      <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--surface-2)] shrink-0 space-y-2">
         <div className="flex justify-between items-center text-[10px]">
-          <span className="text-slate-500 uppercase tracking-widest font-bold">Path Summary</span>
+          <span className="text-[var(--text-tertiary)] uppercase tracking-widest font-bold">Path Summary</span>
           <span className="font-mono bg-slate-800 border border-slate-700 text-white px-2 py-0.5 rounded text-[9px]">
             {segments.length} segment{segments.length !== 1 ? 's' : ''}
           </span>
@@ -278,11 +278,11 @@ export default function FiberRouteDrawer({
         {distanceFt !== null && (
           <div className="flex items-center gap-6 text-[11px] font-mono">
             <div>
-              <span className="text-slate-500 block text-[9px] uppercase font-sans">Measured</span>
+              <span className="text-[var(--text-tertiary)] block text-[9px] uppercase font-sans">Measured</span>
               <span className="text-white font-bold text-xs">{distanceFt.toLocaleString()} ft</span>
             </div>
             <div>
-              <span className="text-indigo-400 block text-[9px] uppercase font-sans">Slack-Adjusted</span>
+              <span className="text-[var(--accent-text)] block text-[9px] uppercase font-sans">Slack-Adjusted</span>
               <span className="text-indigo-300 font-bold text-xs">{installedFt.toLocaleString()} ft</span>
             </div>
           </div>
@@ -293,18 +293,18 @@ export default function FiberRouteDrawer({
       <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
 
         {/* Selected nodes list sequence */}
-        <div className="bg-slate-950/60 border border-slate-850 p-2.5 rounded-xl space-y-1.5 select-none">
-          <span className="text-[9px] text-slate-500 uppercase tracking-widest font-bold block">
+        <div className="bg-[var(--surface-2)] border border-[var(--border)] p-2.5 rounded-xl space-y-1.5 select-none">
+          <span className="text-[9px] text-[var(--text-tertiary)] uppercase tracking-widest font-bold block">
             Node Sequence Path
           </span>
           <div className="space-y-1 max-h-[110px] overflow-y-auto pr-1">
             {segments.map((seg) => (
-              <div key={seg.index} className="flex items-center gap-1.5 text-[11px] text-slate-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+              <div key={seg.index} className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white" />
                 <span className="font-mono text-white truncate max-w-[90px]">{seg.startTag}</span>
                 <span className="text-slate-600">➔</span>
                 <span className="font-mono text-white truncate max-w-[90px]">{seg.endTag}</span>
-                <span className="ml-auto font-mono text-[9.5px] text-slate-500">{seg.lengthFeet} ft</span>
+                <span className="ml-auto font-mono text-[9.5px] text-[var(--text-tertiary)]">{seg.lengthFeet} ft</span>
               </div>
             ))}
           </div>
@@ -312,7 +312,7 @@ export default function FiberRouteDrawer({
 
         {/* Route ID Tag */}
         <div>
-          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+          <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1">
             Route ID Tag *
           </label>
           <input
@@ -323,15 +323,15 @@ export default function FiberRouteDrawer({
             placeholder="e.g. R-001"
             maxLength={50}
             disabled={!isCreating}
-            className="w-full px-3 py-2 bg-slate-950 border border-slate-700 text-white text-[12px] font-mono rounded-lg
-              focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500
+            className="w-full px-3 py-2 bg-[var(--surface-2)] border border-slate-700 text-white text-[12px] font-mono rounded-lg
+              focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-[var(--accent)]
               disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-slate-600"
           />
         </div>
 
         {/* Installation Type */}
         <div>
-          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+          <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1">
             Installation Type *
           </label>
           <select
@@ -339,8 +339,8 @@ export default function FiberRouteDrawer({
             value={installationType}
             onChange={e => setInstallationType(e.target.value as InstallationType)}
             disabled={!isCreating}
-            className="w-full px-3 py-2 bg-slate-950 border border-slate-700 text-white text-[12px] rounded-lg
-              focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500
+            className="w-full px-3 py-2 bg-[var(--surface-2)] border border-slate-700 text-white text-[12px] rounded-lg
+              focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-[var(--accent)]
               disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <option value="underground">Underground (Conduit)</option>
@@ -351,7 +351,7 @@ export default function FiberRouteDrawer({
 
         {/* Route Purpose */}
         <div>
-          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+          <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1">
             Route Purpose
           </label>
           <select
@@ -359,8 +359,8 @@ export default function FiberRouteDrawer({
             value={routePurpose}
             onChange={e => setRoutePurpose(e.target.value as RoutePurpose)}
             disabled={!isCreating}
-            className="w-full px-3 py-2 bg-slate-950 border border-slate-700 text-white text-[12px] rounded-lg
-              focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500
+            className="w-full px-3 py-2 bg-[var(--surface-2)] border border-slate-700 text-white text-[12px] rounded-lg
+              focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-[var(--accent)]
               disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <option value="camera_backbone">Camera Backbone</option>
@@ -372,7 +372,7 @@ export default function FiberRouteDrawer({
 
         {/* Conduit Diameter */}
         <div>
-          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+          <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1">
             Conduit Diameter (inches)
           </label>
           <input
@@ -384,15 +384,15 @@ export default function FiberRouteDrawer({
             value={conduitDiameterInches}
             onChange={e => setConduitDiameterInches(parseFloat(e.target.value) || 2.0)}
             disabled={!isCreating}
-            className="w-full px-3 py-2 bg-slate-950 border border-slate-700 text-white text-[12px] rounded-lg
-              focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500
+            className="w-full px-3 py-2 bg-[var(--surface-2)] border border-slate-700 text-white text-[12px] rounded-lg
+              focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-[var(--accent)]
               disabled:opacity-50 disabled:cursor-not-allowed"
           />
         </div>
 
         {/* Slack Percentage */}
         <div>
-          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+          <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1">
             Slack Percentage (%)
           </label>
           <input
@@ -404,8 +404,8 @@ export default function FiberRouteDrawer({
             value={slackPercentage}
             onChange={e => setSlackPercentage(parseFloat(e.target.value) || 10.0)}
             disabled={!isCreating}
-            className="w-full px-3 py-2 bg-slate-950 border border-slate-700 text-white text-[12px] rounded-lg
-              focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500
+            className="w-full px-3 py-2 bg-[var(--surface-2)] border border-slate-700 text-white text-[12px] rounded-lg
+              focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-[var(--accent)]
               disabled:opacity-50 disabled:cursor-not-allowed"
           />
         </div>
@@ -413,7 +413,7 @@ export default function FiberRouteDrawer({
         {/* ── Cable Catalog Attachment (Step 4) ───────────────────────────────── */}
         {isCreating && (
           <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+            <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1">
               Link Cable Catalog Item
             </label>
             {fiberCatalog.length === 0 ? (
@@ -426,7 +426,7 @@ export default function FiberRouteDrawer({
                   id="fiber-route-drawer-catalog"
                   value={cableCatalogId}
                   onChange={e => setCableCatalogId(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 text-white text-[12px] rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 bg-[var(--surface-2)] border border-slate-700 text-white text-[12px] rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 >
                   <option value="none">No Cable Assigned (Route Only)</option>
                   {fiberCatalog.map(item => (
@@ -438,45 +438,45 @@ export default function FiberRouteDrawer({
 
                 {/* Cable Selection Summary Card */}
                 {selectedCatalogItem ? (
-                  <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl space-y-1.5 text-[11px]">
-                    <div className="flex justify-between text-slate-500">
+                  <div className="p-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl space-y-1.5 text-[11px]">
+                    <div className="flex justify-between text-[var(--text-tertiary)]">
                       <span>Manufacturer</span>
                       <span className="text-white font-medium">{selectedCatalogItem.manufacturer}</span>
                     </div>
-                    <div className="flex justify-between text-slate-500">
+                    <div className="flex justify-between text-[var(--text-tertiary)]">
                       <span>Model/Part #</span>
                       <span className="text-white font-mono">{selectedCatalogItem.part_number}</span>
                     </div>
-                    <div className="flex justify-between text-slate-500">
+                    <div className="flex justify-between text-[var(--text-tertiary)]">
                       <span>Fiber Count</span>
                       <span className="text-white font-bold">{selectedCatalogItem.fiber_count} Cores</span>
                     </div>
-                    <div className="flex justify-between text-slate-500">
+                    <div className="flex justify-between text-[var(--text-tertiary)]">
                       <span>Fiber Mode</span>
                       <span className="text-white font-medium">{selectedCatalogItem.mode} ({selectedCatalogItem.grade})</span>
                     </div>
-                    <div className="flex justify-between text-slate-500">
+                    <div className="flex justify-between text-[var(--text-tertiary)]">
                       <span>Diameter</span>
                       <span className="text-white font-mono">{selectedCatalogItem.diameter_mm} mm</span>
                     </div>
-                    <div className="flex justify-between text-slate-500">
+                    <div className="flex justify-between text-[var(--text-tertiary)]">
                       <span>Unit Cost</span>
                       <span className="text-white font-mono">${Number(selectedCatalogItem.cost_per_foot).toFixed(2)}/ft</span>
                     </div>
                     {/* Estimated Cost */}
-                    <div className="flex justify-between pt-1 border-t border-slate-850 text-indigo-400 font-semibold">
+                    <div className="flex justify-between pt-1 border-t border-[var(--border)] text-[var(--accent-text)] font-semibold">
                       <span>Est. Cable Cost</span>
                       <span className="font-mono">${(selectedCatalogItem.cost_per_foot * installedFt).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
 
                     {/* Estimated Conduit Fill percentage (Disclaimer Label) */}
                     {conduitFillEstimate !== null && (
-                      <div className="pt-2 border-t border-slate-850 space-y-1 select-none">
+                      <div className="pt-2 border-t border-[var(--border)] space-y-1 select-none">
                         <div className="flex justify-between text-indigo-300">
                           <span>Est. Conduit Fill</span>
                           <span className="font-mono font-bold">{conduitFillEstimate}%</span>
                         </div>
-                        <span className="text-[8px] text-slate-500 block leading-tight font-medium italic">
+                        <span className="text-[8px] text-[var(--text-tertiary)] block leading-tight font-medium italic">
                           Estimated conduit fill only. Final fill requires verified conduit internal diameter and existing occupancy.
                         </span>
                       </div>
@@ -494,35 +494,35 @@ export default function FiberRouteDrawer({
 
         {/* Existing route linked cable details view */}
         {existingRoute && !isCreating && (
-          <div className="bg-slate-950/60 border border-slate-850 p-2.5 rounded-xl space-y-2 select-none">
-            <span className="text-[9px] text-slate-500 uppercase tracking-widest font-bold block">
+          <div className="bg-[var(--surface-2)] border border-[var(--border)] p-2.5 rounded-xl space-y-2 select-none">
+            <span className="text-[9px] text-[var(--text-tertiary)] uppercase tracking-widest font-bold block">
               Cable Infrastructure
             </span>
             {linkedCable ? (
               <div className="space-y-1.5 text-[11px]">
-                <div className="flex justify-between text-slate-500">
+                <div className="flex justify-between text-[var(--text-tertiary)]">
                   <span>Cable Tag</span>
                   <span className="text-white font-mono font-bold">{linkedCable.cable_tag}</span>
                 </div>
-                <div className="flex justify-between text-slate-500">
+                <div className="flex justify-between text-[var(--text-tertiary)]">
                   <span>Manufacturer</span>
                   <span className="text-white font-medium">{linkedCable.manufacturer ?? 'Generic'}</span>
                 </div>
-                <div className="flex justify-between text-slate-500">
+                <div className="flex justify-between text-[var(--text-tertiary)]">
                   <span>Model/Part #</span>
                   <span className="text-white font-mono">{linkedCable.model ?? 'N/A'}</span>
                 </div>
-                <div className="flex justify-between text-slate-500">
+                <div className="flex justify-between text-[var(--text-tertiary)]">
                   <span>Strand Count</span>
-                  <span className="text-indigo-400 font-mono font-bold">{linkedCable.strand_count ?? linkedCable.fiber_count} Cores</span>
+                  <span className="text-[var(--accent-text)] font-mono font-bold">{linkedCable.strand_count ?? linkedCable.fiber_count} Cores</span>
                 </div>
-                <div className="flex justify-between text-slate-500">
+                <div className="flex justify-between text-[var(--text-tertiary)]">
                   <span>Cable Status</span>
                   <span className="text-emerald-400 font-bold">{linkedCable.install_status}</span>
                 </div>
               </div>
             ) : (
-              <div className="text-[11.5px] text-slate-500 italic py-1">
+              <div className="text-[11.5px] text-[var(--text-tertiary)] italic py-1">
                 No cable attached to this route conduit.
               </div>
             )}
@@ -532,7 +532,7 @@ export default function FiberRouteDrawer({
         {/* Notes */}
         {isCreating && (
           <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+            <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1">
               Notes
             </label>
             <textarea
@@ -541,8 +541,8 @@ export default function FiberRouteDrawer({
               onChange={e => setNotes(e.target.value)}
               rows={2}
               placeholder="Optional route notes…"
-              className="w-full px-3 py-2 bg-slate-950 border border-slate-700 text-white text-[12px] rounded-lg
-                focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500
+              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-slate-700 text-white text-[12px] rounded-lg
+                focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-[var(--accent)]
                 resize-none placeholder:text-slate-600"
             />
           </div>
@@ -550,23 +550,23 @@ export default function FiberRouteDrawer({
 
         {/* Existing route metadata details */}
         {existingRoute && !isCreating && (
-          <div className="space-y-1.5 text-[11px] bg-slate-950/40 border border-slate-850 p-2.5 rounded-xl">
-            <span className="text-[9px] text-slate-500 uppercase tracking-widest font-bold block mb-1">
+          <div className="space-y-1.5 text-[11px] bg-[var(--surface-2)] border border-[var(--border)] p-2.5 rounded-xl">
+            <span className="text-[9px] text-[var(--text-tertiary)] uppercase tracking-widest font-bold block mb-1">
               Conduit Metadata
             </span>
-            <div className="flex justify-between text-slate-500">
+            <div className="flex justify-between text-[var(--text-tertiary)]">
               <span>Installation</span>
               <span className="text-white capitalize">{existingRoute.installation_type?.replace('_', ' ')}</span>
             </div>
-            <div className="flex justify-between text-slate-500">
+            <div className="flex justify-between text-[var(--text-tertiary)]">
               <span>Purpose</span>
               <span className="text-white capitalize">{existingRoute.route_purpose?.replace(/_/g, ' ')}</span>
             </div>
-            <div className="flex justify-between text-slate-500">
+            <div className="flex justify-between text-[var(--text-tertiary)]">
               <span>Conduit size</span>
               <span className="text-white font-mono">{existingRoute.conduit_diameter_inches ?? '—'} in</span>
             </div>
-            <div className="flex justify-between text-slate-500">
+            <div className="flex justify-between text-[var(--text-tertiary)]">
               <span>Slack pct</span>
               <span className="text-white font-mono">{existingRoute.slack_percentage ?? 10}%</span>
             </div>
@@ -582,7 +582,7 @@ export default function FiberRouteDrawer({
       </form>
 
       {/* ── Footer Actions ──────────────────────────────────────────────────── */}
-      <div className="px-4 py-3 border-t border-slate-800 shrink-0 space-y-2">
+      <div className="px-4 py-3 border-t border-[var(--border)] shrink-0 space-y-2">
 
         {/* Save */}
         {isCreating && (
@@ -591,7 +591,7 @@ export default function FiberRouteDrawer({
             type="submit"
             onClick={handleSubmit}
             disabled={isSaving || pathNodes.length < 2}
-            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[12px] rounded-xl
+            className="w-full py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-white font-bold text-[12px] rounded-xl
               transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSaving ? 'Saving Route…' : 'Save Route'}
@@ -618,7 +618,7 @@ export default function FiberRouteDrawer({
           id="fiber-route-drawer-cancel"
           type="button"
           onClick={onClose}
-          className="w-full py-2 bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-400
+          className="w-full py-2 bg-[var(--surface-2)] border border-[var(--border)] hover:border-slate-700 text-[var(--text-secondary)]
             hover:text-white font-medium text-[11px] rounded-xl transition-all"
         >
           {isCreating ? 'Cancel' : 'Close'}

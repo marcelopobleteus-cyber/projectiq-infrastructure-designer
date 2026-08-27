@@ -27,7 +27,6 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
 
   const categories = ['All', 'Camera', 'Network', 'Fiber', 'Power', 'Mounting', 'Labor', 'Miscellaneous']
 
-  // Filter items based on category and search query
   const filteredItems = items.filter(item => {
     const matchesCategory = selectedCategory === 'All' || item.category.toLowerCase() === selectedCategory.toLowerCase()
     const matchesSearch = 
@@ -37,7 +36,6 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
     return matchesCategory && matchesSearch
   })
 
-  // Calculations for summary metrics
   const totalBOMCost = items.reduce((acc, item) => acc + item.totalCost, 0)
   const fiberOSPSubtotal = items
     .filter(item => item.category.toLowerCase() === 'fiber')
@@ -61,14 +59,13 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
   const totalLaborHours = items
     .filter(item => item.category.toLowerCase() === 'labor')
     .reduce((acc, item) => {
-      if (item.partNumber === 'LAB-OSP-SPLICING') return acc + item.quantity * 1.5 // 1.5 hours per splice
+      if (item.partNumber === 'LAB-OSP-SPLICING') return acc + item.quantity * 1.5
       if (item.partNumber === 'LAB-OSP-CONDUIT') return acc + item.quantity * 0.08
       if (item.partNumber === 'LAB-OSP-CABLE-PULL') return acc + item.quantity * 0.05
       if (item.partNumber === 'LAB-OSP-NODE-SET') return acc + item.quantity * 8
       return acc
     }, 0)
 
-  // Currency Formatter
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -76,7 +73,6 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
     }).format(val)
   }
 
-  // CSV Export handler
   const handleExportCSV = () => {
     const headers = ['Description', 'Manufacturer', 'Part Number', 'Category', 'Quantity', 'Unit', 'Unit Cost', 'Total Cost', 'Status']
     const rows = filteredItems.map(item => [
@@ -103,65 +99,59 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
   }
 
   return (
-    <div className="space-y-6 text-slate-300 w-full">
+    <div className="space-y-6 text-[var(--text-primary)] w-full font-sans">
       
-      {/* Metrics Banner */}
+      {/* Metrics Banner (Stat Cards Spec: upper label, mono big number, surface-1 background) */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-slate-900/60 backdrop-blur-md border border-slate-850 p-4 rounded-2xl flex flex-col justify-between shadow-xl">
-          <span className="text-[10px] font-bold text-slate-555 uppercase tracking-wider block">Total Estimated Cost</span>
-          <span className="text-2xl font-black text-white font-mono tracking-tight mt-1">{formatCurrency(totalBOMCost)}</span>
-          <p className="text-[9px] text-slate-500 mt-2">Combined hardware & outside plant</p>
+        <div className="bg-[var(--surface-1)] border border-[var(--border)] p-4 rounded-xl flex flex-col justify-between shadow-xs">
+          <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider block">Total Estimated Cost</span>
+          <span className="text-2xl font-black text-[var(--text-primary)] font-mono tracking-tight mt-1">{formatCurrency(totalBOMCost)}</span>
+          <p className="text-[10px] text-[var(--text-secondary)] mt-2">Combined hardware & outside plant</p>
         </div>
 
-        <div className="bg-slate-900/60 backdrop-blur-md border border-slate-850 p-4 rounded-2xl flex flex-col justify-between shadow-xl relative overflow-hidden group hover:border-indigo-500/30 transition-all">
-          <div className="absolute top-0 right-0 p-3 text-indigo-500/10 group-hover:text-indigo-500/20 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-          </div>
+        <div className="bg-[var(--surface-1)] border border-[var(--border)] p-4 rounded-xl flex flex-col justify-between shadow-xs relative overflow-hidden">
           <div>
-            <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider block">Outside Plant (OSP)</span>
-            <span className="text-2xl font-black text-white font-mono tracking-tight mt-1">{formatCurrency(fiberOSPSubtotal)}</span>
+            <span className="text-[10px] font-bold text-[var(--accent-text)] uppercase tracking-wider block">Outside Plant (OSP)</span>
+            <span className="text-2xl font-black text-[var(--text-primary)] font-mono tracking-tight mt-1">{formatCurrency(fiberOSPSubtotal)}</span>
           </div>
-          <div className="text-[9px] text-slate-400 mt-2 space-y-1">
+          <div className="text-[10px] text-[var(--text-secondary)] mt-2 space-y-1 font-mono">
             <div className="flex justify-between">
               <span>Fiber Cable:</span>
-              <span className="font-mono text-slate-200">{fiberCableLength.toFixed(1)} ft</span>
+              <span className="font-bold text-[var(--text-primary)]">{fiberCableLength.toFixed(1)} ft</span>
             </div>
             <div className="flex justify-between">
               <span>Conduit/HDPE:</span>
-              <span className="font-mono text-slate-200">{conduitLength.toFixed(1)} ft</span>
+              <span className="font-bold text-[var(--text-primary)]">{conduitLength.toFixed(1)} ft</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-slate-900/60 backdrop-blur-md border border-slate-850 p-4 rounded-2xl flex flex-col justify-between shadow-xl">
-          <span className="text-[10px] font-bold text-slate-555 uppercase tracking-wider block">Devices Subtotal</span>
-          <span className="text-2xl font-black text-emerald-450 font-mono tracking-tight mt-1">{formatCurrency(cameraDeviceSubtotal)}</span>
-          <p className="text-[9px] text-emerald-500/80 mt-2">CCTV Cameras & Network switches</p>
+        <div className="bg-[var(--surface-1)] border border-[var(--border)] p-4 rounded-xl flex flex-col justify-between shadow-xs">
+          <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider block">Devices Subtotal</span>
+          <span className="text-2xl font-black text-[var(--success)] font-mono tracking-tight mt-1">{formatCurrency(cameraDeviceSubtotal)}</span>
+          <p className="text-[10px] text-[var(--text-secondary)] mt-2">CCTV Cameras & Network switches</p>
         </div>
 
-        <div className="bg-slate-900/60 backdrop-blur-md border border-slate-850 p-4 rounded-2xl flex flex-col justify-between shadow-xl relative overflow-hidden group hover:border-amber-500/30 transition-all">
-          <div className="absolute top-0 right-0 p-3 text-amber-500/10 group-hover:text-amber-500/20 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-          </div>
+        <div className="bg-[var(--surface-1)] border border-[var(--border)] p-4 rounded-xl flex flex-col justify-between shadow-xs">
           <div>
-            <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider block">Labor & Construction</span>
-            <span className="text-2xl font-black text-white font-mono tracking-tight mt-1">{formatCurrency(laborSubtotal)}</span>
+            <span className="text-[10px] font-bold text-[var(--warn)] uppercase tracking-wider block">Labor & Construction</span>
+            <span className="text-2xl font-black text-[var(--text-primary)] font-mono tracking-tight mt-1">{formatCurrency(laborSubtotal)}</span>
           </div>
-          <div className="text-[9px] text-slate-400 mt-2 space-y-1">
+          <div className="text-[10px] text-[var(--text-secondary)] mt-2 space-y-1 font-mono">
             <div className="flex justify-between">
               <span>Est. Construction Labor:</span>
-              <span className="font-mono text-slate-200">{totalLaborHours.toFixed(1)} hrs</span>
+              <span className="font-bold text-[var(--text-primary)]">{totalLaborHours.toFixed(1)} hrs</span>
             </div>
             <div className="flex justify-between">
               <span>Distinct items count:</span>
-              <span className="font-mono text-slate-200">{totalItemsCount} units</span>
+              <span className="font-bold text-[var(--text-primary)]">{totalItemsCount} units</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Control Bar: Category Selector, Search, CSV Export */}
-      <div className="bg-slate-900/40 border border-slate-850 p-3 rounded-2xl flex flex-col md:flex-row gap-3 items-center justify-between shadow-lg">
+      <div className="bg-[var(--surface-1)] border border-[var(--border)] p-3 rounded-xl flex flex-col md:flex-row gap-3 items-center justify-between shadow-xs">
         
         {/* Category Pills */}
         <div className="flex flex-wrap gap-1 w-full md:w-auto">
@@ -169,10 +159,10 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
+              className={`px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer border ${
                 selectedCategory === cat
-                  ? 'bg-indigo-650 text-white shadow-inner shadow-indigo-950/20'
-                  : 'bg-transparent text-slate-400 hover:text-white hover:bg-slate-850/50'
+                  ? 'bg-[var(--surface-2)] border-[var(--accent-border)] text-[var(--accent-text)]'
+                  : 'bg-[var(--surface-1)] border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]'
               }`}
             >
               {cat}
@@ -180,7 +170,7 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
           ))}
         </div>
 
-        {/* Search & Action Buttons */}
+        {/* Search & Export Button (Spec: Secondary action button style) */}
         <div className="flex items-center gap-2.5 w-full md:w-auto shrink-0 justify-between md:justify-end">
           <div className="relative w-full md:w-48">
             <input
@@ -188,91 +178,77 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
               placeholder="Search BOM items..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-850 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-slate-700"
+              className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)]"
             />
           </div>
           <button
             onClick={handleExportCSV}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 border border-indigo-500/20 text-white rounded-xl text-[10px] font-bold uppercase tracking-wide transition-all shrink-0 shadow-lg hover:shadow-indigo-900/10"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--surface-1)] hover:bg-[var(--surface-hover)] border border-[var(--border)] text-[var(--text-primary)] rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer shadow-xs"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Export CSV
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            EXPORT CSV
           </button>
         </div>
       </div>
 
-      {/* Main BOM Listing Table */}
+      {/* Main Table Component */}
       {filteredItems.length === 0 ? (
-        <div className="border border-dashed border-slate-850 rounded-2xl p-16 text-center bg-slate-900/10 backdrop-blur-sm max-w-xl mx-auto mt-6 space-y-4">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-slate-950 border border-slate-850 text-slate-555">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-          </div>
-          <div>
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider">No Items Found</h3>
-            <p className="text-xs text-slate-400 mt-2 max-w-xs mx-auto leading-relaxed">
-              No equipment matching the filter criteria. Place components in Fiber OSP Map or Cameras/Network pages to populate the Bill of Materials.
-            </p>
-          </div>
+        <div className="border border-dashed border-[var(--border-strong)] rounded-xl p-12 text-center bg-[var(--surface-1)] max-w-xl mx-auto mt-4 space-y-3">
+          <h3 className="text-xs font-extrabold text-[var(--text-primary)] uppercase tracking-wider">No Items Found</h3>
+          <p className="text-xs text-[var(--text-secondary)] mt-1 max-w-xs mx-auto leading-relaxed">
+            No equipment matching the filter criteria. Place components in Fiber OSP Map or Cameras/Network pages to populate the Bill of Materials.
+          </p>
         </div>
       ) : (
-        <div className="bg-slate-900/40 backdrop-blur-md border border-slate-850 rounded-2xl shadow-xl overflow-hidden">
+        <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-xl shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-slate-950/60 text-slate-450 border-b border-slate-850 font-mono text-[9px] uppercase tracking-wider">
-                  <th className="py-3 px-6">Item Description</th>
-                  <th className="py-3 px-4">Category</th>
-                  <th className="py-3 px-4">Manufacturer</th>
-                  <th className="py-3 px-4">Part Number</th>
-                  <th className="py-3 px-4 text-center">Quantity</th>
-                  <th className="py-3 px-4 text-right">Unit Cost</th>
-                  <th className="py-3 px-4 text-right">Total Cost</th>
-                  <th className="py-3 px-4 text-center">Status</th>
+                <tr className="bg-[var(--surface-2)] text-[var(--text-tertiary)] border-b border-[var(--border)] font-mono text-[10px] uppercase tracking-wider">
+                  <th className="py-2.5 px-6 font-bold">Item Description</th>
+                  <th className="py-2.5 px-4 font-bold">Category</th>
+                  <th className="py-2.5 px-4 font-bold">Manufacturer</th>
+                  <th className="py-2.5 px-4 font-bold">Part Number</th>
+                  <th className="py-2.5 px-4 text-center font-bold">Quantity</th>
+                  <th className="py-2.5 px-4 text-right font-bold">Unit Cost</th>
+                  <th className="py-2.5 px-4 text-right font-bold">Total Cost</th>
+                  <th className="py-2.5 px-4 text-center font-bold">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-850">
+              <tbody className="divide-y divide-[var(--border)]">
                 {filteredItems.map((item, idx) => (
-                  <tr key={idx} className="hover:bg-slate-855/15 transition-colors">
-                    <td className="py-3.5 px-6 font-bold text-slate-200">
+                  <tr key={idx} className="hover:bg-[var(--surface-hover)] transition-colors">
+                    <td className="py-3 px-6 font-bold text-[var(--text-primary)]">
                       {item.description}
                       {item.unit === 'ft' && (
-                        <span className="block text-[9px] text-slate-500 font-semibold font-mono mt-0.5 uppercase tracking-wide">
+                        <span className="block text-[9.5px] text-[var(--text-tertiary)] font-mono mt-0.5 uppercase tracking-wide">
                           OSP Length in Feet (Calculated via Installed Cable Pathway)
                         </span>
                       )}
                     </td>
-                    <td className="py-3.5 px-4">
-                      <span className={`inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
-                        item.category.toLowerCase() === 'fiber' ? 'bg-indigo-950 text-indigo-400 border border-indigo-500/10' :
-                        item.category.toLowerCase() === 'camera' ? 'bg-emerald-950 text-emerald-450 border border-emerald-500/10' :
-                        item.category.toLowerCase() === 'network' ? 'bg-blue-950 text-blue-400 border border-blue-500/10' :
-                        'bg-slate-955 text-slate-400 border border-slate-800'
-                      }`}>
+                    <td className="py-3 px-4">
+                      <span className="inline-flex px-2 py-0.5 rounded text-[9.5px] font-bold uppercase bg-[var(--surface-2)] text-[var(--text-secondary)] border border-[var(--border)]">
                         {item.category}
                       </span>
                     </td>
-                    <td className="py-3.5 px-4 text-slate-350">
+                    <td className="py-3 px-4 text-[var(--text-secondary)]">
                       {item.manufacturer}
                     </td>
-                    <td className="py-3.5 px-4 font-mono text-slate-350">
+                    <td className="py-3 px-4 font-mono text-[var(--accent-text)] font-extrabold">
                       {item.partNumber}
                     </td>
-                    <td className="py-3.5 px-4 text-center font-mono text-white">
+                    <td className="py-3 px-4 text-center font-mono text-[var(--text-primary)] font-bold">
                       {item.quantity.toLocaleString(undefined, { minimumFractionDigits: item.unit === 'ft' ? 2 : 0, maximumFractionDigits: item.unit === 'ft' ? 2 : 0 })}
-                      <span className="text-[10px] text-slate-500 ml-1 font-semibold lowercase">{item.unit}</span>
+                      <span className="text-[10px] text-[var(--text-tertiary)] ml-1 lowercase font-normal">{item.unit}</span>
                     </td>
-                    <td className="py-3.5 px-4 text-right font-mono text-slate-350">
-                      {item.unitCost > 0 ? formatCurrency(item.unitCost) : <span className="italic text-slate-555">N/A</span>}
+                    <td className="py-3 px-4 text-right font-mono text-[var(--text-secondary)]">
+                      {item.unitCost > 0 ? formatCurrency(item.unitCost) : <span className="italic text-[var(--text-tertiary)]">N/A</span>}
                     </td>
-                    <td className="py-3.5 px-4 text-right font-mono text-white font-semibold">
-                      {item.totalCost > 0 ? formatCurrency(item.totalCost) : <span className="italic text-slate-555">N/A</span>}
+                    <td className="py-3 px-4 text-right font-mono text-[var(--text-primary)] font-extrabold">
+                      {item.totalCost > 0 ? formatCurrency(item.totalCost) : <span className="italic text-[var(--text-tertiary)]">N/A</span>}
                     </td>
-                    <td className="py-3.5 px-4 text-center">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border ${
-                        item.status.toLowerCase() === 'active' 
-                          ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/10' 
-                          : 'bg-slate-800 text-slate-400 border-slate-700/50'
-                      }`}>
+                    <td className="py-3 px-4 text-center">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-[var(--success-soft)] text-[var(--success)] border border-emerald-200">
                         {item.status}
                       </span>
                     </td>

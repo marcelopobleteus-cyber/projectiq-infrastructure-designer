@@ -35,7 +35,6 @@ export default async function ProjectBOMPage({ params }: PageProps) {
     project = { ...DEMO_PROJECT, id: projectId } as any
   }
 
-  // Fetch actual cameras, devices, and OSP database BOM items
   let cameras: any[] = []
   let cameraModels: any[] = []
   let devices: any[] = []
@@ -56,7 +55,6 @@ export default async function ProjectBOMPage({ params }: PageProps) {
     console.error('Failed to load BOM items:', err)
   }
 
-  // Prepare BOM list
   const mergedItems: any[] = []
 
   // 1. Add Network Devices dynamically
@@ -107,7 +105,7 @@ export default async function ProjectBOMPage({ params }: PageProps) {
     })
   })
 
-  // 3. Add Database BOM Items (Fiber paths, handholes, conduits, etc.)
+  // 3. Add Database BOM Items
   let totalConduitFeet = 0
   let totalCableFeet = 0
   let totalNodePcs = 0
@@ -150,7 +148,7 @@ export default async function ProjectBOMPage({ params }: PageProps) {
     }
   })
 
-  // 4. Add Calculated OSP Labor Items if we have OSP materials
+  // 4. Add Calculated OSP Labor Items
   if (totalConduitFeet > 0 || totalCableFeet > 0 || totalNodePcs > 0 || totalEnclosurePcs > 0) {
     if (totalConduitFeet > 0) {
       mergedItems.push({
@@ -211,13 +209,12 @@ export default async function ProjectBOMPage({ params }: PageProps) {
     }
   }
 
-
   return (
-    <div className="space-y-6 relative z-10 w-full px-6 py-4 font-sans text-slate-300 flex-1 flex flex-col overflow-hidden">
+    <div className="space-y-6 relative z-10 w-full px-6 py-4 font-sans text-[var(--text-primary)] bg-[var(--bg)] flex-1 flex flex-col overflow-hidden min-h-full">
       {/* Page Header */}
-      <div className="border-b border-slate-900 pb-4 shrink-0">
-        <h2 className="text-xl font-black text-white tracking-tight">Bill of Materials (BOM)</h2>
-        <p className="text-xs text-slate-400 mt-1">Export hardware listings, quantities, and device details for procurement</p>
+      <div className="border-b border-[var(--border)] pb-4 shrink-0">
+        <h2 className="text-xl font-extrabold text-[var(--text-primary)] tracking-tight">Bill of Materials (BOM)</h2>
+        <p className="text-xs text-[var(--text-secondary)] mt-1">Export hardware listings, quantities, and device details for procurement</p>
       </div>
 
       {/* Main Table view */}

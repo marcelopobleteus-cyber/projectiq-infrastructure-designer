@@ -327,7 +327,7 @@ export default function ProjectsPage() {
       {/* Create Project Modal */}
       {isCreateOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs" onClick={() => setIsCreateOpen(false)} />
+          <div className="absolute inset-0 bg-[var(--surface-1)] backdrop-blur-xs" onClick={() => setIsCreateOpen(false)} />
           <form onSubmit={handleCreateSubmit} className="relative bg-[var(--surface-1)] border border-[var(--border-strong)] p-6 rounded-xl w-full max-w-lg space-y-4 shadow-2xl animate-in zoom-in-95 duration-150">
             <div>
               <h3 className="text-sm font-black uppercase text-[var(--accent-text)] tracking-wider">Create New Project</h3>
@@ -380,7 +380,7 @@ export default function ProjectsPage() {
       {/* Import Project Modal */}
       {isImportOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs" onClick={() => setIsImportOpen(false)} />
+          <div className="absolute inset-0 bg-[var(--surface-1)] backdrop-blur-xs" onClick={() => setIsImportOpen(false)} />
           <div className="relative bg-[var(--surface-1)] border border-[var(--border-strong)] p-6 rounded-xl w-full max-w-md space-y-4 shadow-2xl animate-in zoom-in-95 duration-150">
             <div>
               <h3 className="text-sm font-black uppercase text-[var(--accent-text)] tracking-wider">Project Import Center</h3>

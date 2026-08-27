@@ -23,7 +23,7 @@ export default function MobileAppShell({
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
 
   return (
-    <div className="flex flex-col min-h-screen w-full bg-background text-foreground font-sans pb-16 selection:bg-indigo-500 selection:text-white">
+    <div className="flex flex-col min-h-screen w-full bg-background text-foreground font-sans pb-16 selection:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white selection:text-white">
       {/* Top Mobile Header */}
       <MobileHeader
         title={title}

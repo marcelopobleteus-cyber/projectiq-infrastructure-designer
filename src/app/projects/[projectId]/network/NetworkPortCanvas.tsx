@@ -168,13 +168,13 @@ export default function NetworkPortCanvas({
                 onClick={() => setSelectedSwitchId(sw.id)}
                 className={`w-full flex items-center justify-between text-left px-3 py-2.5 rounded-xl border text-xs transition-all ${
                   selectedSwitchId === sw.id
-                    ? 'bg-indigo-600/10 border-indigo-500/30 text-white font-semibold'
-                    : 'bg-slate-950/40 border-slate-850 hover:border-slate-800 text-slate-400 hover:text-white'
+                    ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white/10 border-[var(--accent)]/30 text-[var(--text-primary)] font-semibold'
+                    : 'bg-[var(--surface-2)] border-[var(--border)] hover:border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                 }`}
               >
                 <div className="truncate pr-1">
                   <span className="block font-medium truncate">{sw.name}</span>
-                  <span className="text-[10px] text-slate-500 font-mono">IP: {sw.ip_address || 'Unassigned'}</span>
+                  <span className="text-[10px] text-[var(--text-tertiary)] font-mono">IP: {sw.ip_address || 'Unassigned'}</span>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   {isExceeded && (
@@ -182,7 +182,7 @@ export default function NetworkPortCanvas({
                       <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                     </span>
                   )}
-                  <span className="text-[9px] bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded-md font-mono">
+                  <span className="text-[9px] bg-[var(--surface-1)] border border-[var(--border)] text-[var(--text-secondary)] px-1.5 py-0.5 rounded-md font-mono">
                     {poe.used.toFixed(0)}W
                   </span>
                 </div>
@@ -196,16 +196,16 @@ export default function NetworkPortCanvas({
             const isExceeded = poe.used > poe.budget
             
             return (
-              <div key={sw.id} className="border border-slate-850 p-2.5 rounded-xl bg-slate-950/20 text-[10px] space-y-1">
-                <div className="flex justify-between font-semibold text-slate-350">
+              <div key={sw.id} className="border border-[var(--border)] p-2.5 rounded-xl bg-[var(--surface-2)] text-[10px] space-y-1">
+                <div className="flex justify-between font-semibold text-[var(--text-secondary)]">
                   <span>{sw.name}</span>
-                  <span className={isExceeded ? 'text-amber-400' : 'text-slate-400'}>
+                  <span className={isExceeded ? 'text-amber-400' : 'text-[var(--text-secondary)]'}>
                     {poe.used.toFixed(1)}W / {poe.budget}W
                   </span>
                 </div>
-                <div className="w-full bg-slate-900 rounded-full h-1 border border-slate-800 overflow-hidden">
+                <div className="w-full bg-[var(--surface-1)] rounded-full h-1 border border-[var(--border)] overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all ${isExceeded ? 'bg-amber-500' : 'bg-indigo-500'}`}
+                    className={`h-full rounded-full transition-all ${isExceeded ? 'bg-amber-500' : 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white'}`}
                     style={{ width: `${Math.min(poe.percentage, 100)}%` }}
                   />
                 </div>
@@ -220,17 +220,17 @@ export default function NetworkPortCanvas({
         {selectedSwitch ? (
           <>
             {/* Selected Switch summary cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-900/60 backdrop-blur-md border border-slate-800 p-6 rounded-2xl shadow-lg relative overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-[2px] bg-indigo-500/40" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-[var(--surface-1)] backdrop-blur-md border border-[var(--border)] p-6 rounded-2xl shadow-lg relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-[2px] bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white/40" />
               
               {/* Hardware Summary */}
               <div className="space-y-1">
-                <span className="block text-[10px] text-slate-500 uppercase tracking-widest font-bold">Switch Node</span>
-                <h3 className="text-lg font-black text-white">{selectedSwitch.name}</h3>
-                <p className="text-xs text-slate-400 font-mono">
+                <span className="block text-[10px] text-[var(--text-tertiary)] uppercase tracking-widest font-bold">Switch Node</span>
+                <h3 className="text-lg font-black text-[var(--text-primary)]">{selectedSwitch.name}</h3>
+                <p className="text-xs text-[var(--text-secondary)] font-mono">
                   {selectedSwitch.manufacturer || 'Generic'} - {selectedSwitch.model_number || 'Standard Switch'}
                 </p>
-                <div className="pt-2 flex gap-4 text-[10px] text-slate-500 font-mono">
+                <div className="pt-2 flex gap-4 text-[10px] text-[var(--text-tertiary)] font-mono">
                   <span>IP: {selectedSwitch.ip_address || 'Unassigned'}</span>
                   <span>Rack Unit: {selectedSwitch.rack_unit || 'Unplaced'}</span>
                 </div>
@@ -238,34 +238,34 @@ export default function NetworkPortCanvas({
 
               {/* Ports allocation */}
               <div className="space-y-2.5">
-                <span className="block text-[10px] text-slate-500 uppercase tracking-widest font-bold">Ports Allocation</span>
+                <span className="block text-[10px] text-[var(--text-tertiary)] uppercase tracking-widest font-bold">Ports Allocation</span>
                 <div className="grid grid-cols-3 gap-2">
-                  <div className="bg-slate-950/40 border border-slate-850 p-2 rounded-xl text-center">
-                    <span className="block text-[9px] text-slate-500 font-semibold uppercase">Total</span>
-                    <span className="text-lg font-bold text-white font-mono">{totalPortsCount}</span>
+                  <div className="bg-[var(--surface-2)] border border-[var(--border)] p-2 rounded-xl text-center">
+                    <span className="block text-[9px] text-[var(--text-tertiary)] font-semibold uppercase">Total</span>
+                    <span className="text-lg font-bold text-[var(--text-primary)] font-mono">{totalPortsCount}</span>
                   </div>
-                  <div className="bg-slate-950/40 border border-slate-850 p-2 rounded-xl text-center">
-                    <span className="block text-[9px] text-slate-500 font-semibold uppercase">Connected</span>
+                  <div className="bg-[var(--surface-2)] border border-[var(--border)] p-2 rounded-xl text-center">
+                    <span className="block text-[9px] text-[var(--text-tertiary)] font-semibold uppercase">Connected</span>
                     <span className="text-lg font-bold text-emerald-400 font-mono">{usedPortsCount}</span>
                   </div>
-                  <div className="bg-slate-950/40 border border-slate-850 p-2 rounded-xl text-center">
-                    <span className="block text-[9px] text-slate-500 font-semibold uppercase">Available</span>
-                    <span className="text-lg font-bold text-slate-400 font-mono">{availablePortsCount}</span>
+                  <div className="bg-[var(--surface-2)] border border-[var(--border)] p-2 rounded-xl text-center">
+                    <span className="block text-[9px] text-[var(--text-tertiary)] font-semibold uppercase">Available</span>
+                    <span className="text-lg font-bold text-[var(--text-secondary)] font-mono">{availablePortsCount}</span>
                   </div>
                 </div>
               </div>
 
               {/* Power / PoE budget */}
               <div className="space-y-2">
-                <span className="block text-[10px] text-slate-500 uppercase tracking-widest font-bold">PoE Budget Allocation</span>
+                <span className="block text-[10px] text-[var(--text-tertiary)] uppercase tracking-widest font-bold">PoE Budget Allocation</span>
                 <div className="space-y-1">
                   <div className="flex justify-between text-xs font-mono">
-                    <span className="text-slate-400">Total Draw:</span>
+                    <span className="text-[var(--text-secondary)]">Total Draw:</span>
                     <span className={`font-bold ${currentPoe.used > currentPoe.budget ? 'text-amber-400' : 'text-emerald-450'}`}>
                       {currentPoe.used.toFixed(1)}W / {currentPoe.budget}W
                     </span>
                   </div>
-                  <div className="w-full bg-slate-950 border border-slate-850 h-2 rounded-full overflow-hidden">
+                  <div className="w-full bg-[var(--surface-2)] border border-[var(--border)] h-2 rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all ${currentPoe.used > currentPoe.budget ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}
                       style={{ width: `${Math.min(currentPoe.percentage, 100)}%` }}
@@ -283,15 +283,15 @@ export default function NetworkPortCanvas({
             </div>
 
             {/* Visual switch faceplate Ports Matrix */}
-            <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg space-y-4">
-              <span className="block text-[10px] text-slate-500 uppercase tracking-widest font-black">Visual Ports Matrix (RJ45 Grid)</span>
+            <div className="bg-[var(--surface-1)] border border-[var(--border)] p-6 rounded-2xl shadow-lg space-y-4">
+              <span className="block text-[10px] text-[var(--text-tertiary)] uppercase tracking-widest font-black">Visual Ports Matrix (RJ45 Grid)</span>
               
               {loading ? (
-                <div className="h-36 flex items-center justify-center text-xs text-slate-500 animate-pulse">Loading visual ports...</div>
+                <div className="h-36 flex items-center justify-center text-xs text-[var(--text-tertiary)] animate-pulse">Loading visual ports...</div>
               ) : ports.length === 0 ? (
-                <div className="h-36 flex items-center justify-center text-xs text-slate-500">No ports configured for this switch.</div>
+                <div className="h-36 flex items-center justify-center text-xs text-[var(--text-tertiary)]">No ports configured for this switch.</div>
               ) : (
-                <div className="flex flex-col items-center bg-slate-950/80 border border-slate-850 p-6 rounded-2xl">
+                <div className="flex flex-col items-center bg-[var(--surface-2)] border border-[var(--border)] p-6 rounded-2xl">
                   {/* Two rows of RJ45 ports */}
                   <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-3.5 w-full max-w-4xl">
                     {/* Row 1: Odd ports */}
@@ -303,7 +303,7 @@ export default function NetworkPortCanvas({
                           className={`aspect-square border rounded-xl flex flex-col justify-between p-1.5 transition-all group relative cursor-help ${
                             isAssigned
                               ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-450 hover:bg-emerald-500/15 hover:border-emerald-500/50'
-                              : 'bg-slate-900 border-slate-800 text-slate-550 hover:border-slate-700'
+                              : 'bg-[var(--surface-1)] border-[var(--border)] text-slate-550 hover:border-slate-700'
                           }`}
                         >
                           {/* Status LED Dot */}
@@ -317,20 +317,20 @@ export default function NetworkPortCanvas({
                           </div>
 
                           {/* Float Tooltip Details */}
-                          <div className="absolute bottom-14 left-1/2 -translate-x-1/2 bg-slate-950 text-slate-200 text-[10px] p-3 rounded-xl border border-slate-850 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-2xl w-48 space-y-1.5">
-                            <p className="font-bold text-white border-b border-slate-850 pb-1">Port {port.port_number} ({port.port_type.toUpperCase()})</p>
-                            <p>Speed: <span className="font-mono text-white">{port.speed_mbps} Mbps</span></p>
-                            <p>VLAN: <span className="font-mono text-white">{port.vlan_id}</span></p>
-                            <p>PoE: <span className="font-mono text-white">{port.poe_enabled ? `${port.poe_budget_watts}W Max (Enabled)` : 'Disabled'}</span></p>
+                          <div className="absolute bottom-14 left-1/2 -translate-x-1/2 bg-[var(--surface-2)] text-[var(--text-primary)] text-[10px] p-3 rounded-xl border border-[var(--border)] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-2xl w-48 space-y-1.5">
+                            <p className="font-bold text-[var(--text-primary)] border-b border-[var(--border)] pb-1">Port {port.port_number} ({port.port_type.toUpperCase()})</p>
+                            <p>Speed: <span className="font-mono text-[var(--text-primary)]">{port.speed_mbps} Mbps</span></p>
+                            <p>VLAN: <span className="font-mono text-[var(--text-primary)]">{port.vlan_id}</span></p>
+                            <p>PoE: <span className="font-mono text-[var(--text-primary)]">{port.poe_enabled ? `${port.poe_budget_watts}W Max (Enabled)` : 'Disabled'}</span></p>
                             {isAssigned ? (
-                              <div className="border-t border-slate-850 pt-1 mt-1 text-emerald-400 font-medium">
+                              <div className="border-t border-[var(--border)] pt-1 mt-1 text-emerald-400 font-medium">
                                 <p>Assigned Camera: {port.assigned_camera?.camera_id_tag}</p>
-                                <p className="text-[9px] text-slate-400">
+                                <p className="text-[9px] text-[var(--text-secondary)]">
                                   Model: {port.assigned_camera?.camera_models?.manufacturer} - {port.assigned_camera?.camera_models?.model_number} ({port.assigned_camera?.camera_models?.default_poe_draw}W)
                                 </p>
                               </div>
                             ) : (
-                              <p className="text-slate-500 italic mt-0.5">Available / Unassigned</p>
+                              <p className="text-[var(--text-tertiary)] italic mt-0.5">Available / Unassigned</p>
                             )}
                           </div>
                         </div>
@@ -346,7 +346,7 @@ export default function NetworkPortCanvas({
                           className={`aspect-square border rounded-xl flex flex-col justify-between p-1.5 transition-all group relative cursor-help ${
                             isAssigned
                               ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-450 hover:bg-emerald-500/15 hover:border-emerald-500/50'
-                              : 'bg-slate-900 border-slate-800 text-slate-550 hover:border-slate-700'
+                              : 'bg-[var(--surface-1)] border-[var(--border)] text-slate-550 hover:border-slate-700'
                           }`}
                         >
                           {/* Status LED Dot */}
@@ -360,20 +360,20 @@ export default function NetworkPortCanvas({
                           </div>
 
                           {/* Float Tooltip Details */}
-                          <div className="absolute top-14 left-1/2 -translate-x-1/2 bg-slate-950 text-slate-200 text-[10px] p-3 rounded-xl border border-slate-850 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-2xl w-48 space-y-1.5">
-                            <p className="font-bold text-white border-b border-slate-850 pb-1">Port {port.port_number} ({port.port_type.toUpperCase()})</p>
-                            <p>Speed: <span className="font-mono text-white">{port.speed_mbps} Mbps</span></p>
-                            <p>VLAN: <span className="font-mono text-white">{port.vlan_id}</span></p>
-                            <p>PoE: <span className="font-mono text-white">{port.poe_enabled ? `${port.poe_budget_watts}W Max (Enabled)` : 'Disabled'}</span></p>
+                          <div className="absolute top-14 left-1/2 -translate-x-1/2 bg-[var(--surface-2)] text-[var(--text-primary)] text-[10px] p-3 rounded-xl border border-[var(--border)] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-2xl w-48 space-y-1.5">
+                            <p className="font-bold text-[var(--text-primary)] border-b border-[var(--border)] pb-1">Port {port.port_number} ({port.port_type.toUpperCase()})</p>
+                            <p>Speed: <span className="font-mono text-[var(--text-primary)]">{port.speed_mbps} Mbps</span></p>
+                            <p>VLAN: <span className="font-mono text-[var(--text-primary)]">{port.vlan_id}</span></p>
+                            <p>PoE: <span className="font-mono text-[var(--text-primary)]">{port.poe_enabled ? `${port.poe_budget_watts}W Max (Enabled)` : 'Disabled'}</span></p>
                             {isAssigned ? (
-                              <div className="border-t border-slate-850 pt-1 mt-1 text-emerald-400 font-medium">
+                              <div className="border-t border-[var(--border)] pt-1 mt-1 text-emerald-400 font-medium">
                                 <p>Assigned Camera: {port.assigned_camera?.camera_id_tag}</p>
-                                <p className="text-[9px] text-slate-400">
+                                <p className="text-[9px] text-[var(--text-secondary)]">
                                   Model: {port.assigned_camera?.camera_models?.manufacturer} - {port.assigned_camera?.camera_models?.model_number} ({port.assigned_camera?.camera_models?.default_poe_draw}W)
                                 </p>
                               </div>
                             ) : (
-                              <p className="text-slate-500 italic mt-0.5">Available / Unassigned</p>
+                              <p className="text-[var(--text-tertiary)] italic mt-0.5">Available / Unassigned</p>
                             )}
                           </div>
                         </div>
@@ -385,18 +385,18 @@ export default function NetworkPortCanvas({
             </div>
 
             {/* Ports details tabular matrix */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-lg overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-800 bg-slate-950/20">
-                <h4 className="font-black text-xs text-white uppercase tracking-wider">Ports Allocation Matrix Table</h4>
+            <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl shadow-lg overflow-hidden">
+              <div className="px-6 py-4 border-b border-[var(--border)] bg-[var(--surface-2)]">
+                <h4 className="font-black text-xs text-[var(--text-primary)] uppercase tracking-wider">Ports Allocation Matrix Table</h4>
               </div>
 
               {loading ? (
-                <div className="p-8 text-center text-xs text-slate-500 animate-pulse">Loading ports table...</div>
+                <div className="p-8 text-center text-xs text-[var(--text-tertiary)] animate-pulse">Loading ports table...</div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
-                      <tr className="bg-slate-950/60 text-slate-400 font-mono border-b border-slate-800 uppercase text-[9px] tracking-wider">
+                      <tr className="bg-[var(--surface-2)] text-[var(--text-secondary)] font-mono border-b border-[var(--border)] uppercase text-[9px] tracking-wider">
                         <th className="py-3 px-6">Port</th>
                         <th className="py-3 px-4">Media</th>
                         <th className="py-3 px-4">Speed</th>
@@ -414,13 +414,13 @@ export default function NetworkPortCanvas({
                         
                         return (
                           <tr key={port.id} className="hover:bg-slate-850/20 transition-colors">
-                            <td className="py-3.5 px-6 font-bold text-white">Port {port.port_number}</td>
-                            <td className="py-3.5 px-4 uppercase font-mono text-[10px] text-slate-400">{port.port_type}</td>
-                            <td className="py-3.5 px-4 font-mono text-slate-300">{port.speed_mbps}M</td>
-                            <td className="py-3.5 px-4 font-mono text-slate-350">{port.vlan_id}</td>
+                            <td className="py-3.5 px-6 font-bold text-[var(--text-primary)]">Port {port.port_number}</td>
+                            <td className="py-3.5 px-4 uppercase font-mono text-[10px] text-[var(--text-secondary)]">{port.port_type}</td>
+                            <td className="py-3.5 px-4 font-mono text-[var(--text-primary)]">{port.speed_mbps}M</td>
+                            <td className="py-3.5 px-4 font-mono text-[var(--text-secondary)]">{port.vlan_id}</td>
                             <td className="py-3.5 px-4">
                               {port.poe_enabled ? (
-                                <span className="font-mono text-indigo-400">{port.poe_budget_watts}W (PoE)</span>
+                                <span className="font-mono text-[var(--accent-text)]">{port.poe_budget_watts}W (PoE)</span>
                               ) : (
                                 <span className="text-slate-650">Disabled</span>
                               )}
@@ -429,7 +429,7 @@ export default function NetworkPortCanvas({
                               <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
                                 isAssigned 
                                   ? 'bg-emerald-500/10 text-emerald-450 border border-emerald-500/20' 
-                                  : 'bg-slate-950 border border-slate-850 text-slate-500'
+                                  : 'bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-tertiary)]'
                               }`}>
                                 <span className={`w-1 h-1 rounded-full ${isAssigned ? 'bg-emerald-400' : 'bg-slate-700'}`} />
                                 {isAssigned ? 'Active' : 'Down'}
@@ -439,7 +439,7 @@ export default function NetworkPortCanvas({
                               {isAssigned ? (
                                 <div className="space-y-0.5">
                                   <span className="font-bold text-emerald-400 text-xs">{camera.camera_id_tag}</span>
-                                  <span className="block text-[9px] text-slate-400 font-mono">
+                                  <span className="block text-[9px] text-[var(--text-secondary)] font-mono">
                                     Model PoE: {camera.camera_models?.default_poe_draw}W
                                   </span>
                                 </div>
@@ -461,7 +461,7 @@ export default function NetworkPortCanvas({
                                   <select
                                     value={quickAssignCam[port.id] || ''}
                                     onChange={e => setQuickAssignCam(prev => ({ ...prev, [port.id]: e.target.value }))}
-                                    className="px-2 py-1 bg-slate-950 border border-slate-850 rounded text-[10px] text-white focus:outline-none"
+                                    className="px-2 py-1 bg-[var(--surface-2)] border border-[var(--border)] rounded text-[10px] text-[var(--text-primary)] focus:outline-none"
                                   >
                                     <option value="">Choose camera...</option>
                                     {unassignedCameras.map(c => (
@@ -471,7 +471,7 @@ export default function NetworkPortCanvas({
                                   <button
                                     onClick={() => handleQuickAssign(port.id)}
                                     disabled={!quickAssignCam[port.id] || isPending}
-                                    className="px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-950 disabled:border-slate-850 disabled:text-slate-600 text-[10px] border border-indigo-500/20 font-semibold text-white transition-all"
+                                    className="px-2.5 py-1 rounded bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white disabled:bg-[var(--surface-2)] disabled:border-[var(--border)] disabled:text-slate-600 text-[10px] border border-[var(--accent)]/20 font-semibold text-[var(--text-primary)] transition-all"
                                   >
                                     Assign
                                   </button>
@@ -488,13 +488,13 @@ export default function NetworkPortCanvas({
             </div>
           </>
         ) : (
-          <div className="flex flex-col items-center justify-center text-center py-20 bg-slate-900 border border-slate-800 rounded-2xl shadow-lg p-8 space-y-4">
-            <div className="w-16 h-16 rounded-full bg-slate-950 border border-slate-850 flex items-center justify-center text-slate-500">
+          <div className="flex flex-col items-center justify-center text-center py-20 bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl shadow-lg p-8 space-y-4">
+            <div className="w-16 h-16 rounded-full bg-[var(--surface-2)] border border-[var(--border)] flex items-center justify-center text-[var(--text-tertiary)]">
               <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M12 8v8"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/></svg>
             </div>
             <div>
-              <h4 className="font-bold text-white text-sm">No Network Switches Configured</h4>
-              <p className="text-xs text-slate-400 mt-2 max-w-sm mx-auto leading-relaxed">
+              <h4 className="font-bold text-[var(--text-primary)] text-sm">No Network Switches Configured</h4>
+              <p className="text-xs text-[var(--text-secondary)] mt-2 max-w-sm mx-auto leading-relaxed">
                 Configure switches in the **Map Layout** workspace using **Add Network Device** mode first to populate the ports matrix layout.
               </p>
             </div>

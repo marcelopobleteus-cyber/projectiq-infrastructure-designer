@@ -1666,18 +1666,18 @@ export default function FiberMapCanvas({
         <div className="flex-1 relative h-full flex flex-col min-w-0">
           
           {/* Map Toolbar Overlay */}
-          <div className="absolute top-3 left-3 z-20 bg-slate-900/95 backdrop-blur-md border border-slate-800 p-1.5 rounded-xl shadow-xl flex items-center gap-1.5 font-sans">
+          <div className="absolute top-3 left-3 z-20 bg-[var(--surface-1)]/95 backdrop-blur-md border border-[var(--border)] p-1.5 rounded-xl shadow-xl flex items-center gap-1.5 font-sans">
             <button
               onClick={() => { setToolMode('select'); setTempRoutePoints([]) }}
               className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
-                toolMode === 'select' ? 'bg-indigo-600 text-white shadow-inner shadow-indigo-950/20' : 'bg-transparent text-slate-400 hover:text-white'
+                toolMode === 'select' ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] shadow-inner shadow-indigo-950/20' : 'bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
               Select
             </button>
             <div className="w-px h-4 bg-slate-800" />
             
-            <div className="flex items-center gap-1 bg-slate-950 border border-slate-850 p-0.5 rounded-lg">
+            <div className="flex items-center gap-1 bg-[var(--surface-2)] border border-[var(--border)] p-0.5 rounded-lg">
               <select
                 id="toolbar-node-type-select"
                 defaultValue="Handhole"
@@ -1686,17 +1686,17 @@ export default function FiberMapCanvas({
                   setToolMode(newMode)
                   setTempRoutePoints([])
                 }}
-                className="bg-transparent text-[10px] font-bold uppercase tracking-wide px-1.5 py-1 text-slate-350 focus:outline-none"
+                className="bg-transparent text-[10px] font-bold uppercase tracking-wide px-1.5 py-1 text-[var(--text-secondary)] focus:outline-none"
               >
-                <option value="Manhole" className="bg-slate-900">Manhole</option>
-                <option value="Handhole" className="bg-slate-900">Handhole</option>
-                <option value="Pull Box" className="bg-slate-900">Pull Box</option>
-                <option value="Cabinet" className="bg-slate-900">Cabinet</option>
-                <option value="Pole" className="bg-slate-900">Pole</option>
-                <option value="Building" className="bg-slate-900">Building</option>
-                <option value="Existing Fiber Source" className="bg-slate-900">Existing Fiber Source</option>
-                <option value="Camera Location" className="bg-slate-900">Camera Location</option>
-                <option value="Custom" className="bg-slate-900">Custom</option>
+                <option value="Manhole" className="bg-[var(--surface-1)]">Manhole</option>
+                <option value="Handhole" className="bg-[var(--surface-1)]">Handhole</option>
+                <option value="Pull Box" className="bg-[var(--surface-1)]">Pull Box</option>
+                <option value="Cabinet" className="bg-[var(--surface-1)]">Cabinet</option>
+                <option value="Pole" className="bg-[var(--surface-1)]">Pole</option>
+                <option value="Building" className="bg-[var(--surface-1)]">Building</option>
+                <option value="Existing Fiber Source" className="bg-[var(--surface-1)]">Existing Fiber Source</option>
+                <option value="Camera Location" className="bg-[var(--surface-1)]">Camera Location</option>
+                <option value="Custom" className="bg-[var(--surface-1)]">Custom</option>
               </select>
               <button
                 onClick={() => {
@@ -1706,7 +1706,7 @@ export default function FiberMapCanvas({
                   setTempRoutePoints([])
                 }}
                 className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide transition-all ${
-                  toolMode !== 'select' && toolMode !== 'draw_route' ? 'bg-emerald-600 text-white shadow shadow-emerald-800' : 'bg-slate-800 text-slate-400 hover:text-white'
+                  toolMode !== 'select' && toolMode !== 'draw_route' ? 'bg-emerald-600 text-[var(--text-primary)] shadow shadow-emerald-800' : 'bg-slate-800 text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                 }`}
               >
                 + Place Node
@@ -1717,7 +1717,7 @@ export default function FiberMapCanvas({
             <button
               onClick={() => { setToolMode('draw_route'); setTempRoutePoints([]) }}
               className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
-                toolMode === 'draw_route' ? 'bg-rose-600 text-white' : 'bg-transparent text-slate-400 hover:text-white'
+                toolMode === 'draw_route' ? 'bg-rose-600 text-[var(--text-primary)]' : 'bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
               Draw Route
@@ -1728,13 +1728,13 @@ export default function FiberMapCanvas({
               <>
                 <button
                   onClick={handleFinishRoute}
-                  className="px-2.5 py-1.5 bg-indigo-650 hover:bg-indigo-600 border border-indigo-500/20 text-white rounded-lg text-[10px] font-bold uppercase"
+                  className="px-2.5 py-1.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white border border-[var(--accent)]/20 text-[var(--text-primary)] rounded-lg text-[10px] font-bold uppercase"
                 >
                   Finish Route
                 </button>
                 <button
                   onClick={() => setTempRoutePoints([])}
-                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-750 text-slate-350 rounded-lg text-[10px] font-bold uppercase"
+                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-750 text-[var(--text-secondary)] rounded-lg text-[10px] font-bold uppercase"
                 >
                   Clear
                 </button>
@@ -1743,18 +1743,18 @@ export default function FiberMapCanvas({
           </div>
 
           {/* Map canvas container */}
-          <div className="w-full h-full min-h-0 bg-slate-950 flex-1 relative">
+          <div className="w-full h-full min-h-0 bg-[var(--surface-2)] flex-1 relative">
             {/* Map layer toggle UI */}
             {!errorMessage && (
-              <div className="absolute top-3 right-3 z-10 flex bg-slate-950/70 border border-slate-805 rounded-xl p-1 gap-1 backdrop-blur-md">
+              <div className="absolute top-3 right-3 z-10 flex bg-[var(--surface-2)]/70 border border-slate-805 rounded-xl p-1 gap-1 backdrop-blur-md">
                 {(['hybrid', 'roadmap', 'satellite'] as const).map(layer => (
                   <button
                     key={layer}
                     onClick={() => handleLayerChange(layer)}
                     className={`px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider rounded-lg transition-all ${
                       activeLayer === layer
-                        ? 'bg-indigo-650 text-white font-bold'
-                        : 'text-slate-400 hover:text-slate-200'
+                        ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] font-bold'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                     }`}
                   >
                     {layer === 'roadmap' ? 'Road' : layer === 'hybrid' ? 'Hybrid' : 'Sat'}
@@ -1781,14 +1781,14 @@ export default function FiberMapCanvas({
         </div>
 
         {/* Right Side: Tabbed Config Drawer */}
-        <aside className="w-96 bg-slate-900 border-l border-slate-800 flex flex-col shrink-0 h-full overflow-hidden z-10 font-sans">
+        <aside className="w-96 bg-[var(--surface-1)] border-l border-[var(--border)] flex flex-col shrink-0 h-full overflow-hidden z-10 font-sans">
           
           {/* Navigation tab bar */}
-          <div className="flex border-b border-slate-850 shrink-0">
+          <div className="flex border-b border-[var(--border)] shrink-0">
             <button
               onClick={() => setActiveTab('properties')}
               className={`flex-1 py-3 text-center text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
-                activeTab === 'properties' ? 'border-indigo-500 text-white bg-slate-950/20' : 'border-transparent text-slate-450 hover:text-white'
+                activeTab === 'properties' ? 'border-[var(--accent)] text-[var(--text-primary)] bg-[var(--surface-2)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
               Props
@@ -1796,7 +1796,7 @@ export default function FiberMapCanvas({
             <button
               onClick={() => setActiveTab('splice')}
               className={`flex-1 py-3 text-center text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
-                activeTab === 'splice' ? 'border-indigo-500 text-white bg-slate-950/20' : 'border-transparent text-slate-450 hover:text-white'
+                activeTab === 'splice' ? 'border-[var(--accent)] text-[var(--text-primary)] bg-[var(--surface-2)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
               disabled={!selectedNode || (selectedNode.node_type !== 'Splice Enclosure' && selectedNode.node_type !== 'Cabinet' && selectedNode.node_type !== 'Handhole')}
               title={(!selectedNode || (selectedNode.node_type !== 'Splice Enclosure' && selectedNode.node_type !== 'Cabinet' && selectedNode.node_type !== 'Handhole')) ? 'Select a Splice Enclosure on the map first' : ''}
@@ -1806,7 +1806,7 @@ export default function FiberMapCanvas({
             <button
               onClick={() => setActiveTab('cameras')}
               className={`flex-1 py-3 text-center text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
-                activeTab === 'cameras' ? 'border-indigo-500 text-white bg-slate-950/20' : 'border-transparent text-slate-450 hover:text-white'
+                activeTab === 'cameras' ? 'border-[var(--accent)] text-[var(--text-primary)] bg-[var(--surface-2)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
               Cameras
@@ -1814,7 +1814,7 @@ export default function FiberMapCanvas({
             <button
               onClick={() => setActiveTab('lists')}
               className={`flex-1 py-3 text-center text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
-                activeTab === 'lists' ? 'border-indigo-500 text-white bg-slate-950/20' : 'border-transparent text-slate-450 hover:text-white'
+                activeTab === 'lists' ? 'border-[var(--accent)] text-[var(--text-primary)] bg-[var(--surface-2)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
               Lists
@@ -1822,7 +1822,7 @@ export default function FiberMapCanvas({
             <button
               onClick={() => setActiveTab('catalog')}
               className={`flex-1 py-3 text-center text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
-                activeTab === 'catalog' ? 'border-indigo-500 text-white bg-slate-950/20' : 'border-transparent text-slate-450 hover:text-white'
+                activeTab === 'catalog' ? 'border-[var(--accent)] text-[var(--text-primary)] bg-[var(--surface-2)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
               Catalog
@@ -1839,9 +1839,9 @@ export default function FiberMapCanvas({
                 {/* 1. Default (No selection) - Fiber Dashboard */}
                 {!selectedNode && !selectedRoute && (
                   <div className="space-y-4 font-sans">
-                    <div className="border-b border-slate-800 pb-2">
-                      <h4 className="text-sm font-bold text-white uppercase tracking-wider">OSP Fiber Dashboard</h4>
-                      <p className="text-xs text-slate-400 mt-0.5">Real-time status of the 35-camera fiber rollout</p>
+                    <div className="border-b border-[var(--border)] pb-2">
+                      <h4 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider">OSP Fiber Dashboard</h4>
+                      <p className="text-xs text-[var(--text-secondary)] mt-0.5">Real-time status of the 35-camera fiber rollout</p>
                     </div>
 
                     {/* Calculated stats variables */}
@@ -1861,31 +1861,31 @@ export default function FiberMapCanvas({
                       return (
                         <>
                           <div className="grid grid-cols-2 gap-2.5">
-                            <div className="bg-slate-950/40 border border-slate-850 p-2.5 rounded-xl">
-                              <div className="text-xs font-bold text-slate-500 uppercase tracking-wide">Total Cameras</div>
-                              <div className="text-xl font-bold text-white mt-0.5">{totalCams}</div>
-                              <div className="text-xs text-slate-450 mt-1">{fiberCams} Fiber • {ethCams} Ethernet</div>
+                            <div className="bg-[var(--surface-2)] border border-[var(--border)] p-2.5 rounded-xl">
+                              <div className="text-xs font-bold text-[var(--text-tertiary)] uppercase tracking-wide">Total Cameras</div>
+                              <div className="text-xl font-bold text-[var(--text-primary)] mt-0.5">{totalCams}</div>
+                              <div className="text-xs text-[var(--text-secondary)] mt-1">{fiberCams} Fiber • {ethCams} Ethernet</div>
                             </div>
-                            <div className="bg-slate-950/40 border border-slate-850 p-2.5 rounded-xl">
-                              <div className="text-xs font-bold text-slate-500 uppercase tracking-wide">Fiber Paths</div>
-                              <div className="text-xl font-bold text-indigo-400 mt-0.5">{assignedCams}</div>
-                              <div className="text-xs text-slate-450 mt-1 font-mono">
+                            <div className="bg-[var(--surface-2)] border border-[var(--border)] p-2.5 rounded-xl">
+                              <div className="text-xs font-bold text-[var(--text-tertiary)] uppercase tracking-wide">Fiber Paths</div>
+                              <div className="text-xl font-bold text-[var(--accent-text)] mt-0.5">{assignedCams}</div>
+                              <div className="text-xs text-[var(--text-secondary)] mt-1 font-mono">
                                 {fiberCams > 0 ? Math.round((assignedCams / fiberCams) * 100) : 0}% Assigned
                               </div>
                             </div>
                           </div>
 
                           {/* Progress bars / Rollout Status */}
-                          <div className="bg-slate-950/20 border border-slate-850 p-3 rounded-xl space-y-3.5">
-                            <h5 className="text-xs font-bold text-slate-450 uppercase tracking-wider border-b border-slate-850 pb-1.5">Rollout Execution</h5>
+                          <div className="bg-[var(--surface-2)] border border-[var(--border)] p-3 rounded-xl space-y-3.5">
+                            <h5 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider border-b border-[var(--border)] pb-1.5">Rollout Execution</h5>
                             
                             {/* Pulling Drop Cables */}
                             <div className="space-y-1">
                               <div className="flex justify-between items-center text-xs">
-                                <span className="text-slate-400">Fiber Drops Pulled</span>
-                                <span className="font-mono text-white font-bold">{dropsPulled} / {assignedCams}</span>
+                                <span className="text-[var(--text-secondary)]">Fiber Drops Pulled</span>
+                                <span className="font-mono text-[var(--text-primary)] font-bold">{dropsPulled} / {assignedCams}</span>
                               </div>
-                              <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden">
+                              <div className="w-full bg-[var(--surface-2)] rounded-full h-1.5 overflow-hidden">
                                 <div 
                                   className="bg-blue-500 h-1.5 rounded-full transition-all duration-500"
                                   style={{ width: `${assignedCams > 0 ? (dropsPulled / assignedCams) * 100 : 0}%` }}
@@ -1896,10 +1896,10 @@ export default function FiberMapCanvas({
                             {/* Splicing */}
                             <div className="space-y-1">
                               <div className="flex justify-between items-center text-xs">
-                                <span className="text-slate-400">Strands Spliced</span>
-                                <span className="font-mono text-white font-bold">{splicesComplete} / {assignedCams}</span>
+                                <span className="text-[var(--text-secondary)]">Strands Spliced</span>
+                                <span className="font-mono text-[var(--text-primary)] font-bold">{splicesComplete} / {assignedCams}</span>
                               </div>
-                              <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden">
+                              <div className="w-full bg-[var(--surface-2)] rounded-full h-1.5 overflow-hidden">
                                 <div 
                                   className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500"
                                   style={{ width: `${assignedCams > 0 ? (splicesComplete / assignedCams) * 100 : 0}%` }}
@@ -1910,10 +1910,10 @@ export default function FiberMapCanvas({
                             {/* Testing */}
                             <div className="space-y-1">
                               <div className="flex justify-between items-center text-xs">
-                                <span className="text-slate-400">OTDR Tests Passed</span>
-                                <span className="font-mono text-white font-bold">{testsPassed} / {assignedCams}</span>
+                                <span className="text-[var(--text-secondary)]">OTDR Tests Passed</span>
+                                <span className="font-mono text-[var(--text-primary)] font-bold">{testsPassed} / {assignedCams}</span>
                               </div>
-                              <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden">
+                              <div className="w-full bg-[var(--surface-2)] rounded-full h-1.5 overflow-hidden">
                                 <div 
                                   className="bg-teal-500 h-1.5 rounded-full transition-all duration-500"
                                   style={{ width: `${assignedCams > 0 ? (testsPassed / assignedCams) * 100 : 0}%` }}
@@ -1923,28 +1923,28 @@ export default function FiberMapCanvas({
                           </div>
 
                           {/* Detailed Statistics list */}
-                          <div className="bg-slate-950/40 border border-slate-850 p-3 rounded-xl space-y-2 text-[11px]">
-                            <div className="flex justify-between text-slate-400">
+                          <div className="bg-[var(--surface-2)] border border-[var(--border)] p-3 rounded-xl space-y-2 text-[11px]">
+                            <div className="flex justify-between text-[var(--text-secondary)]">
                               <span>Planned Drops (Not Pulled):</span>
                               <span className="font-bold text-yellow-500">{dropsPlanned}</span>
                             </div>
-                            <div className="flex justify-between text-slate-400">
+                            <div className="flex justify-between text-[var(--text-secondary)]">
                               <span>Splicing Pending:</span>
                               <span className="font-bold text-blue-400">{splicesPending}</span>
                             </div>
-                            <div className="flex justify-between text-slate-400">
+                            <div className="flex justify-between text-[var(--text-secondary)]">
                               <span>OTDR Retests Required:</span>
                               <span className="font-bold text-amber-500">
                                 {initialData.assignments.filter(a => a.test_status === 'Needs Retest').length}
                               </span>
                             </div>
-                            <div className="flex justify-between text-slate-400">
+                            <div className="flex justify-between text-[var(--text-secondary)]">
                               <span>Blocked Fiber Paths:</span>
                               <span className="font-bold text-red-500">{blockedPaths}</span>
                             </div>
                           </div>
 
-                          <div className="text-center p-3 border border-indigo-500/10 bg-indigo-950/20 rounded-xl">
+                          <div className="text-center p-3 border border-[var(--accent)]/10 bg-[var(--accent-soft)] text-[var(--accent-text)]/20 rounded-xl">
                             <p className="text-xs text-indigo-300 leading-normal">
                               Select any <strong>Fiber Node</strong> marker or <strong>Conduit Route</strong> on the map to configure splices, enclosures, physical specs, and camera loops.
                             </p>
@@ -1958,8 +1958,8 @@ export default function FiberMapCanvas({
                 {/* 2. Fiber Node specifications */}
                 {selectedNode && (
                   <div className="space-y-4">
-                    <div className="border-b border-slate-850 pb-2 flex justify-between items-center">
-                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold uppercase bg-indigo-950/40 text-indigo-400 border border-indigo-500/10">
+                    <div className="border-b border-[var(--border)] pb-2 flex justify-between items-center">
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold uppercase bg-[var(--accent-soft)] text-[var(--accent-text)]/40 text-[var(--accent-text)] border border-[var(--accent)]/10">
                         {selectedNode.node_type.replace('_', ' ')}
                       </span>
                       <button 
@@ -1972,66 +1972,66 @@ export default function FiberMapCanvas({
 
                     <div className="space-y-3.5 text-sm">
                       <div>
-                        <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Node Tag/ID</label>
+                        <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Node Tag/ID</label>
                         <input
                           type="text"
                           value={nodeIdTag}
                           onChange={e => setNodeIdTag(e.target.value)}
-                          className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                          className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none"
                         />
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Latitude</label>
+                          <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Latitude</label>
                           <input
                             type="number"
                             step="0.00000001"
                             value={nodeLat}
                             onChange={e => setNodeLat(Number(e.target.value))}
-                            className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none font-mono text-xs"
+                            className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none font-mono text-xs"
                           />
                         </div>
                         <div>
-                          <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Longitude</label>
+                          <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Longitude</label>
                           <input
                             type="number"
                             step="0.00000001"
                             value={nodeLng}
                             onChange={e => setNodeLng(Number(e.target.value))}
-                            className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none font-mono text-xs"
+                            className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none font-mono text-xs"
                           />
                         </div>
                       </div>
 
                       <div>
-                        <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Dimensions (Size)</label>
+                        <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Dimensions (Size)</label>
                         <input
                           type="text"
                           value={nodeSize}
                           onChange={e => setNodeSize(e.target.value)}
-                          className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                          className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none"
                         />
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Elevation (m)</label>
+                          <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Elevation (m)</label>
                           <input
                             type="number"
                             step="0.1"
                             value={nodeElevation}
                             onChange={e => setNodeElevation(Number(e.target.value))}
-                            className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                            className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none"
                           />
                         </div>
                         <div>
-                          <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Slack Loop (ft)</label>
+                          <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Slack Loop (ft)</label>
                           <input
                             type="number"
                             value={nodeSlack}
                             onChange={e => setNodeSlack(Number(e.target.value))}
-                            className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                            className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none"
                           />
                         </div>
                       </div>
@@ -2039,13 +2039,13 @@ export default function FiberMapCanvas({
                       {/* Enclosure detail parameters */}
                       {selectedNode.node_type === 'splice_enclosure' && (
                         <>
-                          <div className="border-t border-slate-850 pt-3.5 space-y-3.5">
+                          <div className="border-t border-[var(--border)] pt-3.5 space-y-3.5">
                             <div>
-                              <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Closure Type</label>
+                              <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Closure Type</label>
                               <select
                                 value={nodeClosureType}
                                 onChange={e => setNodeClosureType(e.target.value as any)}
-                                className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                                className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none"
                               >
                                 <option value="Dome Closure">Dome Closure</option>
                                 <option value="Inline Closure">Inline Closure</option>
@@ -2054,12 +2054,12 @@ export default function FiberMapCanvas({
                               </select>
                             </div>
                             <div>
-                              <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Port Capacity (Cores)</label>
+                              <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Port Capacity (Cores)</label>
                               <input
                                 type="number"
                                 value={nodeCapacity}
                                 onChange={e => setNodeCapacity(Number(e.target.value))}
-                                className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                                className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none"
                               />
                             </div>
                           </div>
@@ -2067,7 +2067,7 @@ export default function FiberMapCanvas({
                       )}
 
                       <div>
-                        <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1.5">Custom Icon Color</label>
+                        <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1.5">Custom Icon Color</label>
                         <div className="flex items-center gap-2 flex-wrap">
                           {[
                             { name: 'Default', value: '' },
@@ -2087,7 +2087,7 @@ export default function FiberMapCanvas({
                               className={`w-7 h-7 rounded-full border transition-all flex items-center justify-center ${
                                 nodeColor === col.value
                                   ? 'border-white scale-110 shadow-lg'
-                                  : 'border-slate-800 hover:border-slate-650'
+                                  : 'border-[var(--border)] hover:border-slate-650'
                               }`}
                               style={{
                                 backgroundColor: col.value || '#475569'
@@ -2103,18 +2103,18 @@ export default function FiberMapCanvas({
                       </div>
 
                       <div>
-                        <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Notes</label>
+                        <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Notes</label>
                         <textarea
                           rows={3}
                           value={nodeNotes}
                           onChange={e => setNodeNotes(e.target.value)}
-                          className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white text-[11px] focus:outline-none"
+                          className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-[11px] focus:outline-none"
                         />
                       </div>
 
                       <button
                         onClick={handleSaveNodeDetails}
-                        className="w-full py-2.5.5 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-sm font-bold transition-all shadow-lg"
+                        className="w-full py-2.5.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-lg"
                       >
                         Save Specifications
                       </button>
@@ -2125,7 +2125,7 @@ export default function FiberMapCanvas({
                 {/* 3. Fiber Route Conduit pathway details */}
                 {selectedRoute && (
                   <div className="space-y-4">
-                    <div className="border-b border-slate-850 pb-2 flex justify-between items-center">
+                    <div className="border-b border-[var(--border)] pb-2 flex justify-between items-center">
                       <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold uppercase bg-rose-950/40 text-rose-400 border border-rose-500/10">
                         Pathway Route
                       </span>
@@ -2139,22 +2139,22 @@ export default function FiberMapCanvas({
 
                     <div className="space-y-3.5 text-sm">
                       <div>
-                        <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Route Tag/ID</label>
+                        <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Route Tag/ID</label>
                         <input
                           type="text"
                           value={routeIdTag}
                           onChange={e => setRouteIdTag(e.target.value)}
-                          className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                          className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none"
                         />
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Conduit Size (inches)</label>
+                          <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Conduit Size (inches)</label>
                           <select
                             value={conduitDiameter}
                             onChange={e => setConduitDiameter(Number(e.target.value))}
-                            className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                            className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none"
                           >
                             <option value={0.75}>0.75 in</option>
                             <option value={1.0}>1.0 in</option>
@@ -2166,11 +2166,11 @@ export default function FiberMapCanvas({
                           </select>
                         </div>
                         <div>
-                          <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Installation Type</label>
+                          <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Installation Type</label>
                           <select
                             value={installationType}
                             onChange={e => setInstallationType(e.target.value as any)}
-                            className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                            className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none"
                           >
                             <option value="underground">Underground</option>
                             <option value="aerial">Aerial</option>
@@ -2180,27 +2180,27 @@ export default function FiberMapCanvas({
                       </div>
 
                       <div>
-                        <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Slack Loop (%)</label>
+                        <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Slack Loop (%)</label>
                         <input
                           type="number"
                           value={routeSlackPercentage}
                           onChange={e => setRouteSlackPercentage(Number(e.target.value))}
-                          className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                          className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none"
                         />
                       </div>
 
-                      <div className="grid grid-cols-3 gap-2 bg-slate-950/40 p-2.5 rounded-xl border border-slate-850">
+                      <div className="grid grid-cols-3 gap-2 bg-[var(--surface-2)] p-2.5 rounded-xl border border-[var(--border)]">
                         <div className="space-y-0.5">
-                          <span className="text-slate-500 block font-semibold uppercase tracking-wide text-[10px]">Measured</span>
-                          <span className="text-[11px] font-black text-white font-mono">{selectedRoute.measured_length_feet} ft</span>
+                          <span className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-[10px]">Measured</span>
+                          <span className="text-[11px] font-black text-[var(--text-primary)] font-mono">{selectedRoute.measured_length_feet} ft</span>
                         </div>
                         <div className="space-y-0.5">
-                          <span className="text-slate-500 block font-semibold uppercase tracking-wide text-[10px]">Installed</span>
-                          <span className="text-[11px] font-black text-white font-mono">{selectedRoute.installed_length_feet} ft</span>
+                          <span className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-[10px]">Installed</span>
+                          <span className="text-[11px] font-black text-[var(--text-primary)] font-mono">{selectedRoute.installed_length_feet} ft</span>
                         </div>
                         <div className="space-y-0.5">
-                          <span className="text-slate-500 block font-semibold uppercase tracking-wide text-[10px]">Conduit Fill</span>
-                          <span className="text-[11px] font-bold text-slate-200 font-mono">{selectedRoute.fill_percentage}%</span>
+                          <span className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-[10px]">Conduit Fill</span>
+                          <span className="text-[11px] font-bold text-[var(--text-primary)] font-mono">{selectedRoute.fill_percentage}%</span>
                         </div>
                       </div>
 
@@ -2210,13 +2210,13 @@ export default function FiberMapCanvas({
                           <svg className="shrink-0 mt-0.5" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                           <div>
                             <p className="font-bold">TIA/EIA Max Fill Exceeded</p>
-                            <p className="text-slate-400 mt-0.5">Conduit fill exceeds the 40% standard capacity limit. Consider utilizing larger conduit diameters or higher fiber counts.</p>
+                            <p className="text-[var(--text-secondary)] mt-0.5">Conduit fill exceeds the 40% standard capacity limit. Consider utilizing larger conduit diameters or higher fiber counts.</p>
                           </div>
                         </div>
                       )}
 
                       <div>
-                        <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1.5">Custom Route Color (Fiber Type)</label>
+                        <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1.5">Custom Route Color (Fiber Type)</label>
                         <div className="flex items-center gap-2 flex-wrap">
                           {[
                             { name: 'Default', value: '' },
@@ -2236,7 +2236,7 @@ export default function FiberMapCanvas({
                               className={`w-7 h-7 rounded-full border transition-all flex items-center justify-center ${
                                 routeColor === col.value
                                   ? 'border-white scale-110 shadow-lg'
-                                  : 'border-slate-800 hover:border-slate-650'
+                                  : 'border-[var(--border)] hover:border-slate-650'
                               }`}
                               style={{
                                 backgroundColor: col.value || '#eab308'
@@ -2252,19 +2252,19 @@ export default function FiberMapCanvas({
                       </div>
 
                       <div>
-                        <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Route Notes</label>
+                        <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Route Notes</label>
                         <textarea
                           rows={2}
                           value={routeNotes}
                           onChange={e => setRouteNotes(e.target.value)}
-                          className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white text-[11px] focus:outline-none"
+                          className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-[11px] focus:outline-none"
                           placeholder="Fiber type, cable model, installation notes..."
                         />
                       </div>
 
                       <button
                         onClick={handleSaveRouteDetails}
-                        className="w-full py-2.5.5 bg-rose-650 hover:bg-rose-600 text-white rounded-xl text-sm font-bold transition-all shadow-lg"
+                        className="w-full py-2.5.5 bg-rose-650 hover:bg-rose-600 text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-lg"
                       >
                         Save Pathway Specifications
                       </button>
@@ -2280,23 +2280,23 @@ export default function FiberMapCanvas({
               const trays = enclosure ? (initialData.spliceTrays || []).filter((t: any) => t.enclosure_id === enclosure.id) : []
               return (
                 <div className="space-y-4">
-                  <div className="border-b border-slate-850 pb-2">
-                    <h4 className="text-sm font-bold text-white uppercase tracking-wider">Visual Splice Matrix</h4>
-                    <p className="text-xs text-slate-400 mt-0.5">Patch fiber cores inside {selectedNode.node_tag}</p>
+                  <div className="border-b border-[var(--border)] pb-2">
+                    <h4 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider">Visual Splice Matrix</h4>
+                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">Patch fiber cores inside {selectedNode.node_tag}</p>
                   </div>
 
                   <div className="space-y-3.5 text-sm">
                     {/* Splice Trays Configuration */}
-                    <div className="bg-slate-950/20 p-3.5 rounded-xl border border-slate-850 space-y-3">
-                      <span className="block text-xs font-bold text-slate-200 uppercase tracking-wider">Splice Trays</span>
+                    <div className="bg-[var(--surface-2)] p-3.5 rounded-xl border border-[var(--border)] space-y-3">
+                      <span className="block text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">Splice Trays</span>
                       {enclosure ? (
                         <>
                           <div>
-                            <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Select Active Tray</label>
+                            <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Select Active Tray</label>
                             <select
                               value={selectedTrayId}
                               onChange={e => setSelectedTrayId(e.target.value)}
-                              className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                              className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none"
                             >
                               <option value="">No Tray (Loose Splice)</option>
                               {trays.map((t: any) => {
@@ -2310,25 +2310,25 @@ export default function FiberMapCanvas({
                             </select>
                           </div>
                           
-                          <div className="border-t border-slate-900 pt-2.5 space-y-2">
-                            <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Create Splice Tray</span>
+                          <div className="border-t border-[var(--border)] pt-2.5 space-y-2">
+                            <span className="block text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Create Splice Tray</span>
                             <div className="grid grid-cols-2 gap-2">
                               <div>
-                                <label className="text-slate-500 block text-[10px] mb-0.5">Tray Number</label>
+                                <label className="text-[var(--text-tertiary)] block text-[10px] mb-0.5">Tray Number</label>
                                 <input
                                   type="number"
                                   min="1"
                                   value={newTrayNumber}
                                   onChange={e => setNewTrayNumber(parseInt(e.target.value, 10))}
-                                  className="w-full px-2.5 py-1 bg-slate-950 border border-slate-800 rounded-lg text-white"
+                                  className="w-full px-2.5 py-1 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-[var(--text-primary)]"
                                 />
                               </div>
                               <div>
-                                <label className="text-slate-500 block text-[10px] mb-0.5">Capacity</label>
+                                <label className="text-[var(--text-tertiary)] block text-[10px] mb-0.5">Capacity</label>
                                 <select
                                   value={newTrayCapacity}
                                   onChange={e => setNewTrayCapacity(parseInt(e.target.value, 10))}
-                                  className="w-full px-2.5 py-1 bg-slate-950 border border-slate-800 rounded-lg text-white"
+                                  className="w-full px-2.5 py-1 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-[var(--text-primary)]"
                                 >
                                   <option value={12}>12 Splices</option>
                                   <option value={24}>24 Splices</option>
@@ -2351,37 +2351,37 @@ export default function FiberMapCanvas({
                                   await loadDesignData()
                                 }
                               }}
-                              className="w-full py-2 bg-slate-800 hover:bg-slate-750 text-white rounded-lg text-xs font-bold transition-all"
+                              className="w-full py-2 bg-slate-800 hover:bg-slate-750 text-[var(--text-primary)] rounded-lg text-xs font-bold transition-all"
                             >
                               Add Splice Tray
                             </button>
                           </div>
                         </>
                       ) : (
-                        <p className="text-xs text-slate-400 italic">Select cables to automatically generate enclosure and trays.</p>
+                        <p className="text-xs text-[var(--text-secondary)] italic">Select cables to automatically generate enclosure and trays.</p>
                       )}
                     </div>
 
                     {/* Splicing Defaults Card */}
-                    <div className="bg-slate-950/20 p-3.5 rounded-xl border border-slate-850 space-y-2">
-                      <span className="block text-xs font-bold text-slate-200 uppercase tracking-wider">Splicing Defaults</span>
+                    <div className="bg-[var(--surface-2)] p-3.5 rounded-xl border border-[var(--border)] space-y-2">
+                      <span className="block text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">Splicing Defaults</span>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="text-slate-500 block text-[10px] mb-0.5">Splice Loss (dB)</label>
+                          <label className="text-[var(--text-tertiary)] block text-[10px] mb-0.5">Splice Loss (dB)</label>
                           <input
                             type="text"
                             value={globalSpliceLoss}
                             onChange={e => setGlobalSpliceLoss(e.target.value)}
-                            className="w-full px-2.5 py-1 bg-slate-950 border border-slate-800 rounded-lg text-white"
+                            className="w-full px-2.5 py-1 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-[var(--text-primary)]"
                             placeholder="0.020"
                           />
                         </div>
                         <div>
-                          <label className="text-slate-500 block text-[10px] mb-0.5">Splice Type</label>
+                          <label className="text-[var(--text-tertiary)] block text-[10px] mb-0.5">Splice Type</label>
                           <select
                             value={globalSpliceType}
                             onChange={e => setGlobalSpliceType(e.target.value as any)}
-                            className="w-full px-2.5 py-1 bg-slate-950 border border-slate-800 rounded-lg text-white"
+                            className="w-full px-2.5 py-1 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-[var(--text-primary)]"
                           >
                             <option value="Fusion">Fusion</option>
                             <option value="Mechanical">Mechanical</option>
@@ -2393,11 +2393,11 @@ export default function FiberMapCanvas({
 
                     {/* Select cables */}
                     <div>
-                      <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Cable A (Left)</label>
+                      <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Cable A (Left)</label>
                       <select
                         value={spliceCableA}
                         onChange={e => setSpliceCableA(e.target.value)}
-                        className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                        className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none"
                       >
                         <option value="">Select Cable...</option>
                         {initialData.cables.map(c => (
@@ -2407,11 +2407,11 @@ export default function FiberMapCanvas({
                     </div>
 
                     <div>
-                      <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Cable B (Right)</label>
+                      <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Cable B (Right)</label>
                       <select
                         value={spliceCableB}
                         onChange={e => setSpliceCableB(e.target.value)}
-                        className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                        className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none"
                       >
                         <option value="">Select Cable...</option>
                         {initialData.cables.map(c => (
@@ -2422,8 +2422,8 @@ export default function FiberMapCanvas({
 
                     {/* Splicing Core list */}
                     {spliceCableA && spliceCableB && (
-                      <div className="border border-slate-850 rounded-xl p-3 bg-slate-950/40 space-y-3">
-                        <div className="flex justify-between items-center text-xs uppercase font-bold text-slate-500 border-b border-slate-850 pb-1.5">
+                      <div className="border border-[var(--border)] rounded-xl p-3 bg-[var(--surface-2)] space-y-3">
+                        <div className="flex justify-between items-center text-xs uppercase font-bold text-[var(--text-tertiary)] border-b border-[var(--border)] pb-1.5">
                           <span>Cable A Core</span>
                           <span>Cable B Target & Details</span>
                         </div>
@@ -2433,14 +2433,14 @@ export default function FiberMapCanvas({
                             const coreNum = idx + 1
                             const col = getFiberColor(coreNum)
                             return (
-                              <div key={coreNum} className="flex justify-between items-center gap-2 text-[11px] border-b border-slate-900/40 pb-2">
+                              <div key={coreNum} className="flex justify-between items-center gap-2 text-[11px] border-b border-[var(--border)]/40 pb-2">
                                 <div className="flex items-center gap-1.5 shrink-0 w-24">
                                   <span 
                                     className="w-2.5 h-2.5 rounded-full border border-white/20"
                                     style={{ backgroundColor: col.hex }} 
                                     title={col.name}
                                   />
-                                  <span className="font-mono text-slate-300">Core {coreNum}</span>
+                                  <span className="font-mono text-[var(--text-primary)]">Core {coreNum}</span>
                                 </div>
 
                                 <div className="flex items-center gap-1.5 grow justify-end">
@@ -2453,7 +2453,7 @@ export default function FiberMapCanvas({
                                         [coreNum]: val
                                       }))
                                     }}
-                                    className="px-1.5 py-1 bg-slate-950 border border-slate-850 rounded text-xs text-white focus:outline-none w-28"
+                                    className="px-1.5 py-1 bg-[var(--surface-2)] border border-[var(--border)] rounded text-xs text-[var(--text-primary)] focus:outline-none w-28"
                                   >
                                     <option value="">Open / Unused</option>
                                     {Array.from({ length: initialData.cables.find(c => c.id === spliceCableB)?.fiber_count || 12 }).map((_, bIdx) => (
@@ -2468,13 +2468,13 @@ export default function FiberMapCanvas({
                                         placeholder={globalSpliceLoss}
                                         value={spliceLosses[coreNum] || ''}
                                         onChange={e => setSpliceLosses(prev => ({ ...prev, [coreNum]: e.target.value }))}
-                                        className="w-10 px-1 py-0.5 bg-slate-950 border border-slate-850 rounded text-xs text-white focus:outline-none text-center"
+                                        className="w-10 px-1 py-0.5 bg-[var(--surface-2)] border border-[var(--border)] rounded text-xs text-[var(--text-primary)] focus:outline-none text-center"
                                         title="Splice Loss (dB)"
                                       />
                                       <select
                                         value={spliceTypes[coreNum] || globalSpliceType}
                                         onChange={e => setSpliceTypes(prev => ({ ...prev, [coreNum]: e.target.value as any }))}
-                                        className="px-1 py-0.5 bg-slate-950 border border-slate-850 rounded text-xs text-white focus:outline-none w-10"
+                                        className="px-1 py-0.5 bg-[var(--surface-2)] border border-[var(--border)] rounded text-xs text-[var(--text-primary)] focus:outline-none w-10"
                                         title="Splice Type"
                                       >
                                         <option value="Fusion">F</option>
@@ -2491,7 +2491,7 @@ export default function FiberMapCanvas({
 
                         <button
                           onClick={handleSaveSplices}
-                          className="w-full py-2.5 bg-emerald-650 hover:bg-emerald-600 text-white rounded-lg text-sm font-bold transition-all mt-2"
+                          className="w-full py-2.5 bg-emerald-650 hover:bg-emerald-600 text-[var(--text-primary)] rounded-lg text-sm font-bold transition-all mt-2"
                         >
                           Apply Splicing Changes
                         </button>
@@ -2505,13 +2505,13 @@ export default function FiberMapCanvas({
             {/* TABS 3: Camera Fiber Assignment Tab */}
             {activeTab === 'cameras' && (
               <div className="space-y-4">
-                <div className="border-b border-slate-850 pb-2">
-                  <h4 className="text-sm font-bold text-white uppercase tracking-wider">CCTV Fiber Assignments</h4>
-                  <p className="text-xs text-slate-400 mt-0.5">Patch camera channels to OSP fiber transmission cores</p>
+                <div className="border-b border-[var(--border)] pb-2">
+                  <h4 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider">CCTV Fiber Assignments</h4>
+                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">Patch camera channels to OSP fiber transmission cores</p>
                 </div>
 
                 {/* Mode Selector Toggle */}
-                <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-850 text-sm font-semibold">
+                <div className="flex bg-[var(--surface-2)] p-1 rounded-xl border border-[var(--border)] text-sm font-semibold">
                   <button
                     onClick={() => {
                       setTechMode(true)
@@ -2519,8 +2519,8 @@ export default function FiberMapCanvas({
                     }}
                     className={`flex-1 py-2 rounded-lg text-center transition-all ${
                       techMode 
-                        ? 'bg-indigo-600 text-white font-bold shadow-md' 
-                        : 'text-slate-400 hover:text-slate-200'
+                        ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] font-bold shadow-md' 
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                     }`}
                   >
                     Field Tech Mode
@@ -2529,8 +2529,8 @@ export default function FiberMapCanvas({
                     onClick={() => setTechMode(false)}
                     className={`flex-1 py-2 rounded-lg text-center transition-all ${
                       !techMode 
-                        ? 'bg-indigo-600 text-white font-bold shadow-md' 
-                        : 'text-slate-400 hover:text-slate-200'
+                        ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] font-bold shadow-md' 
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                     }`}
                   >
                     Advanced Mode
@@ -2581,14 +2581,14 @@ export default function FiberMapCanvas({
                       return (
                         <div className="space-y-4">
                           <div>
-                            <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Target Camera</label>
+                            <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Target Camera</label>
                             <select
                               value={selectedCameraId}
                               onChange={e => {
                                 setSelectedCameraId(e.target.value)
                                 setWizardStep(1)
                               }}
-                              className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                              className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none"
                             >
                               <option value="">Select Camera...</option>
                               {initialData.cameras.map(cam => (
@@ -2597,9 +2597,9 @@ export default function FiberMapCanvas({
                             </select>
                           </div>
 
-                          <div className="bg-slate-950/40 p-4 border border-slate-850 rounded-xl space-y-3.5 text-sm text-slate-350">
-                            <div className="flex items-center justify-between border-b border-slate-850 pb-2 mb-1">
-                              <span className="font-bold text-white text-xs uppercase tracking-wider">{camera?.camera_id_tag} Fiber Summary</span>
+                          <div className="bg-[var(--surface-2)] p-4 border border-[var(--border)] rounded-xl space-y-3.5 text-sm text-[var(--text-secondary)]">
+                            <div className="flex items-center justify-between border-b border-[var(--border)] pb-2 mb-1">
+                              <span className="font-bold text-[var(--text-primary)] text-xs uppercase tracking-wider">{camera?.camera_id_tag} Fiber Summary</span>
                               <span className={`px-2 py-0.5 rounded text-[10px] uppercase tracking-wider font-bold ${
                                 activeAssignment.fiber_path_status === 'Fiber Pair Complete' 
                                   ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/20' 
@@ -2611,52 +2611,52 @@ export default function FiberMapCanvas({
 
                             <div className="grid grid-cols-2 gap-3 text-xs">
                               <div>
-                                <span className="block text-slate-500 font-semibold uppercase text-[10px]">Backbone Cable</span>
-                                <span className="font-mono text-white font-bold">{backboneCable?.cable_tag || 'N/A'}</span>
+                                <span className="block text-[var(--text-tertiary)] font-semibold uppercase text-[10px]">Backbone Cable</span>
+                                <span className="font-mono text-[var(--text-primary)] font-bold">{backboneCable?.cable_tag || 'N/A'}</span>
                               </div>
                               <div>
-                                <span className="block text-slate-500 font-semibold uppercase text-[10px]">Buffer Tube</span>
-                                <span className="text-white font-semibold">
+                                <span className="block text-[var(--text-tertiary)] font-semibold uppercase text-[10px]">Buffer Tube</span>
+                                <span className="text-[var(--text-primary)] font-semibold">
                                   {txTube ? `Tube ${String(txTube.tube_number).padStart(2, '0')} - ${txTube.tube_color}` : 'N/A'}
                                 </span>
                               </div>
                               <div>
-                                <span className="block text-slate-500 font-semibold uppercase text-[10px]">TX Fiber (Backbone)</span>
-                                <span className="text-white font-semibold inline-flex items-center gap-1.5 mt-0.5">
+                                <span className="block text-[var(--text-tertiary)] font-semibold uppercase text-[10px]">TX Fiber (Backbone)</span>
+                                <span className="text-[var(--text-primary)] font-semibold inline-flex items-center gap-1.5 mt-0.5">
                                   {txStrand ? (
                                     <>
-                                      <span className="w-2 h-2 rounded-full border border-slate-800" style={{ backgroundColor: getFiberColor(txStrand.strand_number).hex }} />
+                                      <span className="w-2 h-2 rounded-full border border-[var(--border)]" style={{ backgroundColor: getFiberColor(txStrand.strand_number).hex }} />
                                       Fiber {txStrand.strand_number} - {getFiberColor(txStrand.strand_number).name}
                                     </>
                                   ) : 'N/A'}
                                 </span>
                               </div>
                               <div>
-                                <span className="block text-slate-500 font-semibold uppercase text-[10px]">RX Fiber (Backbone)</span>
-                                <span className="text-white font-semibold inline-flex items-center gap-1.5 mt-0.5">
+                                <span className="block text-[var(--text-tertiary)] font-semibold uppercase text-[10px]">RX Fiber (Backbone)</span>
+                                <span className="text-[var(--text-primary)] font-semibold inline-flex items-center gap-1.5 mt-0.5">
                                   {rxStrand ? (
                                     <>
-                                      <span className="w-2 h-2 rounded-full border border-slate-800" style={{ backgroundColor: getFiberColor(rxStrand.strand_number).hex }} />
+                                      <span className="w-2 h-2 rounded-full border border-[var(--border)]" style={{ backgroundColor: getFiberColor(rxStrand.strand_number).hex }} />
                                       Fiber {rxStrand.strand_number} - {getFiberColor(rxStrand.strand_number).name}
                                     </>
                                   ) : 'N/A'}
                                 </span>
                               </div>
                               <div>
-                                <span className="block text-slate-500 font-semibold uppercase text-[10px]">Drop Cable</span>
-                                <span className="font-mono text-white font-bold">{dropCable?.cable_tag || 'N/A'}</span>
+                                <span className="block text-[var(--text-tertiary)] font-semibold uppercase text-[10px]">Drop Cable</span>
+                                <span className="font-mono text-[var(--text-primary)] font-bold">{dropCable?.cable_tag || 'N/A'}</span>
                               </div>
                               <div>
-                                <span className="block text-slate-500 font-semibold uppercase text-[10px]">CCTV Cabinet</span>
-                                <span className="text-white font-semibold">{cabinet?.cabinet_tag || 'N/A'}</span>
+                                <span className="block text-[var(--text-tertiary)] font-semibold uppercase text-[10px]">CCTV Cabinet</span>
+                                <span className="text-[var(--text-primary)] font-semibold">{cabinet?.cabinet_tag || 'N/A'}</span>
                               </div>
                             </div>
 
-                            <div className="border-t border-slate-850 pt-3 space-y-2.5">
+                            <div className="border-t border-[var(--border)] pt-3 space-y-2.5">
                               <div className="flex items-center justify-between">
                                 <div>
-                                  <span className="block font-bold text-white text-xs uppercase tracking-wider">Mainhole Splices</span>
-                                  <span className="text-xs text-slate-400 font-medium">Splice at MH Enclosure: {enclosure?.enclosure_tag || sourceNode?.node_tag}</span>
+                                  <span className="block font-bold text-[var(--text-primary)] text-xs uppercase tracking-wider">Mainhole Splices</span>
+                                  <span className="text-xs text-[var(--text-secondary)] font-medium">Splice at MH Enclosure: {enclosure?.enclosure_tag || sourceNode?.node_tag}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <span className={`px-2 py-0.5 rounded text-[10px] uppercase tracking-wider font-bold ${
@@ -2670,7 +2670,7 @@ export default function FiberMapCanvas({
                                     <button
                                       onClick={() => handleCompleteSplices('mainhole')}
                                       disabled={techLoading}
-                                      className="px-2 py-1 bg-indigo-650 hover:bg-indigo-600 text-white rounded text-[10px] font-bold transition-all"
+                                      className="px-2 py-1 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] rounded text-[10px] font-bold transition-all"
                                     >
                                       Complete
                                     </button>
@@ -2678,10 +2678,10 @@ export default function FiberMapCanvas({
                                 </div>
                               </div>
 
-                              <div className="flex items-center justify-between border-t border-slate-900 pt-2.5">
+                              <div className="flex items-center justify-between border-t border-[var(--border)] pt-2.5">
                                 <div>
-                                  <span className="block font-bold text-white text-xs uppercase tracking-wider">Cabinet Splices</span>
-                                  <span className="text-xs text-slate-400 font-medium">Splice at Cabinet: {cabinet?.cabinet_tag}</span>
+                                  <span className="block font-bold text-[var(--text-primary)] text-xs uppercase tracking-wider">Cabinet Splices</span>
+                                  <span className="text-xs text-[var(--text-secondary)] font-medium">Splice at Cabinet: {cabinet?.cabinet_tag}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <span className={`px-2 py-0.5 rounded text-[10px] uppercase tracking-wider font-bold ${
@@ -2695,7 +2695,7 @@ export default function FiberMapCanvas({
                                     <button
                                       onClick={() => handleCompleteSplices('cabinet')}
                                       disabled={techLoading}
-                                      className="px-2 py-1 bg-indigo-650 hover:bg-indigo-600 text-white rounded text-[10px] font-bold transition-all"
+                                      className="px-2 py-1 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] rounded text-[10px] font-bold transition-all"
                                     >
                                       Complete
                                     </button>
@@ -2721,8 +2721,8 @@ export default function FiberMapCanvas({
                     // WIZARD FLOW
                     return (
                       <div className="space-y-4">
-                        <div className="flex items-center justify-between border-b border-slate-850 pb-2">
-                          <span className="font-bold text-white text-sm uppercase tracking-wider">
+                        <div className="flex items-center justify-between border-b border-[var(--border)] pb-2">
+                          <span className="font-bold text-[var(--text-primary)] text-sm uppercase tracking-wider">
                             Step {wizardStep} of 8: {
                               wizardStep === 1 ? 'Select Camera' :
                               wizardStep === 2 ? 'Select Source Node' :
@@ -2734,12 +2734,12 @@ export default function FiberMapCanvas({
                               'Save Assignment'
                             }
                           </span>
-                          <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Tech Guide</span>
+                          <span className="text-xs text-[var(--text-tertiary)] font-bold uppercase tracking-wider">Tech Guide</span>
                         </div>
 
-                        <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden">
+                        <div className="w-full bg-[var(--surface-2)] h-1.5 rounded-full overflow-hidden">
                           <div 
-                            className="bg-indigo-600 h-full transition-all duration-300" 
+                            className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white h-full transition-all duration-300" 
                             style={{ width: `${(wizardStep / 8) * 100}%` }}
                           />
                         </div>
@@ -2748,11 +2748,11 @@ export default function FiberMapCanvas({
                         {wizardStep === 1 && (
                           <div className="space-y-3.5 text-sm">
                             <div>
-                              <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Target Camera</label>
+                              <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Target Camera</label>
                               <select
                                 value={selectedCameraId}
                                 onChange={e => setSelectedCameraId(e.target.value)}
-                                className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                                className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none"
                               >
                                 <option value="">Select Camera...</option>
                                 {initialData.cameras.map(cam => (
@@ -2768,7 +2768,7 @@ export default function FiberMapCanvas({
                                 }
                                 setWizardStep(2)
                               }}
-                              className="w-full py-2.5 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-sm font-bold transition-all shadow-md"
+                              className="w-full py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-md"
                             >
                               Next Step: Source Node →
                             </button>
@@ -2779,7 +2779,7 @@ export default function FiberMapCanvas({
                         {wizardStep === 2 && (
                           <div className="space-y-3.5 text-sm">
                             <div>
-                              <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Source Node / Manhole / Handhole</label>
+                              <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Source Node / Manhole / Handhole</label>
                               <select
                                 value={techSourceNodeId}
                                 onChange={e => {
@@ -2790,7 +2790,7 @@ export default function FiberMapCanvas({
                                   setTechTxStrandId('')
                                   setTechRxStrandId('')
                                 }}
-                                className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                                className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none"
                               >
                                 <option value="">Select Source Node...</option>
                                 {initialData.nodes
@@ -2803,7 +2803,7 @@ export default function FiberMapCanvas({
                             <div className="flex gap-2">
                               <button
                                 onClick={() => setWizardStep(1)}
-                                className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-750 text-white rounded-xl text-sm font-bold transition-all"
+                                className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-750 text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all"
                               >
                                 ← Back
                               </button>
@@ -2815,7 +2815,7 @@ export default function FiberMapCanvas({
                                   }
                                   setWizardStep(3)
                                 }}
-                                className="flex-1 py-2.5 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-sm font-bold transition-all shadow-md"
+                                className="flex-1 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-md"
                               >
                                 Next Step →
                               </button>
@@ -2827,11 +2827,11 @@ export default function FiberMapCanvas({
                         {wizardStep === 3 && (
                           <div className="space-y-3.5 text-sm">
                             <div>
-                              <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Select splice enclosure</label>
+                              <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Select splice enclosure</label>
                               <select
                                 value={techEnclosureId}
                                 onChange={e => setTechEnclosureId(e.target.value)}
-                                className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                                className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none"
                               >
                                 <option value="">Select Enclosure...</option>
                                 {initialData.enclosures
@@ -2847,7 +2847,7 @@ export default function FiberMapCanvas({
                             <div className="flex gap-2">
                               <button
                                 onClick={() => setWizardStep(2)}
-                                className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-750 text-white rounded-xl text-sm font-bold transition-all"
+                                className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-750 text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all"
                               >
                                 ← Back
                               </button>
@@ -2859,7 +2859,7 @@ export default function FiberMapCanvas({
                                   }
                                   setWizardStep(4)
                                 }}
-                                className="flex-1 py-2.5 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-sm font-bold transition-all shadow-md"
+                                className="flex-1 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-md"
                               >
                                 Next Step →
                               </button>
@@ -2871,7 +2871,7 @@ export default function FiberMapCanvas({
                         {wizardStep === 4 && (
                           <div className="space-y-3.5 text-sm">
                             <div>
-                              <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Backbone Cable</label>
+                              <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Backbone Cable</label>
                               <select
                                 value={techBackboneCableId}
                                 onChange={e => {
@@ -2880,7 +2880,7 @@ export default function FiberMapCanvas({
                                   setTechTxStrandId('')
                                   setTechRxStrandId('')
                                 }}
-                                className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                                className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none"
                               >
                                 <option value="">Select Backbone Cable...</option>
                                 {initialData.cables
@@ -2893,7 +2893,7 @@ export default function FiberMapCanvas({
                             <div className="flex gap-2">
                               <button
                                 onClick={() => setWizardStep(3)}
-                                className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-750 text-white rounded-xl text-sm font-bold transition-all"
+                                className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-750 text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all"
                               >
                                 ← Back
                               </button>
@@ -2905,7 +2905,7 @@ export default function FiberMapCanvas({
                                   }
                                   setWizardStep(5)
                                 }}
-                                className="flex-1 py-2.5 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-sm font-bold transition-all shadow-md"
+                                className="flex-1 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-md"
                               >
                                 Next Step →
                               </button>
@@ -2917,7 +2917,7 @@ export default function FiberMapCanvas({
                         {wizardStep === 5 && (
                           <div className="space-y-3.5 text-sm">
                             <div>
-                              <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-2">Select Buffer Tube</label>
+                              <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-2">Select Buffer Tube</label>
                               <div className="grid grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1">
                                 {(initialData.bufferTubes || [])
                                   .filter((t: any) => t.cable_id === techBackboneCableId)
@@ -2935,15 +2935,15 @@ export default function FiberMapCanvas({
                                         }}
                                         className={`p-2.5 rounded-xl border text-left text-xs leading-relaxed transition-all flex flex-col justify-between ${
                                           techBufferTubeId === t.id
-                                            ? 'border-indigo-500 bg-indigo-950/20 text-white shadow-md font-semibold'
-                                            : 'border-slate-850 bg-slate-950/40 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                                            ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-text)]/20 text-[var(--text-primary)] shadow-md font-semibold'
+                                            : 'border-[var(--border)] bg-[var(--surface-2)] text-[var(--text-secondary)] hover:border-slate-700 hover:text-[var(--text-primary)]'
                                         }`}
                                       >
                                         <span className="font-bold flex items-center gap-1.5">
-                                          <span className="w-2 h-2 rounded border border-slate-800" style={{ backgroundColor: getFiberColor(t.tube_number).hex }} />
+                                          <span className="w-2 h-2 rounded border border-[var(--border)]" style={{ backgroundColor: getFiberColor(t.tube_number).hex }} />
                                           Tube {String(t.tube_number).padStart(2, '0')} - {t.tube_color}
                                         </span>
-                                        <span className="text-[10px] text-slate-500 mt-1 font-semibold block">
+                                        <span className="text-[10px] text-[var(--text-tertiary)] mt-1 font-semibold block">
                                           Util: {count} / {total} Cores Assigned
                                         </span>
                                       </button>
@@ -2954,7 +2954,7 @@ export default function FiberMapCanvas({
                             <div className="flex gap-2">
                               <button
                                 onClick={() => setWizardStep(4)}
-                                className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-750 text-white rounded-xl text-sm font-bold transition-all"
+                                className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-750 text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all"
                               >
                                 ← Back
                               </button>
@@ -2966,7 +2966,7 @@ export default function FiberMapCanvas({
                                   }
                                   setWizardStep(6)
                                 }}
-                                className="flex-1 py-2.5 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-sm font-bold transition-all shadow-md"
+                                className="flex-1 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-md"
                               >
                                 Next Step →
                               </button>
@@ -2978,14 +2978,14 @@ export default function FiberMapCanvas({
                         {wizardStep === 6 && (
                           <div className="space-y-4 text-sm">
                             <div className="space-y-3">
-                              <span className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Cores in Selected Tube</span>
+                              <span className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Cores in Selected Tube</span>
                               <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                  <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">TX Core (Transmit)</label>
+                                  <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">TX Core (Transmit)</label>
                                   <select
                                     value={techTxStrandId}
                                     onChange={e => setTechTxStrandId(e.target.value)}
-                                    className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none text-xs"
+                                    className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none text-xs"
                                   >
                                     <option value="">Select TX Core...</option>
                                     {initialData.strands
@@ -3004,11 +3004,11 @@ export default function FiberMapCanvas({
                                 </div>
 
                                 <div>
-                                  <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">RX Core (Receive)</label>
+                                  <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">RX Core (Receive)</label>
                                   <select
                                     value={techRxStrandId}
                                     onChange={e => setTechRxStrandId(e.target.value)}
-                                    className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none text-xs"
+                                    className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none text-xs"
                                   >
                                     <option value="">Select RX Core...</option>
                                     {initialData.strands
@@ -3030,7 +3030,7 @@ export default function FiberMapCanvas({
                             <div className="flex gap-2">
                               <button
                                 onClick={() => setWizardStep(5)}
-                                className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-750 text-white rounded-xl text-sm font-bold transition-all"
+                                className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-750 text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all"
                               >
                                 ← Back
                               </button>
@@ -3046,7 +3046,7 @@ export default function FiberMapCanvas({
                                   }
                                   setWizardStep(7)
                                 }}
-                                className="flex-1 py-2.5 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-sm font-bold transition-all shadow-md"
+                                className="flex-1 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-md"
                               >
                                 Next Step →
                               </button>
@@ -3058,11 +3058,11 @@ export default function FiberMapCanvas({
                         {wizardStep === 7 && (
                           <div className="space-y-3.5 text-sm">
                             <div>
-                              <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Select Target CCTV Cabinet</label>
+                              <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Select Target CCTV Cabinet</label>
                               <select
                                 value={techCabinetId}
                                 onChange={e => setTechCabinetId(e.target.value)}
-                                className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                                className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none"
                               >
                                 <option value="">Select Cabinet...</option>
                                 {(initialData.cabinets || []).map((cab: any) => (
@@ -3073,7 +3073,7 @@ export default function FiberMapCanvas({
                             <div className="flex gap-2">
                               <button
                                 onClick={() => setWizardStep(6)}
-                                className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-750 text-white rounded-xl text-sm font-bold transition-all"
+                                className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-750 text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all"
                               >
                                 ← Back
                               </button>
@@ -3085,7 +3085,7 @@ export default function FiberMapCanvas({
                                   }
                                   setWizardStep(8)
                                 }}
-                                className="flex-1 py-2.5 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-sm font-bold transition-all shadow-md"
+                                className="flex-1 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-md"
                               >
                                 Next Step →
                               </button>
@@ -3106,50 +3106,50 @@ export default function FiberMapCanvas({
 
                           return (
                             <div className="space-y-4 text-sm">
-                              <div className="bg-slate-950/40 p-4 border border-slate-850 rounded-xl space-y-3 text-[11px] text-slate-350">
-                                <span className="block font-bold text-white uppercase text-xs tracking-wider border-b border-slate-850 pb-1.5">
+                              <div className="bg-[var(--surface-2)] p-4 border border-[var(--border)] rounded-xl space-y-3 text-[11px] text-[var(--text-secondary)]">
+                                <span className="block font-bold text-[var(--text-primary)] uppercase text-xs tracking-wider border-b border-[var(--border)] pb-1.5">
                                   Assignment Summary
                                 </span>
 
                                 <div className="grid grid-cols-2 gap-x-2 gap-y-3">
                                   <div>
-                                    <span className="block text-slate-500 font-semibold uppercase text-[10px]">Camera</span>
-                                    <span className="text-white font-bold">{cam?.camera_id_tag}</span>
+                                    <span className="block text-[var(--text-tertiary)] font-semibold uppercase text-[10px]">Camera</span>
+                                    <span className="text-[var(--text-primary)] font-bold">{cam?.camera_id_tag}</span>
                                   </div>
                                   <div>
-                                    <span className="block text-slate-500 font-semibold uppercase text-[10px]">Cabinet</span>
-                                    <span className="text-white font-bold">{cab?.cabinet_tag}</span>
+                                    <span className="block text-[var(--text-tertiary)] font-semibold uppercase text-[10px]">Cabinet</span>
+                                    <span className="text-[var(--text-primary)] font-bold">{cab?.cabinet_tag}</span>
                                   </div>
                                   <div>
-                                    <span className="block text-slate-500 font-semibold uppercase text-[10px]">Mainhole Node</span>
-                                    <span className="text-white font-semibold">{node?.node_tag}</span>
+                                    <span className="block text-[var(--text-tertiary)] font-semibold uppercase text-[10px]">Mainhole Node</span>
+                                    <span className="text-[var(--text-primary)] font-semibold">{node?.node_tag}</span>
                                   </div>
                                   <div>
-                                    <span className="block text-slate-500 font-semibold uppercase text-[10px]">Mainhole Enclosure</span>
-                                    <span className="text-white font-semibold">{enclosure?.enclosure_tag}</span>
+                                    <span className="block text-[var(--text-tertiary)] font-semibold uppercase text-[10px]">Mainhole Enclosure</span>
+                                    <span className="text-[var(--text-primary)] font-semibold">{enclosure?.enclosure_tag}</span>
                                   </div>
                                   <div className="col-span-2 font-mono">
-                                    <span className="block text-slate-500 font-semibold uppercase text-[10px] font-sans">Backbone Cable</span>
-                                    <span className="text-white font-semibold">{cable?.cable_tag}</span>
+                                    <span className="block text-[var(--text-tertiary)] font-semibold uppercase text-[10px] font-sans">Backbone Cable</span>
+                                    <span className="text-[var(--text-primary)] font-semibold">{cable?.cable_tag}</span>
                                   </div>
                                   <div>
-                                    <span className="block text-slate-500 font-semibold uppercase text-[10px]">Buffer Tube</span>
-                                    <span className="text-white font-semibold">
+                                    <span className="block text-[var(--text-tertiary)] font-semibold uppercase text-[10px]">Buffer Tube</span>
+                                    <span className="text-[var(--text-primary)] font-semibold">
                                       {tube ? `Tube ${String(tube.tube_number).padStart(2, '0')} - ${tube.tube_color}` : ''}
                                     </span>
                                   </div>
                                   <div>
-                                    <span className="block text-slate-500 font-semibold uppercase text-[10px]">Fiber Core Pairs</span>
-                                    <span className="text-white font-semibold block mt-0.5">
+                                    <span className="block text-[var(--text-tertiary)] font-semibold uppercase text-[10px]">Fiber Core Pairs</span>
+                                    <span className="text-[var(--text-primary)] font-semibold block mt-0.5">
                                       TX: Fiber {txS?.strand_number} ({getFiberColor(txS?.strand_number || 1).name})
                                     </span>
-                                    <span className="text-white font-semibold block">
+                                    <span className="text-[var(--text-primary)] font-semibold block">
                                       RX: Fiber {rxS?.strand_number} ({getFiberColor(rxS?.strand_number || 2).name})
                                     </span>
                                   </div>
-                                  <div className="col-span-2 border-t border-slate-900 pt-2 text-xs leading-normal text-slate-400">
-                                    * Creates Drop Cable: <strong className="text-white font-mono">DROP-{cam?.camera_id_tag}-6F</strong><br />
-                                    * Creates Jumper: <strong className="text-white font-mono">PIGTAIL-{cam?.camera_id_tag}</strong><br />
+                                  <div className="col-span-2 border-t border-[var(--border)] pt-2 text-xs leading-normal text-[var(--text-secondary)]">
+                                    * Creates Drop Cable: <strong className="text-[var(--text-primary)] font-mono">DROP-{cam?.camera_id_tag}-6F</strong><br />
+                                    * Creates Jumper: <strong className="text-[var(--text-primary)] font-mono">PIGTAIL-{cam?.camera_id_tag}</strong><br />
                                     * Creates 4 planned splice records (2 at mainhole, 2 at cabinet)
                                   </div>
                                 </div>
@@ -3160,7 +3160,7 @@ export default function FiberMapCanvas({
                                   type="button"
                                   onClick={() => setWizardStep(7)}
                                   disabled={techLoading}
-                                  className="flex-1 py-2.5.5 bg-slate-800 hover:bg-slate-750 text-white rounded-xl text-sm font-bold transition-all"
+                                  className="flex-1 py-2.5.5 bg-slate-800 hover:bg-slate-750 text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all"
                                 >
                                   ← Back
                                 </button>
@@ -3168,7 +3168,7 @@ export default function FiberMapCanvas({
                                   type="button"
                                   onClick={handleSaveTechAssignment}
                                   disabled={techLoading}
-                                  className="flex-1 py-2.5.5 bg-emerald-650 hover:bg-emerald-600 text-white rounded-xl text-sm font-bold transition-all shadow-lg flex items-center justify-center gap-1.5"
+                                  className="flex-1 py-2.5.5 bg-emerald-650 hover:bg-emerald-600 text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-lg flex items-center justify-center gap-1.5"
                                 >
                                   {techLoading ? (
                                     <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -3185,15 +3185,15 @@ export default function FiberMapCanvas({
                   // ORIGINAL ADVANCED MODE
                   <>
                     {/* Form to assign camera */}
-                    <div className="space-y-3.5 text-sm border border-slate-850 p-3.5 rounded-xl bg-slate-950/20">
-                      <h5 className="font-bold text-white text-xs uppercase tracking-wide border-b border-slate-850 pb-1.5 mb-2">New Core Patch</h5>
+                    <div className="space-y-3.5 text-sm border border-[var(--border)] p-3.5 rounded-xl bg-[var(--surface-2)]">
+                      <h5 className="font-bold text-[var(--text-primary)] text-xs uppercase tracking-wide border-b border-[var(--border)] pb-1.5 mb-2">New Core Patch</h5>
                       
                       <div>
-                        <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Target Camera</label>
+                        <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Target Camera</label>
                         <select
                           value={selectedCameraId}
                           onChange={e => setSelectedCameraId(e.target.value)}
-                          className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                          className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none"
                         >
                           <option value="">Select Camera...</option>
                           {initialData.cameras.map(cam => (
@@ -3203,11 +3203,11 @@ export default function FiberMapCanvas({
                       </div>
 
                       <div>
-                        <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Installed Fiber Cable</label>
+                        <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Installed Fiber Cable</label>
                         <select
                           value={selectedAssignCableId}
                           onChange={e => setSelectedAssignCableId(e.target.value)}
-                          className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                          className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none"
                         >
                           <option value="">Select Cable...</option>
                           {initialData.cables.map(cab => (
@@ -3218,33 +3218,33 @@ export default function FiberMapCanvas({
 
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">TX Core</label>
+                          <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">TX Core</label>
                           <input
                             type="number"
                             min="1"
                             value={assignTxCore}
                             onChange={e => setAssignTxCore(Number(e.target.value))}
-                            className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none font-mono"
+                            className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none font-mono"
                           />
                         </div>
                         <div>
-                          <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">RX Core</label>
+                          <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">RX Core</label>
                           <input
                             type="number"
                             min="1"
                             value={assignRxCore}
                             onChange={e => setAssignRxCore(Number(e.target.value))}
-                            className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none font-mono"
+                            className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none font-mono"
                           />
                         </div>
                       </div>
 
                       <div>
-                        <label className="text-slate-500 block font-semibold uppercase tracking-wide text-xs mb-1">Link Role (Redundancy)</label>
+                        <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Link Role (Redundancy)</label>
                         <select
                           value={assignLinkRole}
                           onChange={e => setAssignLinkRole(e.target.value as any)}
-                          className="w-full px-3.5 py-2.5.5 bg-slate-950 border border-slate-850 rounded-xl text-white focus:outline-none"
+                          className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none"
                         >
                           <option value="primary">Primary Route Link</option>
                           <option value="backup">Backup Redundant Link</option>
@@ -3253,7 +3253,7 @@ export default function FiberMapCanvas({
 
                       <button
                         onClick={handleAssignCameraFiber}
-                        className="w-full py-2.5 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-sm font-bold transition-all shadow-md"
+                        className="w-full py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-md"
                       >
                         Patch Core Assignment
                       </button>
@@ -3261,9 +3261,9 @@ export default function FiberMapCanvas({
 
                     {/* Assignments List */}
                     <div className="space-y-2 pt-2">
-                      <h5 className="font-bold text-slate-400 text-xs uppercase tracking-wide">Active Patch Connections</h5>
+                      <h5 className="font-bold text-[var(--text-secondary)] text-xs uppercase tracking-wide">Active Patch Connections</h5>
                       {initialData.assignments.length === 0 ? (
-                        <p className="text-xs text-slate-500 italic">No camera fiber patched yet.</p>
+                        <p className="text-xs text-[var(--text-tertiary)] italic">No camera fiber patched yet.</p>
                       ) : (
                         <div className="space-y-2">
                           {initialData.assignments.map(ass => {
@@ -3278,15 +3278,15 @@ export default function FiberMapCanvas({
                             const rxStrand = rxStrandJoin ? initialData.strands.find((s: any) => s.id === rxStrandJoin.strand_id) : null
                             
                             return (
-                              <div key={ass.id} className="border border-slate-850 bg-slate-950/40 p-2.5 rounded-xl flex items-center justify-between text-xs leading-relaxed">
+                              <div key={ass.id} className="border border-[var(--border)] bg-[var(--surface-2)] p-2.5 rounded-xl flex items-center justify-between text-xs leading-relaxed">
                                 <div>
-                                  <p className="font-bold text-white">
+                                  <p className="font-bold text-[var(--text-primary)]">
                                     {camera?.camera_id_tag || 'Unknown'} 
-                                    <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider font-bold bg-indigo-950 text-indigo-400">
+                                    <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider font-bold bg-[var(--accent-soft)] text-[var(--accent-text)] text-[var(--accent-text)]">
                                       Patched
                                     </span>
                                   </p>
-                                  <p className="text-slate-450 mt-0.5">
+                                  <p className="text-[var(--text-secondary)] mt-0.5">
                                     Cable: {cable?.cable_id_tag || 'CAB-N/A'} | Cores: TX-{txStrand ? txStrand.strand_number : 'N/A'} / RX-{rxStrand ? rxStrand.strand_number : 'N/A'}
                                   </p>
                                 </div>
@@ -3310,27 +3310,27 @@ export default function FiberMapCanvas({
             {/* TABS 4: Cable Catalog List */}
             {activeTab === 'catalog' && (
               <div className="space-y-4">
-                <div className="border-b border-slate-850 pb-2">
-                  <h4 className="text-sm font-bold text-white uppercase tracking-wider">Fiber Cable Specifications</h4>
-                  <p className="text-xs text-slate-400 mt-0.5">Available cable configurations in OSP database catalog</p>
+                <div className="border-b border-[var(--border)] pb-2">
+                  <h4 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider">Fiber Cable Specifications</h4>
+                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">Available cable configurations in OSP database catalog</p>
                 </div>
 
                 <div className="space-y-3">
                   {fiberCatalog.map(cab => (
-                    <div key={cab.id} className="border border-slate-850 rounded-xl p-3 bg-slate-950/40 space-y-1.5 text-[11px] hover:border-indigo-500/20 transition-colors">
+                    <div key={cab.id} className="border border-[var(--border)] rounded-xl p-3 bg-[var(--surface-2)] space-y-1.5 text-[11px] hover:border-[var(--accent)]/20 transition-colors">
                       <div className="flex justify-between items-center">
-                        <span className="font-bold text-white">{cab.manufacturer} {cab.part_number}</span>
-                        <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-900 border border-slate-800 text-slate-400">
+                        <span className="font-bold text-[var(--text-primary)]">{cab.manufacturer} {cab.part_number}</span>
+                        <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[var(--surface-1)] border border-[var(--border)] text-[var(--text-secondary)]">
                           {cab.grade}
                         </span>
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-y-1 text-slate-450 font-mono text-xs">
+                      <div className="grid grid-cols-2 gap-y-1 text-[var(--text-secondary)] font-mono text-xs">
                         <div>Mode: {cab.mode}</div>
                         <div>Cores: {cab.fiber_count}</div>
                         <div>Weight: {cab.weight_kg_km} kg/km</div>
                         <div>Diameter: {cab.diameter_mm} mm</div>
-                        <div className="col-span-2 text-indigo-400 font-bold mt-0.5">Cost: ${(Number(cab.cost_per_meter)/3.28084).toFixed(3)}/ft</div>
+                        <div className="col-span-2 text-[var(--accent-text)] font-bold mt-0.5">Cost: ${(Number(cab.cost_per_meter)/3.28084).toFixed(3)}/ft</div>
                       </div>
                     </div>
                   ))}
@@ -3341,20 +3341,20 @@ export default function FiberMapCanvas({
             {/* TABS 5: Directory & Infrastructure Lists */}
             {activeTab === 'lists' && (
               <div className="space-y-4">
-                <div className="border-b border-slate-850 pb-2">
-                  <h4 className="text-sm font-bold text-white uppercase tracking-wider">Infrastructure Directory</h4>
-                  <p className="text-xs text-slate-400 mt-0.5">Quick lookup and navigation of project fiber assets</p>
+                <div className="border-b border-[var(--border)] pb-2">
+                  <h4 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider">Infrastructure Directory</h4>
+                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">Quick lookup and navigation of project fiber assets</p>
                 </div>
 
                 <div className="space-y-4">
                   {/* Nodes Section */}
                   <div className="space-y-2">
-                    <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wide">
+                    <h5 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wide">
                       Fiber Nodes ({initialData.nodes.length})
                     </h5>
                     <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1 scrollbar-thin">
                       {initialData.nodes.length === 0 ? (
-                        <div className="text-xs text-slate-500 italic">No nodes placed.</div>
+                        <div className="text-xs text-[var(--text-tertiary)] italic">No nodes placed.</div>
                       ) : (
                         initialData.nodes.map(n => (
                           <button
@@ -3378,10 +3378,10 @@ export default function FiberMapCanvas({
                                 setNodeCapacity(enclosure.capacity || 12)
                               }
                             }}
-                            className="w-full text-left p-2 rounded-lg bg-slate-950/40 hover:bg-slate-950 border border-slate-850 hover:border-slate-750 transition-colors flex justify-between items-center text-[11px]"
+                            className="w-full text-left p-2 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--surface-2)] border border-[var(--border)] hover:border-slate-750 transition-colors flex justify-between items-center text-[11px]"
                           >
-                            <span className="font-bold text-white font-mono">{n.node_tag}</span>
-                            <span className="text-slate-450 text-xs">{n.node_type}</span>
+                            <span className="font-bold text-[var(--text-primary)] font-mono">{n.node_tag}</span>
+                            <span className="text-[var(--text-secondary)] text-xs">{n.node_type}</span>
                           </button>
                         ))
                       )}
@@ -3390,12 +3390,12 @@ export default function FiberMapCanvas({
 
                   {/* Cables Section */}
                   <div className="space-y-2">
-                    <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wide">
+                    <h5 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wide">
                       Fiber Cables ({initialData.cables.length})
                     </h5>
                     <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1 scrollbar-thin">
                       {initialData.cables.length === 0 ? (
-                        <div className="text-xs text-slate-500 italic">No cables created.</div>
+                        <div className="text-xs text-[var(--text-tertiary)] italic">No cables created.</div>
                       ) : (
                         initialData.cables.map(c => (
                           <button
@@ -3413,13 +3413,13 @@ export default function FiberMapCanvas({
                                 }
                               }
                             }}
-                            className="w-full text-left p-2 rounded-lg bg-slate-950/40 hover:bg-slate-950 border border-slate-850 hover:border-slate-750 transition-colors flex justify-between items-center text-[11px]"
+                            className="w-full text-left p-2 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--surface-2)] border border-[var(--border)] hover:border-slate-750 transition-colors flex justify-between items-center text-[11px]"
                           >
                             <div className="flex flex-col">
-                              <span className="font-bold text-white font-mono">{c.cable_tag}</span>
+                              <span className="font-bold text-[var(--text-primary)] font-mono">{c.cable_tag}</span>
                               <span className="text-xs text-slate-550">{c.cable_type} • {c.fiber_count} Cores • {c.length_ft} ft</span>
                             </div>
-                            <span className="text-indigo-400 text-xs font-bold">{c.install_status}</span>
+                            <span className="text-[var(--accent-text)] text-xs font-bold">{c.install_status}</span>
                           </button>
                         ))
                       )}
@@ -3428,12 +3428,12 @@ export default function FiberMapCanvas({
 
                   {/* Enclosures Section */}
                   <div className="space-y-2">
-                    <h5 className="text-xs font-bold text-slate-450 uppercase tracking-wide">
+                    <h5 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wide">
                       Enclosures ({initialData.enclosures.length})
                     </h5>
                     <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1 scrollbar-thin">
                       {initialData.enclosures.length === 0 ? (
-                        <div className="text-xs text-slate-500 italic">No enclosures.</div>
+                        <div className="text-xs text-[var(--text-tertiary)] italic">No enclosures.</div>
                       ) : (
                         initialData.enclosures.map(enc => {
                           const parentNode = initialData.nodes.find(n => n.id === enc.node_id)
@@ -3451,10 +3451,10 @@ export default function FiberMapCanvas({
                                   }
                                 }
                               }}
-                              className="w-full text-left p-2 rounded-lg bg-slate-950/40 hover:bg-slate-950 border border-slate-850 hover:border-slate-750 transition-colors flex justify-between items-center text-[11px]"
+                              className="w-full text-left p-2 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--surface-2)] border border-[var(--border)] hover:border-slate-750 transition-colors flex justify-between items-center text-[11px]"
                             >
                               <div className="flex flex-col">
-                                <span className="font-bold text-white font-mono">{enc.enclosure_tag}</span>
+                                <span className="font-bold text-[var(--text-primary)] font-mono">{enc.enclosure_tag}</span>
                                 <span className="text-xs text-slate-550">Node: {parentNode?.node_tag || 'Unknown'} • Splices: {enc.splice_count}</span>
                               </div>
                               <span className="text-emerald-400 text-xs font-bold">{enc.enclosure_type}</span>
@@ -3467,12 +3467,12 @@ export default function FiberMapCanvas({
 
                   {/* Assignments Section */}
                   <div className="space-y-2">
-                    <h5 className="text-xs font-bold text-slate-450 uppercase tracking-wide">
+                    <h5 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wide">
                       Camera Assignments ({initialData.assignments.length})
                     </h5>
                     <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1 scrollbar-thin">
                       {initialData.assignments.length === 0 ? (
-                        <div className="text-xs text-slate-500 italic">No assignments.</div>
+                        <div className="text-xs text-[var(--text-tertiary)] italic">No assignments.</div>
                       ) : (
                         initialData.assignments.map(ass => {
                           const camera = initialData.cameras.find(c => c.id === ass.camera_id)
@@ -3486,14 +3486,14 @@ export default function FiberMapCanvas({
                                   map.setZoom(17)
                                 }
                               }}
-                              className="w-full text-left p-2 rounded-lg bg-slate-950/40 hover:bg-slate-950 border border-slate-850 hover:border-slate-750 transition-colors flex justify-between items-center text-[11px]"
+                              className="w-full text-left p-2 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--surface-2)] border border-[var(--border)] hover:border-slate-750 transition-colors flex justify-between items-center text-[11px]"
                             >
                               <div className="flex flex-col">
-                                <span className="font-bold text-white font-mono">{camera?.camera_id_tag || 'Unknown'}</span>
+                                <span className="font-bold text-[var(--text-primary)] font-mono">{camera?.camera_id_tag || 'Unknown'}</span>
                                 <span className="text-xs text-slate-550">Node: {node?.node_tag || 'None'}</span>
                               </div>
                               <div className="flex flex-col items-end">
-                                <span className="text-indigo-400 text-xs font-bold">{ass.fiber_path_status}</span>
+                                <span className="text-[var(--accent-text)] text-xs font-bold">{ass.fiber_path_status}</span>
                                 <span className="text-[10px] text-slate-550">S: {ass.splice_status} | T: {ass.test_status}</span>
                               </div>
                             </button>
@@ -3512,27 +3512,27 @@ export default function FiberMapCanvas({
 
       {/* Confirm Modal Backdrop & Dialog */}
       {confirmModal && confirmModal.isOpen && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 bg-[var(--surface-2)] backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
             <div className="flex items-start gap-3">
               <span className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="17"/></svg>
               </span>
               <div>
-                <h3 className="text-sm font-black text-white uppercase tracking-wider">{confirmModal.title}</h3>
-                <p className="text-xs text-slate-400 mt-2 leading-relaxed">{confirmModal.message}</p>
+                <h3 className="text-sm font-black text-[var(--text-primary)] uppercase tracking-wider">{confirmModal.title}</h3>
+                <p className="text-xs text-[var(--text-secondary)] mt-2 leading-relaxed">{confirmModal.message}</p>
               </div>
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={() => setConfirmModal(null)}
-                className="px-4 py-2 bg-slate-950 border border-slate-850 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl text-xs font-bold transition-all"
+                className="px-4 py-2 bg-[var(--surface-2)] border border-[var(--border)] hover:bg-slate-800 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-xl text-xs font-bold transition-all"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmModal.onConfirm}
-                className="px-4 py-2 bg-rose-650 hover:bg-rose-600 text-white rounded-xl text-xs font-bold transition-all shadow-md"
+                className="px-4 py-2 bg-rose-650 hover:bg-rose-600 text-[var(--text-primary)] rounded-xl text-xs font-bold transition-all shadow-md"
               >
                 Confirm
               </button>

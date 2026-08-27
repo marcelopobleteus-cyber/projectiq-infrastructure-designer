@@ -21,7 +21,7 @@ export default function MissingLocationEnclosuresSection({
   })
 
   if (missing.length === 0) {
-    return <div className="text-[10px] text-slate-500 italic">None cataloged. All enclosures have mapped coordinates.</div>
+    return <div className="text-[10px] text-[var(--text-tertiary)] italic">None cataloged. All enclosures have mapped coordinates.</div>
   }
 
   return (
@@ -33,7 +33,7 @@ export default function MissingLocationEnclosuresSection({
           className="bg-red-950/10 hover:bg-red-950/20 px-2 py-1.5 rounded-lg border border-red-900/25 text-[10px] flex justify-between items-center cursor-pointer transition-colors"
         >
           <span className="text-red-400 font-semibold">{e.enclosure_tag}</span>
-          <span className="text-[8.5px] text-slate-500 italic">No coordinates</span>
+          <span className="text-[8.5px] text-[var(--text-tertiary)] italic">No coordinates</span>
         </div>
       ))}
     </div>
