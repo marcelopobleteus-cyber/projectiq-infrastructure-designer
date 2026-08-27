@@ -26,14 +26,35 @@ export default async function ProjectLayout({ children, params }: ProjectLayoutP
   }
 
   // Load project details to show name in top bar
-  let { data: project } = await supabase
-    .from('projects')
-    .select('*')
-    .eq('id', projectId)
-    .single()
+  let project: any = null
 
-  if (!project) {
+  if (projectId === 'demo-metro-cctv') {
     project = DEMO_PROJECT as any
+  } else {
+    const { data } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('id', projectId)
+      .single()
+
+    if (!data) {
+      notFound()
+    }
+
+    if (user) {
+      const { data: membership } = await supabase
+        .from('organization_members')
+        .select('id')
+        .eq('organization_id', data.organization_id)
+        .eq('profile_id', user.id)
+        .single()
+
+      if (!membership && !BYPASS_AUTH) {
+        notFound()
+      }
+    }
+
+    project = data
   }
 
   // disciplines is the authoritative source for which modules this project shows.

@@ -22,29 +22,25 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-radial from-slate-900 via-slate-950 to-black p-4 relative overflow-hidden">
-      {/* Decorative gradient blur */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl translate-x-1/2 translate-y-1/2 pointer-events-none" />
-
-      <div className="w-full max-w-md bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl relative z-10">
+    <main className="min-h-screen flex items-center justify-center bg-[var(--bg)] p-4 relative font-sans">
+      <div className="w-full max-w-md bg-[var(--surface-1)] border border-[var(--border)] rounded-xl p-8 shadow-sm relative z-10">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 mb-4 font-bold text-xl tracking-wider">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[var(--accent)] text-white mb-4 font-black text-xl tracking-wider shadow-xs">
             NQ
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Welcome Back</h1>
-          <p className="text-sm text-slate-400 mt-2">Sign in to your NextQ workspace</p>
+          <h1 className="text-2xl font-extrabold text-[var(--text-primary)] tracking-tight">Welcome Back</h1>
+          <p className="text-xs text-[var(--text-secondary)] mt-1.5 font-medium">Sign in to your NextQ workspace</p>
         </div>
 
         {error && (
-          <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm p-3 rounded-lg mb-6">
+          <div className="bg-red-50 border border-red-200 text-[var(--danger)] text-xs font-semibold p-3 rounded-lg mb-6">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="email" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+            <label htmlFor="email" className="block text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider mb-1.5">
               Email Address
             </label>
             <input
@@ -54,12 +50,12 @@ export default function LoginPage() {
               required
               defaultValue="marcelopoblete.us+test654@gmail.com"
               placeholder="you@example.com"
-              className="w-full px-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
+              className="w-full px-3.5 py-2.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)] transition-all text-xs font-semibold"
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+            <label htmlFor="password" className="block text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider mb-1.5">
               Password
             </label>
             <input
@@ -69,22 +65,22 @@ export default function LoginPage() {
               required
               defaultValue="Password123!"
               placeholder="••••••••"
-              className="w-full px-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
+              className="w-full px-3.5 py-2.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)] transition-all text-xs font-semibold"
             />
           </div>
 
           <button
             type="submit"
             disabled={isPending}
-            className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-700 text-white font-medium rounded-xl transition-all shadow-lg shadow-indigo-600/20 active:scale-[0.98] text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+            className="w-full py-2.5 px-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold rounded-lg transition-all shadow-xs text-xs cursor-pointer"
           >
             {isPending ? 'Signing In...' : 'Sign In'}
           </button>
         </form>
 
-        <div className="mt-8 text-center text-sm text-slate-400">
+        <div className="mt-6 text-center text-xs text-[var(--text-secondary)]">
           Don't have an account?{' '}
-          <Link href="/register" className="text-indigo-400 hover:text-indigo-300 transition-colors font-medium">
+          <Link href="/register" className="text-[var(--accent-text)] hover:underline font-bold">
             Sign Up
           </Link>
         </div>

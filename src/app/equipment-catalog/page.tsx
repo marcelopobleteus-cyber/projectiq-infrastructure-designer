@@ -44,7 +44,6 @@ export default function EquipmentCatalogPage() {
     'Mounting Hardware'
   ]
 
-  // Complete seed database with all required technical columns
   const seedCatalog = [
     // Cameras
     { category: 'Cameras', brand: 'Axis', model: 'P3245-LVE', part: '01593-001', type: 'Dome', connectivity: 'RJ45 / Copper', power: 'PoE', poeDraw: '7.5W', ports: '—', fiberCount: '—', status: 'Active', spec: 'Varifocal 1080p dome, Lightfinder 2.0, Forensic WDR.', resolution: '1080p', lens: '3.4-8.9 mm', fov: '100°–36°', range: '30m', nightVision: 'OptimizedIR', mount: 'Wall/Ceiling/Pole', environment: 'Outdoor (IP66)' },
@@ -93,14 +92,9 @@ export default function EquipmentCatalogPage() {
     { category: 'Mounting Hardware', brand: 'Generic', model: 'Banding Straps Kit', part: 'BAND-IT-S34', type: 'Metal Banding', connectivity: '—', power: '—', poeDraw: '—', ports: '—', fiberCount: '—', status: 'Active', spec: 'Heavy-duty steel strapping kit to bind NEMA cabinets to light poles.' }
   ]
 
-  // Filter logic
   const filteredItems = seedCatalog.filter((item) => {
-    // Category tab filter
-    if (activeCategory !== 'All' && item.category !== activeCategory) {
-      return false
-    }
+    if (activeCategory !== 'All' && item.category !== activeCategory) return false
 
-    // Search query filter
     const query = searchQuery.toLowerCase()
     const matchesSearch = searchQuery === '' ||
       item.model.toLowerCase().includes(query) ||
@@ -111,27 +105,16 @@ export default function EquipmentCatalogPage() {
       item.type.toLowerCase().includes(query)
 
     if (!matchesSearch) return false
-
-    // Brand filter
     if (filterBrand !== 'All' && item.brand !== filterBrand) return false
-
-    // Connectivity filter
     if (filterConnectivity !== 'All' && !item.connectivity.toLowerCase().includes(filterConnectivity.toLowerCase())) return false
-
-    // Power filter
     if (filterPower !== 'All' && !item.power.toLowerCase().includes(filterPower.toLowerCase())) return false
-
-    // Status filter
     if (filterStatus !== 'All' && item.status !== filterStatus) return false
 
     return true
   })
 
-  // Grouping logic
   const getGroupedItems = () => {
-    if (groupBy === 'none') {
-      return { 'All Items': filteredItems }
-    }
+    if (groupBy === 'none') return { 'All Items': filteredItems }
     const grouped: Record<string, any[]> = {}
     filteredItems.forEach((item) => {
       let key = ''
@@ -147,7 +130,6 @@ export default function EquipmentCatalogPage() {
 
   const groupedCatalog = getGroupedItems()
 
-  // Extract unique brands for filters based on activeCategory
   const uniqueBrands = Array.from(
     new Set(
       seedCatalog
@@ -156,7 +138,6 @@ export default function EquipmentCatalogPage() {
     )
   )
 
-  // Handle Photo Upload
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !selectedItem) return
@@ -174,12 +155,12 @@ export default function EquipmentCatalogPage() {
   }
 
   return (
-    <div className="space-y-8 w-full px-6 py-8 font-sans text-slate-100 bg-[#0c0f1d] min-h-full overflow-y-auto scrollbar-thin relative flex flex-col">
+    <div className="space-y-6 w-full px-6 py-8 font-sans text-[var(--text-primary)] bg-[var(--bg)] min-h-full overflow-y-auto scrollbar-thin relative flex flex-col">
       
       {/* Toast alert */}
       {toast && (
-        <div className="fixed top-4 right-4 z-50 bg-slate-900 border border-slate-750 text-white px-4 py-3 rounded-xl shadow-2xl animate-in slide-in-from-top-4 duration-200 text-xs font-bold font-mono flex items-center gap-2">
-          <span className={`w-1.5 h-1.5 rounded-full ${toast.type === 'error' ? 'bg-rose-400' : toast.type === 'info' ? 'bg-indigo-450' : 'bg-emerald-400'} animate-pulse`} />
+        <div className="fixed top-4 right-4 z-50 bg-[var(--surface-1)] border border-[var(--border-strong)] text-[var(--text-primary)] px-4 py-3 rounded-xl shadow-xl text-xs font-bold font-mono flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full ${toast.type === 'error' ? 'bg-[var(--danger)]' : toast.type === 'info' ? 'bg-[var(--accent)]' : 'bg-[var(--success)]'} animate-pulse`} />
           {toast.message}
         </div>
       )}
@@ -188,14 +169,14 @@ export default function EquipmentCatalogPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2.5xl font-black text-white tracking-tight leading-none">
+            <h1 className="text-xl font-extrabold text-[var(--text-primary)] tracking-tight leading-none">
               Equipment Catalog
             </h1>
-            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-slate-900 text-indigo-400 border border-indigo-900/30 tracking-widest font-mono">
-              Global Database Draft
+            <span className="text-[9.5px] font-bold uppercase px-2 py-0.5 rounded-md bg-[var(--accent-soft)] text-[var(--accent-text)] border border-[var(--accent-border)] tracking-wider font-mono">
+              Hardware Library
             </span>
           </div>
-          <p className="text-sm text-slate-400 mt-2 font-medium">
+          <p className="text-xs text-[var(--text-secondary)] mt-1.5 font-medium">
             System-level hardware database. Pre-define specs to use across all project Bill of Materials (BOM).
           </p>
         </div>
@@ -203,7 +184,7 @@ export default function EquipmentCatalogPage() {
         <button
           type="button"
           onClick={() => setIsImportRulesOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-indigo-600/10 active:scale-[0.98] cursor-pointer"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold rounded-lg transition-all shadow-xs active:scale-[0.98] cursor-pointer"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
           Configure Import Rules
@@ -211,97 +192,89 @@ export default function EquipmentCatalogPage() {
       </div>
 
       {/* Filter and Grouping Bar */}
-      <div className="bg-slate-900/40 p-4 rounded-2xl border border-slate-850 space-y-4">
+      <div className="bg-[var(--surface-1)] p-4 rounded-xl border border-[var(--border)] space-y-3 shadow-xs">
         
-        {/* Search & Grouping Row */}
         <div className="flex flex-col lg:flex-row gap-3">
-          {/* Search */}
           <div className="flex-1 relative">
             <input
               type="text"
               placeholder="Search by brand, model, description, part number, type..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-slate-950/80 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
+              className="w-full pl-9 pr-4 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-xs text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)] transition-colors"
             />
-            <svg className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <svg className="absolute left-3 top-2.5 w-3.5 h-3.5 text-[var(--text-tertiary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
           </div>
 
-          {/* Group By selector */}
-          <div className="lg:w-56 flex items-center gap-2 bg-slate-950/80 border border-slate-800 px-3 py-2 rounded-xl text-xs">
-            <span className="text-slate-500 font-medium">Group by:</span>
+          <div className="lg:w-56 flex items-center gap-2 bg-[var(--surface-2)] border border-[var(--border)] px-3 py-2 rounded-lg text-xs">
+            <span className="text-[var(--text-tertiary)] font-medium">Group by:</span>
             <select
               value={groupBy}
               onChange={(e) => setGroupBy(e.target.value as any)}
-              className="flex-1 bg-transparent text-white focus:outline-none cursor-pointer font-bold"
+              className="flex-1 bg-transparent text-[var(--text-primary)] focus:outline-none cursor-pointer font-bold"
             >
-              <option value="category" className="bg-slate-950">Category</option>
-              <option value="brand" className="bg-slate-950">Brand / Manufacturer</option>
-              <option value="type" className="bg-slate-950">Equipment Type</option>
-              <option value="none" className="bg-slate-950">None (Full List)</option>
+              <option value="category" className="bg-white">Category</option>
+              <option value="brand" className="bg-white">Brand / Manufacturer</option>
+              <option value="type" className="bg-white">Equipment Type</option>
+              <option value="none" className="bg-white">None (Full List)</option>
             </select>
           </div>
         </div>
 
-        {/* Dropdowns Filters Row */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {/* Brand */}
-          <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-800 px-3 py-2 rounded-xl text-2xs">
-            <span className="text-slate-505 font-semibold text-slate-500">Brand:</span>
+          <div className="flex items-center gap-2 bg-[var(--surface-2)] border border-[var(--border)] px-3 py-1.5 rounded-lg text-xs">
+            <span className="text-[var(--text-tertiary)] font-semibold">Brand:</span>
             <select
               value={filterBrand}
               onChange={(e) => setFilterBrand(e.target.value)}
-              className="flex-1 bg-transparent text-white focus:outline-none cursor-pointer font-bold"
+              className="flex-1 bg-transparent text-[var(--text-primary)] focus:outline-none cursor-pointer font-bold"
             >
-              <option value="All" className="bg-slate-950">All Brands</option>
+              <option value="All" className="bg-white">All Brands</option>
               {uniqueBrands.map((b) => (
-                <option key={b} value={b} className="bg-slate-950">{b}</option>
+                <option key={b} value={b} className="bg-white">{b}</option>
               ))}
             </select>
           </div>
 
-          {/* Connectivity */}
-          <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-800 px-3 py-2 rounded-xl text-2xs">
-            <span className="text-slate-500 font-semibold">Conn:</span>
+          <div className="flex items-center gap-2 bg-[var(--surface-2)] border border-[var(--border)] px-3 py-1.5 rounded-lg text-xs">
+            <span className="text-[var(--text-tertiary)] font-semibold">Conn:</span>
             <select
               value={filterConnectivity}
               onChange={(e) => setFilterConnectivity(e.target.value)}
-              className="flex-1 bg-transparent text-white focus:outline-none cursor-pointer font-bold"
+              className="flex-1 bg-transparent text-[var(--text-primary)] focus:outline-none cursor-pointer font-bold"
             >
-              <option value="All" className="bg-slate-950">All Connectivity</option>
-              <option value="Copper" className="bg-slate-950">Copper / RJ45</option>
-              <option value="SFP" className="bg-slate-950">SFP / LC</option>
-              <option value="Wireless" className="bg-slate-950">Wireless</option>
-              <option value="Fibers" className="bg-slate-950">Fibers</option>
+              <option value="All" className="bg-white">All Connectivity</option>
+              <option value="Copper" className="bg-white">Copper / RJ45</option>
+              <option value="SFP" className="bg-white">SFP / LC</option>
+              <option value="Wireless" className="bg-white">Wireless</option>
+              <option value="Fibers" className="bg-white">Fibers</option>
             </select>
           </div>
 
-          {/* Power */}
-          <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-800 px-3 py-2 rounded-xl text-2xs">
-            <span className="text-slate-500 font-semibold">Power:</span>
+          <div className="flex items-center gap-2 bg-[var(--surface-2)] border border-[var(--border)] px-3 py-1.5 rounded-lg text-xs">
+            <span className="text-[var(--text-tertiary)] font-semibold">Power:</span>
             <select
               value={filterPower}
               onChange={(e) => setFilterPower(e.target.value)}
-              className="flex-1 bg-transparent text-white focus:outline-none cursor-pointer font-bold"
+              className="flex-1 bg-transparent text-[var(--text-primary)] focus:outline-none cursor-pointer font-bold"
             >
-              <option value="All" className="bg-slate-950">All Power</option>
-              <option value="PoE" className="bg-slate-950">PoE / PoE+</option>
-              <option value="AC" className="bg-slate-950">AC Power</option>
-              <option value="DC" className="bg-slate-950">DC Input</option>
+              <option value="All" className="bg-white">All Power</option>
+              <option value="PoE" className="bg-white">PoE / PoE+</option>
+              <option value="AC" className="bg-white">AC Power</option>
+              <option value="DC" className="bg-white">DC Input</option>
             </select>
           </div>
 
-          {/* Status */}
-          <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-800 px-3 py-2 rounded-xl text-2xs">
-            <span className="text-slate-500 font-semibold">Status:</span>
+          <div className="flex items-center gap-2 bg-[var(--surface-2)] border border-[var(--border)] px-3 py-1.5 rounded-lg text-xs">
+            <span className="text-[var(--text-tertiary)] font-semibold">Status:</span>
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="flex-1 bg-transparent text-white focus:outline-none cursor-pointer font-bold"
+              className="flex-1 bg-transparent text-[var(--text-primary)] focus:outline-none cursor-pointer font-bold"
             >
-              <option value="All" className="bg-slate-950">All Statuses</option>
-              <option value="Active" className="bg-slate-950">Active</option>
-              <option value="Planned" className="bg-slate-950">Planned</option>
+              <option value="All" className="bg-white">All Statuses</option>
+              <option value="Active" className="bg-white">Active</option>
+              <option value="Planned" className="bg-white">Planned</option>
             </select>
           </div>
         </div>
@@ -309,7 +282,7 @@ export default function EquipmentCatalogPage() {
       </div>
 
       {/* Category Tabs */}
-      <div className="flex flex-wrap gap-2 border-b border-slate-850 pb-4 select-none">
+      <div className="flex flex-wrap gap-2 border-b border-[var(--border)] pb-3 select-none">
         {categories.map((c) => (
           <button
             key={c}
@@ -317,10 +290,10 @@ export default function EquipmentCatalogPage() {
               setActiveCategory(c)
               setFilterBrand('All')
             }}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer border ${
+            className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer border ${
               activeCategory === c
-                ? 'bg-sky-500/15 border-sky-500/30 text-sky-400 font-extrabold shadow-sm'
-                : 'bg-slate-900/60 border-slate-850 text-slate-450 hover:text-white hover:bg-slate-850/50'
+                ? 'bg-[var(--surface-2)] border-[var(--accent-border)] text-[var(--accent-text)]'
+                : 'bg-[var(--surface-1)] border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]'
             }`}
           >
             {c}
@@ -328,15 +301,12 @@ export default function EquipmentCatalogPage() {
         ))}
       </div>
 
-      {/* Main Grouped List / Technical Table */}
-      <div className="flex-1 space-y-8 min-h-0">
+      {/* Main Table Spec: --surface-2 header, uppercase --text-tertiary, border-bottom 1px solid var(--border) */}
+      <div className="flex-1 space-y-6 min-h-0">
         {Object.keys(groupedCatalog).length === 0 || Object.values(groupedCatalog).every(arr => arr.length === 0) ? (
-          <div className="border border-dashed border-slate-850 rounded-2xl p-16 text-center bg-slate-900/10 max-w-xl mx-auto mt-6">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-slate-900 text-slate-500 border border-slate-800 mb-4">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><line x1="2" y1="17" x2="22" y2="17"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
-            </div>
-            <h3 className="text-sm font-extrabold text-white uppercase tracking-wider">No matching devices</h3>
-            <p className="text-xs text-slate-400 mt-2 max-w-xs mx-auto leading-relaxed">
+          <div className="border border-dashed border-[var(--border-strong)] rounded-xl p-12 text-center bg-[var(--surface-1)] max-w-xl mx-auto mt-4 font-sans">
+            <h3 className="text-xs font-extrabold text-[var(--text-primary)] uppercase tracking-wider">No matching devices</h3>
+            <p className="text-xs text-[var(--text-secondary)] mt-1 max-w-xs mx-auto leading-relaxed">
               No equipment found matching current filter parameters or search term.
             </p>
           </div>
@@ -345,37 +315,36 @@ export default function EquipmentCatalogPage() {
             if (!items || items.length === 0) return null
 
             return (
-              <div key={groupName} className="space-y-3">
-                {/* Group Title Header */}
-                <div className="flex items-center gap-2.5 px-1">
-                  <h3 className="text-xs font-black uppercase text-indigo-400 tracking-wider">
+              <div key={groupName} className="space-y-2">
+                <div className="flex items-center gap-2 px-1">
+                  <h3 className="text-xs font-bold uppercase text-[var(--text-tertiary)] tracking-wider">
                     {groupName}
                   </h3>
-                  <span className="text-[9px] bg-slate-900 text-slate-400 font-bold px-2 py-0.5 rounded-full border border-slate-850">
+                  <span className="text-[10px] bg-[var(--surface-2)] text-[var(--text-secondary)] font-bold px-2 py-0.5 rounded-full font-mono border border-[var(--border)]">
                     {items.length} {items.length === 1 ? 'item' : 'items'}
                   </span>
                 </div>
 
-                {/* Group Technical Table */}
-                <div className="bg-slate-900/15 border border-slate-850 rounded-2xl overflow-hidden shadow-sm">
+                {/* Table Component */}
+                <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-xl overflow-hidden shadow-xs">
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left text-[11px] font-medium border-collapse">
-                      <thead className="bg-slate-950/60 text-slate-500 uppercase text-[9px] tracking-wider border-b border-slate-850 font-mono select-none">
+                    <table className="w-full text-left text-xs font-medium border-collapse">
+                      <thead className="bg-[var(--surface-2)] text-[var(--text-tertiary)] uppercase text-[10px] tracking-wider border-b border-[var(--border)] font-mono select-none">
                         <tr>
-                          <th className="px-4 py-3 font-extrabold">Category</th>
-                          <th className="px-4 py-3 font-extrabold">Brand</th>
-                          <th className="px-4 py-3 font-extrabold">Model</th>
-                          <th className="px-4 py-3 font-extrabold">Type</th>
-                          <th className="px-4 py-3 font-extrabold">Connectivity</th>
-                          <th className="px-4 py-3 font-extrabold">Power</th>
-                          <th className="px-4 py-3 font-extrabold">PoE / Draw</th>
-                          <th className="px-4 py-3 font-extrabold">Ports</th>
-                          <th className="px-4 py-3 font-extrabold">Fiber</th>
-                          <th className="px-4 py-3 font-extrabold text-center">Status</th>
-                          <th className="px-4 py-3 font-extrabold text-right">Actions</th>
+                          <th className="px-4 py-2.5 font-bold">Category</th>
+                          <th className="px-4 py-2.5 font-bold">Brand</th>
+                          <th className="px-4 py-2.5 font-bold">Model</th>
+                          <th className="px-4 py-2.5 font-bold">Type</th>
+                          <th className="px-4 py-2.5 font-bold">Connectivity</th>
+                          <th className="px-4 py-2.5 font-bold">Power</th>
+                          <th className="px-4 py-2.5 font-bold">PoE / Draw</th>
+                          <th className="px-4 py-2.5 font-bold">Ports</th>
+                          <th className="px-4 py-2.5 font-bold">Fiber</th>
+                          <th className="px-4 py-2.5 font-bold text-center">Status</th>
+                          <th className="px-4 py-2.5 font-bold text-right">Actions</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-850/60">
+                      <tbody className="divide-y divide-[var(--border)]">
                         {items.map((item, idx) => {
                           const isSelected = selectedItem?.part === item.part
                           const hasPhoto = !!equipmentImages[item.part]
@@ -384,26 +353,26 @@ export default function EquipmentCatalogPage() {
                             <tr
                               key={item.part || idx}
                               onClick={() => setSelectedItem(item)}
-                              className={`transition-all hover:bg-slate-900/50 cursor-pointer ${
-                                isSelected ? 'bg-sky-500/5 hover:bg-sky-500/10' : 'bg-transparent'
+                              className={`transition-all hover:bg-[var(--surface-hover)] cursor-pointer ${
+                                isSelected ? 'bg-[var(--surface-2)]' : 'bg-transparent'
                               }`}
                             >
-                              <td className="px-4 py-2.5 font-bold text-slate-400">{item.category}</td>
-                              <td className="px-4 py-2.5 font-mono text-indigo-400 font-extrabold">{item.brand}</td>
-                              <td className="px-4 py-2.5 text-white font-extrabold flex items-center gap-1.5">
+                              <td className="px-4 py-2.5 font-semibold text-[var(--text-secondary)]">{item.category}</td>
+                              <td className="px-4 py-2.5 font-mono text-[var(--accent-text)] font-extrabold">{item.brand}</td>
+                              <td className="px-4 py-2.5 text-[var(--text-primary)] font-bold flex items-center gap-1.5">
                                 {hasPhoto && (
-                                  <span className="w-1.5 h-1.5 rounded-full bg-sky-400" title="Photo attached" />
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" title="Photo attached" />
                                 )}
                                 {item.model}
                               </td>
-                              <td className="px-4 py-2.5 text-slate-350">{item.type}</td>
-                              <td className="px-4 py-2.5 text-slate-450">{item.connectivity}</td>
-                              <td className="px-4 py-2.5 text-slate-450">{item.power}</td>
-                              <td className="px-4 py-2.5 font-mono text-slate-350 font-bold">{item.poeDraw}</td>
-                              <td className="px-4 py-2.5 font-mono text-slate-450">{item.ports}</td>
-                              <td className="px-4 py-2.5 font-mono text-slate-450">{item.fiberCount}</td>
+                              <td className="px-4 py-2.5 text-[var(--text-secondary)]">{item.type}</td>
+                              <td className="px-4 py-2.5 text-[var(--text-secondary)]">{item.connectivity}</td>
+                              <td className="px-4 py-2.5 text-[var(--text-secondary)]">{item.power}</td>
+                              <td className="px-4 py-2.5 font-mono text-[var(--text-primary)] font-bold">{item.poeDraw}</td>
+                              <td className="px-4 py-2.5 font-mono text-[var(--text-secondary)]">{item.ports}</td>
+                              <td className="px-4 py-2.5 font-mono text-[var(--text-secondary)]">{item.fiberCount}</td>
                               <td className="px-4 py-2.5 text-center">
-                                <span className="text-[8.5px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-450 border border-emerald-500/20">
+                                <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-[var(--success-soft)] text-[var(--success)] border border-emerald-200">
                                   {item.status}
                                 </span>
                               </td>
@@ -411,9 +380,9 @@ export default function EquipmentCatalogPage() {
                                 <button
                                   type="button"
                                   onClick={() => setSelectedItem(item)}
-                                  className="px-2 py-1 bg-slate-950 border border-slate-800 hover:border-sky-500/40 text-slate-400 hover:text-sky-400 rounded-md transition text-[9px] font-extrabold uppercase cursor-pointer"
+                                  className="px-2 py-1 bg-[var(--surface-1)] border border-[var(--border)] hover:bg-[var(--surface-hover)] text-[var(--accent-text)] rounded-md transition text-[10px] font-bold cursor-pointer"
                                 >
-                                  Specs
+                                  Specs →
                                 </button>
                               </td>
                             </tr>
@@ -429,34 +398,30 @@ export default function EquipmentCatalogPage() {
         )}
       </div>
 
-      {/* Equipment Detail Drawer (Right side overlay panel) */}
+      {/* Equipment Detail Overlay Drawer */}
       {selectedItem && (
-        <div className="fixed inset-y-0 right-0 z-40 w-[420px] bg-slate-900 border-l border-slate-800 shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-200">
-          {/* Header area */}
-          <div className="p-5 border-b border-slate-800 bg-slate-950/40 flex justify-between items-start">
+        <div className="fixed inset-y-0 right-0 z-40 w-[420px] bg-[var(--surface-1)] border-l border-[var(--border)] shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-150">
+          <div className="p-5 border-b border-[var(--border)] bg-[var(--surface-2)] flex justify-between items-start">
             <div>
-              <span className="text-[9px] font-black uppercase text-indigo-400 tracking-widest font-mono bg-indigo-950/30 px-2 py-0.5 rounded border border-indigo-900/20">{selectedItem.category}</span>
-              <h3 className="text-base font-black text-white mt-2 leading-tight">{selectedItem.brand} {selectedItem.model}</h3>
-              <p className="text-[10px] text-slate-500 font-mono mt-1">Part: {selectedItem.part}</p>
+              <span className="text-[9px] font-bold uppercase text-[var(--accent-text)] tracking-wider font-mono bg-[var(--accent-soft)] px-2 py-0.5 rounded border border-[var(--accent-border)]">{selectedItem.category}</span>
+              <h3 className="text-base font-extrabold text-[var(--text-primary)] mt-1.5 leading-tight">{selectedItem.brand} {selectedItem.model}</h3>
+              <p className="text-[11px] text-[var(--text-tertiary)] font-mono mt-0.5">Part: {selectedItem.part}</p>
             </div>
             <button 
               onClick={() => setSelectedItem(null)}
-              className="text-slate-500 hover:text-white p-1 rounded-lg hover:bg-slate-850/50 transition-colors"
+              className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] p-1 rounded-md hover:bg-[var(--surface-hover)] transition-colors cursor-pointer"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              ✕
             </button>
           </div>
 
-          {/* Scrollable details list */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin select-none">
-            
-            {/* 1. Photo Upload / Preview section */}
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Device Photograph</label>
+          <div className="flex-1 overflow-y-auto p-5 space-y-5 scrollbar-thin select-none">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider">Device Photograph</label>
               
               <div 
                 onClick={() => fileInputRef.current?.click()}
-                className="group relative border border-dashed border-slate-800 hover:border-sky-500/50 rounded-2xl h-44 overflow-hidden bg-slate-950/20 flex flex-col items-center justify-center cursor-pointer transition"
+                className="group relative border border-dashed border-[var(--border-strong)] hover:border-[var(--accent)] rounded-xl h-40 overflow-hidden bg-[var(--surface-2)] flex flex-col items-center justify-center cursor-pointer transition"
               >
                 {equipmentImages[selectedItem.part] ? (
                   <>
@@ -465,15 +430,13 @@ export default function EquipmentCatalogPage() {
                       alt={selectedItem.model}
                       className="w-full h-full object-contain p-2"
                     />
-                    <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition text-2xs font-extrabold uppercase text-white tracking-widest gap-1.5">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                    <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition text-xs font-bold text-white uppercase tracking-wider">
                       Replace Image
                     </div>
                   </>
                 ) : (
-                  <div className="text-center p-4 space-y-2">
-                    <svg className="w-8 h-8 mx-auto text-slate-650 group-hover:text-sky-400 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                    <span className="text-[10px] font-extrabold uppercase text-slate-550 group-hover:text-sky-450 tracking-wider block">Upload Product Photo</span>
+                  <div className="text-center p-4 space-y-1.5">
+                    <span className="text-[10px] font-bold uppercase text-[var(--text-secondary)] tracking-wider block">Upload Product Photo</span>
                   </div>
                 )}
               </div>
@@ -486,193 +449,45 @@ export default function EquipmentCatalogPage() {
               />
             </div>
 
-            {/* 2. Technical Specifications fields based on category */}
-            <div className="space-y-4">
-              <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-wider pb-1 border-b border-slate-850">
+            <div className="space-y-3">
+              <h4 className="text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider pb-1 border-b border-[var(--border)]">
                 Technical Specifications
               </h4>
 
-              {/* Description Spec */}
-              <div className="space-y-1">
-                <span className="text-[9px] font-bold text-slate-550 uppercase">Specs Overview</span>
-                <p className="text-xs text-slate-350 leading-relaxed font-sans">{selectedItem.spec}</p>
+              <div className="space-y-0.5">
+                <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase">Specs Overview</span>
+                <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-sans">{selectedItem.spec}</p>
               </div>
 
-              {/* CAMERA FIELDS */}
-              {selectedItem.category === 'Cameras' && (
-                <div className="grid grid-cols-2 gap-4 font-mono text-[10.5px]">
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">Camera Type</span>
-                    <strong className="text-slate-200">{selectedItem.type}</strong>
-                  </div>
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">Resolution</span>
-                    <strong className="text-slate-200">{selectedItem.resolution || '1080p'}</strong>
-                  </div>
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">Lens</span>
-                    <strong className="text-slate-200">{selectedItem.lens}</strong>
-                  </div>
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">Default FOV</span>
-                    <strong className="text-slate-200">{selectedItem.fov}</strong>
-                  </div>
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">Default Range</span>
-                    <strong className="text-slate-200">{selectedItem.range}</strong>
-                  </div>
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">IR Night Vision</span>
-                    <strong className="text-slate-200">{selectedItem.nightVision}</strong>
-                  </div>
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">Mounting Styles</span>
-                    <strong className="text-slate-200">{selectedItem.mount}</strong>
-                  </div>
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">Environment</span>
-                    <strong className="text-slate-200">{selectedItem.environment}</strong>
-                  </div>
+              <div className="grid grid-cols-2 gap-3 font-mono text-xs">
+                <div className="space-y-0.5">
+                  <span className="text-[9.5px] font-sans font-bold text-[var(--text-tertiary)] block uppercase">Connectivity</span>
+                  <strong className="text-[var(--text-primary)]">{selectedItem.connectivity}</strong>
                 </div>
-              )}
-
-              {/* SWITCH FIELDS */}
-              {selectedItem.category === 'Switches' && (
-                <div className="grid grid-cols-2 gap-4 font-mono text-[10.5px]">
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">Switch Type</span>
-                    <strong className="text-slate-200">{selectedItem.switchType}</strong>
-                  </div>
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">RJ45 Ports</span>
-                    <strong className="text-slate-200">{selectedItem.rj45Ports}</strong>
-                  </div>
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">SFP Ports</span>
-                    <strong className="text-slate-200">{selectedItem.sfpPorts}</strong>
-                  </div>
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">PoE Ports</span>
-                    <strong className="text-slate-200">{selectedItem.poePorts}</strong>
-                  </div>
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">PoE Budget</span>
-                    <strong className="text-slate-200">{selectedItem.poeBudget}</strong>
-                  </div>
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">Uplink Speed</span>
-                    <strong className="text-slate-200">{selectedItem.speed}</strong>
-                  </div>
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">Management</span>
-                    <strong className="text-slate-200">{selectedItem.managed}</strong>
-                  </div>
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">Industrial Rating</span>
-                    <strong className="text-slate-200">{selectedItem.rating}</strong>
-                  </div>
+                <div className="space-y-0.5">
+                  <span className="text-[9.5px] font-sans font-bold text-[var(--text-tertiary)] block uppercase">Power Standard</span>
+                  <strong className="text-[var(--text-primary)]">{selectedItem.power}</strong>
                 </div>
-              )}
-
-              {/* WIRELESS RADIO FIELDS */}
-              {selectedItem.category === 'Wireless Radios' && (
-                <div className="grid grid-cols-2 gap-4 font-mono text-[10.5px]">
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">Frequency Band</span>
-                    <strong className="text-slate-200">{selectedItem.frequency}</strong>
-                  </div>
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">Max Throughput</span>
-                    <strong className="text-slate-200">{selectedItem.throughput}</strong>
-                  </div>
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">Antenna Gain</span>
-                    <strong className="text-slate-200">{selectedItem.gain}</strong>
-                  </div>
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">Effective Range</span>
-                    <strong className="text-slate-200">{selectedItem.range}</strong>
-                  </div>
+                <div className="space-y-0.5">
+                  <span className="text-[9.5px] font-sans font-bold text-[var(--text-tertiary)] block uppercase">PoE Draw</span>
+                  <strong className="text-[var(--text-primary)]">{selectedItem.poeDraw}</strong>
                 </div>
-              )}
-
-              {/* FIBER CABLE FIELDS */}
-              {selectedItem.category === 'Fiber Cables' && (
-                <div className="grid grid-cols-2 gap-4 font-mono text-[10.5px]">
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">Fiber Count</span>
-                    <strong className="text-slate-200">{selectedItem.fiberCount} Strands</strong>
-                  </div>
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">Optical Mode</span>
-                    <strong className="text-slate-200">{selectedItem.mode}</strong>
-                  </div>
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">Cable Structure</span>
-                    <strong className="text-slate-200">{selectedItem.cableType}</strong>
-                  </div>
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">Armored Sheath</span>
-                    <strong className="text-slate-200">{selectedItem.armored}</strong>
-                  </div>
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">Environment</span>
-                    <strong className="text-slate-200">{selectedItem.outdoorIndoor}</strong>
-                  </div>
+                <div className="space-y-0.5">
+                  <span className="text-[9.5px] font-sans font-bold text-[var(--text-tertiary)] block uppercase">Ports Capacity</span>
+                  <strong className="text-[var(--text-primary)]">{selectedItem.ports}</strong>
                 </div>
-              )}
-
-              {/* COMMON FIELDS FOR OTHERS */}
-              {!['Cameras', 'Switches', 'Wireless Radios', 'Fiber Cables'].includes(selectedItem.category) && (
-                <div className="grid grid-cols-2 gap-4 font-mono text-[10.5px]">
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">Connectivity</span>
-                    <strong className="text-slate-200">{selectedItem.connectivity}</strong>
-                  </div>
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">Power Standard</span>
-                    <strong className="text-slate-200">{selectedItem.power}</strong>
-                  </div>
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">PoE Draw / capacity</span>
-                    <strong className="text-slate-200">{selectedItem.poeDraw}</strong>
-                  </div>
-                  <div className="space-y-0.5">
-                    <span className="text-slate-550 text-[9px] block">Ports Capacity</span>
-                    <strong className="text-slate-200">{selectedItem.ports}</strong>
-                  </div>
-                </div>
-              )}
-
+              </div>
             </div>
-
           </div>
 
-          {/* Action Footer */}
-          <div className="p-5 border-t border-slate-800 bg-slate-950/40 flex flex-col gap-2 shrink-0">
+          <div className="p-4 border-t border-[var(--border)] bg-[var(--surface-2)] flex flex-col gap-2 shrink-0">
             <button 
               type="button"
               onClick={() => showToast(`Added ${selectedItem.model} to active project BOM list!`)}
-              className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-md active:scale-98 cursor-pointer"
+              className="w-full py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer"
             >
               Add to Project Plan
             </button>
-            <div className="grid grid-cols-2 gap-2 text-[10px] font-bold">
-              <button 
-                type="button"
-                onClick={() => showToast(`Catalog duplicate draft generated for ${selectedItem.model}.`, 'info')}
-                className="py-2 bg-slate-950 border border-slate-850 hover:border-slate-750 text-slate-300 rounded-xl transition cursor-pointer"
-              >
-                Duplicate
-              </button>
-              <button 
-                type="button"
-                onClick={() => showToast(`Archiving this catalog template is planned.`, 'info')}
-                className="py-2 bg-slate-950 border border-slate-850 hover:border-slate-750 text-slate-300 rounded-xl transition cursor-pointer"
-              >
-                Archive Item
-              </button>
-            </div>
           </div>
         </div>
       )}
@@ -680,31 +495,24 @@ export default function EquipmentCatalogPage() {
       {/* Import Rules Modal */}
       {isImportRulesOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-xs" onClick={() => setIsImportRulesOpen(false)} />
-          <div className="relative bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-lg space-y-4 shadow-2xl animate-in zoom-in-95 duration-150">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs" onClick={() => setIsImportRulesOpen(false)} />
+          <div className="relative bg-[var(--surface-1)] border border-[var(--border-strong)] p-6 rounded-xl w-full max-w-lg space-y-4 shadow-2xl animate-in zoom-in-95 duration-150">
             <div>
-              <h3 className="text-sm font-black uppercase text-indigo-400 tracking-wider">Import Rules — Coming Soon</h3>
-              <p className="text-[11px] text-slate-450 mt-1 font-medium">This mapping module allows admins to normalize and match distributor/manufacturer spreadsheets.</p>
+              <h3 className="text-sm font-black uppercase text-[var(--accent-text)] tracking-wider">Import Rules</h3>
+              <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">This mapping module allows admins to normalize distributor spreadsheets.</p>
             </div>
             
-            <div className="bg-slate-950/40 p-4 border border-slate-850 rounded-xl space-y-3.5 text-xs text-slate-455 font-mono">
-              <div className="space-y-1">
-                <span className="text-[9px] font-bold text-slate-550 uppercase">Mapped Fields Schema</span>
-                <p className="text-slate-300">Column mapping, manufacturer normalization, model matching, part number matching, default category mapping, duplicate detection.</p>
-              </div>
-
-              <div className="pt-2 border-t border-slate-900/60 space-y-1">
-                <span className="text-[9px] font-bold text-slate-550 uppercase">Planned Verification Flags</span>
-                <ul className="list-disc pl-4 space-y-0.5 text-slate-500">
-                  <li>Validate PoE wattage vs. switch budget bounds.</li>
-                  <li>Check port count compatibilities.</li>
-                  <li>Normalize optical fiber wavelength transceivers.</li>
-                </ul>
-              </div>
+            <div className="bg-[var(--surface-2)] p-4 border border-[var(--border)] rounded-lg space-y-2 text-xs text-[var(--text-secondary)]">
+              <p>Planned Verification Flags:</p>
+              <ul className="list-disc pl-4 space-y-0.5 font-mono text-[11px]">
+                <li>Validate PoE wattage vs. switch budget bounds.</li>
+                <li>Check port count compatibilities.</li>
+                <li>Normalize optical fiber wavelength transceivers.</li>
+              </ul>
             </div>
 
             <div className="flex justify-end pt-2">
-              <button type="button" onClick={() => setIsImportRulesOpen(false)} className="px-4 py-2 bg-slate-950 border border-slate-800 hover:border-slate-750 text-slate-350 rounded-xl text-xs font-bold transition">
+              <button type="button" onClick={() => setIsImportRulesOpen(false)} className="px-4 py-2 bg-[var(--surface-2)] border border-[var(--border)] hover:bg-[var(--surface-hover)] text-[var(--text-primary)] rounded-lg text-xs font-bold transition">
                 Close
               </button>
             </div>

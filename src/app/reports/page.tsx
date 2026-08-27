@@ -62,12 +62,12 @@ export default function GlobalReportsPage() {
   }
 
   return (
-    <div className="space-y-8 w-full px-6 py-8 font-sans text-slate-100 bg-[#0c0f1d] min-h-full overflow-y-auto scrollbar-thin relative">
+    <div className="space-y-6 w-full px-6 py-8 font-sans text-[var(--text-primary)] bg-[var(--bg)] min-h-full overflow-y-auto scrollbar-thin relative">
       
       {/* Toast alert */}
       {toastMessage && (
-        <div className="fixed top-4 right-4 z-50 bg-slate-900 border border-slate-750 text-white px-4 py-3 rounded-xl shadow-2xl animate-in slide-in-from-top-4 duration-200 text-xs font-bold font-mono flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+        <div className="fixed top-4 right-4 z-50 bg-[var(--surface-1)] border border-[var(--border-strong)] text-[var(--text-primary)] px-4 py-3 rounded-xl shadow-xl text-xs font-bold font-mono flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-[var(--success)] animate-pulse" />
           {toastMessage}
         </div>
       )}
@@ -75,14 +75,14 @@ export default function GlobalReportsPage() {
       {/* Title Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-2.5xl font-black text-white tracking-tight leading-none">
+          <h1 className="text-xl font-extrabold text-[var(--text-primary)] tracking-tight leading-none">
             Global Reports
           </h1>
-          <p className="text-sm text-slate-400 mt-2 font-medium">
+          <p className="text-xs text-[var(--text-secondary)] mt-1.5 font-medium">
             Cross-project reports, bulk statistics, and procurement deliverables.
           </p>
         </div>
-        <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 tracking-wider">
+        <span className="text-[10px] font-bold uppercase px-2.5 py-1 rounded-full bg-[var(--accent-soft)] text-[var(--accent-text)] border border-[var(--accent-border)] font-mono">
           Company level
         </span>
       </div>
@@ -92,25 +92,25 @@ export default function GlobalReportsPage() {
         {globalReports.map((r, i) => (
           <div
             key={i}
-            className="bg-slate-900/40 border border-slate-850 p-6 rounded-2xl flex flex-col justify-between space-y-4 hover:border-slate-800 transition"
+            className="bg-[var(--surface-1)] border border-[var(--border)] p-5 rounded-xl flex flex-col justify-between space-y-4 shadow-xs hover:border-[var(--border-strong)] transition"
           >
             {/* Header info */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <h3 className="font-extrabold text-white text-base">{r.title}</h3>
-                <span className={`text-[8.5px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider font-mono ${
+                <h3 className="font-extrabold text-[var(--text-primary)] text-sm">{r.title}</h3>
+                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider font-mono ${
                   r.status === 'Ready' 
-                    ? 'bg-emerald-500/10 text-emerald-450 border border-emerald-500/20' 
-                    : 'bg-slate-950 text-slate-500'
+                    ? 'bg-[var(--success-soft)] text-[var(--success)] border border-emerald-200' 
+                    : 'bg-[var(--surface-2)] text-[var(--text-tertiary)] border border-[var(--border)]'
                 }`}>{r.status}</span>
               </div>
-              <p className="text-xs text-slate-400 leading-relaxed">{r.desc}</p>
+              <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{r.desc}</p>
             </div>
 
             {/* Details container */}
-            <div className="bg-slate-950/30 p-4 rounded-xl border border-slate-900 text-[10.5px] font-mono text-slate-450">
-              <strong className="text-slate-350">Included Metrics:</strong>
-              <p className="text-slate-400 mt-0.5 leading-snug">{r.sections}</p>
+            <div className="bg-[var(--surface-2)] p-3.5 rounded-lg border border-[var(--border)] text-[11px] font-mono text-[var(--text-secondary)]">
+              <strong className="text-[var(--text-primary)] font-sans font-bold">Included Metrics:</strong>
+              <p className="text-[var(--text-secondary)] mt-0.5 leading-snug">{r.sections}</p>
             </div>
 
             {/* Action button */}
@@ -118,7 +118,7 @@ export default function GlobalReportsPage() {
               <button
                 type="button"
                 onClick={() => handleGenerateReport(r)}
-                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition tracking-wide cursor-pointer active:scale-98"
+                className="w-full py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg text-xs font-bold transition tracking-wide cursor-pointer shadow-xs active:scale-98"
               >
                 Generate Report
               </button>
@@ -126,7 +126,7 @@ export default function GlobalReportsPage() {
               <button
                 type="button"
                 onClick={() => setSelectedReport(r)}
-                className="w-full py-2.5 bg-slate-950 border border-slate-850 hover:border-slate-750 text-slate-400 rounded-xl text-xs font-bold transition tracking-wide cursor-pointer active:scale-98"
+                className="w-full py-2 bg-[var(--surface-2)] border border-[var(--border)] hover:bg-[var(--surface-hover)] text-[var(--text-secondary)] rounded-lg text-xs font-semibold transition tracking-wide cursor-pointer active:scale-98"
               >
                 View Scope — Coming Soon
               </button>
@@ -135,31 +135,31 @@ export default function GlobalReportsPage() {
         ))}
       </div>
 
-      {/* Report Scope / Coming Soon Modal */}
+      {/* Report Scope Modal */}
       {selectedReport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-xs" onClick={() => setSelectedReport(null)} />
-          <div className="relative bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl animate-in zoom-in-95 duration-150">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs" onClick={() => setSelectedReport(null)} />
+          <div className="relative bg-[var(--surface-1)] border border-[var(--border-strong)] p-6 rounded-xl w-full max-w-md space-y-4 shadow-2xl animate-in zoom-in-95 duration-150 font-sans">
             <div>
-              <span className="text-[9px] font-bold uppercase text-slate-500 tracking-widest font-mono">Report Scope</span>
-              <h3 className="text-sm font-black uppercase text-indigo-400 tracking-wider mt-0.5">{selectedReport.title}</h3>
-              <p className="text-[11px] text-slate-450 leading-relaxed mt-2">{selectedReport.desc}</p>
+              <span className="text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider font-mono">Report Scope</span>
+              <h3 className="text-sm font-extrabold uppercase text-[var(--accent-text)] tracking-wider mt-0.5">{selectedReport.title}</h3>
+              <p className="text-xs text-[var(--text-secondary)] leading-relaxed mt-2">{selectedReport.desc}</p>
             </div>
 
-            <div className="space-y-3.5 text-xs font-mono bg-slate-950/40 p-4 border border-slate-900 rounded-xl text-slate-400">
+            <div className="space-y-3 text-xs font-mono bg-[var(--surface-2)] p-4 border border-[var(--border)] rounded-lg text-[var(--text-secondary)]">
               <div className="space-y-1">
-                <span className="text-[9px] font-bold text-slate-550 uppercase">Planned Data Integrations</span>
-                <p className="text-slate-350 leading-relaxed">{selectedReport.sections}</p>
+                <span className="text-[10px] font-bold text-[var(--text-tertiary)] font-sans uppercase">Planned Data Integrations</span>
+                <p className="text-[var(--text-primary)] leading-relaxed">{selectedReport.sections}</p>
               </div>
 
-              <div className="pt-2 border-t border-slate-900 text-rose-500 font-bold flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+              <div className="pt-2 border-t border-[var(--border)] text-[var(--warn)] font-bold flex items-center gap-1.5 font-sans">
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--warn)]" />
                 Status: Coming Soon
               </div>
             </div>
 
             <div className="flex justify-end pt-2">
-              <button type="button" onClick={() => setSelectedReport(null)} className="px-4 py-2 bg-slate-950 border border-slate-800 hover:border-slate-750 text-slate-350 rounded-xl text-xs font-bold transition">
+              <button type="button" onClick={() => setSelectedReport(null)} className="px-4 py-2 bg-[var(--surface-2)] border border-[var(--border)] hover:bg-[var(--surface-hover)] text-[var(--text-primary)] rounded-lg text-xs font-bold transition">
                 Close
               </button>
             </div>
@@ -170,35 +170,34 @@ export default function GlobalReportsPage() {
       {/* Report Preview Modal */}
       {previewReport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-xs" onClick={() => setPreviewReport(null)} />
-          <div className="relative bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-2xl space-y-4 shadow-2xl animate-in zoom-in-95 duration-150">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs" onClick={() => setPreviewReport(null)} />
+          <div className="relative bg-[var(--surface-1)] border border-[var(--border-strong)] p-6 rounded-xl w-full max-w-2xl space-y-4 shadow-2xl animate-in zoom-in-95 duration-150 font-sans">
             <div>
-              <span className="text-[9px] font-bold uppercase text-slate-500 tracking-widest font-mono">Mock Report Preview</span>
-              <h3 className="text-base font-black uppercase text-indigo-400 tracking-wider mt-0.5">{previewReport.title}</h3>
+              <span className="text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider font-mono">Mock Report Preview</span>
+              <h3 className="text-base font-extrabold text-[var(--text-primary)] tracking-wider mt-0.5">{previewReport.title}</h3>
             </div>
 
-            {/* Mock Data Display */}
-            <div className="space-y-4 text-xs font-mono bg-slate-950/40 p-5 border border-slate-900 rounded-xl text-slate-400 max-h-[350px] overflow-y-auto scrollbar-thin">
-              <div className="flex justify-between items-center pb-2 border-b border-slate-900">
-                <span className="text-[9px] font-bold text-slate-550 uppercase">Report Header</span>
-                <span className="text-[9px] text-slate-500">Date: {new Date().toLocaleDateString()}</span>
+            <div className="space-y-4 text-xs font-mono bg-[var(--surface-2)] p-5 border border-[var(--border)] rounded-lg text-[var(--text-secondary)] max-h-[350px] overflow-y-auto scrollbar-thin">
+              <div className="flex justify-between items-center pb-2 border-b border-[var(--border)]">
+                <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase font-sans">Report Header</span>
+                <span className="text-[10px] text-[var(--text-tertiary)]">Date: {new Date().toLocaleDateString()}</span>
               </div>
 
               <div className="space-y-3">
-                <div className="p-3.5 bg-slate-900/60 border border-slate-850 rounded-xl space-y-2">
-                  <h4 className="font-extrabold text-white text-[11px] uppercase tracking-wide">Executive Summary</h4>
-                  <p className="text-[11px] text-slate-400 leading-relaxed font-sans">{previewReport.desc}</p>
+                <div className="p-3 bg-[var(--surface-1)] border border-[var(--border)] rounded-lg space-y-1">
+                  <h4 className="font-bold text-[var(--text-primary)] text-xs uppercase tracking-wide font-sans">Executive Summary</h4>
+                  <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-sans">{previewReport.desc}</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="p-3.5 bg-slate-900/60 border border-slate-850 rounded-xl space-y-1.5">
-                    <span className="text-[9px] font-bold text-slate-550 uppercase">Target Metrics</span>
-                    <p className="text-slate-350 leading-relaxed text-[10.5px]">{previewReport.sections}</p>
+                  <div className="p-3 bg-[var(--surface-1)] border border-[var(--border)] rounded-lg space-y-1">
+                    <span className="text-[10px] font-bold text-[var(--text-tertiary)] font-sans uppercase">Target Metrics</span>
+                    <p className="text-[var(--text-primary)] leading-relaxed text-xs">{previewReport.sections}</p>
                   </div>
-                  <div className="p-3.5 bg-slate-900/60 border border-slate-850 rounded-xl space-y-1.5">
-                    <span className="text-[9px] font-bold text-slate-550 uppercase">Audit Status</span>
-                    <div className="flex items-center gap-1.5 text-emerald-450 font-bold text-[11px] pt-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <div className="p-3 bg-[var(--surface-1)] border border-[var(--border)] rounded-lg space-y-1">
+                    <span className="text-[10px] font-bold text-[var(--text-tertiary)] font-sans uppercase">Audit Status</span>
+                    <div className="flex items-center gap-1.5 text-[var(--success)] font-bold text-xs pt-1 font-sans">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)] animate-pulse" />
                       COMPLETED / SEED DATA
                     </div>
                   </div>
@@ -210,11 +209,11 @@ export default function GlobalReportsPage() {
               <button 
                 type="button" 
                 onClick={() => showToast('Mock PDF generation complete — starting download.')}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-md"
+                className="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg text-xs font-bold transition shadow-xs"
               >
                 Export PDF (Mock)
               </button>
-              <button type="button" onClick={() => setPreviewReport(null)} className="px-4 py-2 bg-slate-950 border border-slate-800 hover:border-slate-750 text-slate-350 rounded-xl text-xs font-bold transition">
+              <button type="button" onClick={() => setPreviewReport(null)} className="px-4 py-2 bg-[var(--surface-2)] border border-[var(--border)] hover:bg-[var(--surface-hover)] text-[var(--text-primary)] rounded-lg text-xs font-bold transition">
                 Close Preview
               </button>
             </div>

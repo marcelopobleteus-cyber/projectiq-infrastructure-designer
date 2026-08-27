@@ -11,10 +11,6 @@ interface ProjectSidebarProps {
   disciplines: string[]
 }
 
-// Canonical discipline ids — must match PROJECT_TYPES in /projects/create and the
-// `disciplines` column on public.projects. 'conduit' and 'lighting' are valid tags
-// today (a project can be created and saved as one) but have no dedicated workspace
-// yet, so their nav entries render disabled until that module ships.
 const ALL_DISCIPLINES: { id: string; name: string; href: string; icon: React.ReactNode; ready: boolean }[] = [
   {
     id: 'cctv', name: 'CCTV & Videovigilancia', href: 'cameras', ready: true,
@@ -22,7 +18,7 @@ const ALL_DISCIPLINES: { id: string; name: string; href: string; icon: React.Rea
   },
   {
     id: 'fiber', name: 'Fibra Óptica (OSP/ISP)', href: 'fiber', ready: true,
-    icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0z"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg>,
+    icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0z"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg>,
   },
   {
     id: 'conduit', name: 'Canalización & Ductos', href: '', ready: false,
@@ -57,23 +53,15 @@ export default function ProjectSidebar({ projectId, projectName, disciplines }: 
       ? activeDisciplines.filter(id => id !== discId)
       : [...activeDisciplines, discId]
 
-    if (next.length === 0) return // at least one discipline must stay active
+    if (next.length === 0) return
 
-    setActiveDisciplines(next) // optimistic
+    setActiveDisciplines(next)
     startTransition(async () => {
       const res = await updateProjectDisciplines(projectId, next)
-      if (res?.error) setActiveDisciplines(activeDisciplines) // roll back on failure
+      if (res?.error) setActiveDisciplines(activeDisciplines)
     })
     setShowAddMenu(false)
   }
-
-  const isCctvActive = activeDisciplines.includes('cctv')
-  const isFiberActive = activeDisciplines.includes('fiber')
-  const isConduitActive = activeDisciplines.includes('conduit')
-  const isNetworkingActive = activeDisciplines.includes('networking')
-  const isWirelessActive = activeDisciplines.includes('wireless')
-  const isPowerActive = activeDisciplines.includes('power')
-  const isLightingActive = activeDisciplines.includes('lighting')
 
   const getDisciplineBadge = () => {
     if (activeDisciplines.length === 1) {
@@ -98,7 +86,7 @@ export default function ProjectSidebar({ projectId, projectName, disciplines }: 
 
   const categories = [
     {
-      label: 'Vista Principal',
+      label: 'VISTA PRINCIPAL',
       items: [
         {
           id: 'overview',
@@ -130,11 +118,11 @@ export default function ProjectSidebar({ projectId, projectName, disciplines }: 
       ]
     },
     {
-      label: 'Módulos del Proyecto',
+      label: 'MÓDULOS DEL PROYECTO',
       items: designItems
     },
     {
-      label: 'Operación & Entregables',
+      label: 'OPERACIÓN & ENTREGABLES',
       items: [
         {
           id: 'bom',
@@ -166,7 +154,7 @@ export default function ProjectSidebar({ projectId, projectName, disciplines }: 
       ]
     },
     {
-      label: 'Soporte',
+      label: 'SOPORTE',
       items: [
         {
           id: 'help',
@@ -182,24 +170,27 @@ export default function ProjectSidebar({ projectId, projectName, disciplines }: 
   ]
 
   return (
-    <aside className="w-[240px] bg-slate-900 border-r border-slate-800 flex flex-col shrink-0 h-full overflow-hidden relative z-10 font-sans">
+    <aside className="w-[222px] bg-[var(--bg)] border-r border-[var(--border)] flex flex-col shrink-0 h-full overflow-hidden relative z-10 font-sans select-none">
       {/* Brand logo identity header */}
-      <div className="p-4 border-b border-slate-800 bg-slate-950/40 shrink-0 flex flex-col gap-2">
-        <div className="flex items-center gap-1.5">
-          <span className="text-sm font-black text-sky-400 tracking-wider">NextQ</span>
-          <span className="text-[10px] text-slate-500 font-medium">Infrastructure Suite</span>
+      <div className="p-3.5 border-b border-[var(--border)] bg-[var(--surface-1)] shrink-0 flex flex-col gap-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-black text-[var(--text-primary)] tracking-wider">NextQ Suite</span>
+          <span className="text-[10px] text-[var(--accent-text)] font-mono font-bold bg-[var(--accent-soft)] px-1.5 py-0.5 rounded border border-[var(--accent-border)]">v2.0</span>
         </div>
 
         {/* Specialty Discipline Indicator Badge */}
-        <div className="flex items-center justify-between gap-1.5 px-2.5 py-1.5 bg-sky-950/60 border border-sky-800/40 rounded-xl text-[11px] text-sky-300 font-semibold truncate shadow-inner">
+        <div className="flex items-center justify-between gap-1 px-2 py-1 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-[10.5px] text-[var(--text-secondary)] font-medium truncate">
           <span className="truncate">{badge.title}</span>
-          {isPending && <span className="w-2.5 h-2.5 rounded-full border border-sky-400 border-t-transparent animate-spin shrink-0" />}
+          {isPending && <span className="w-2.5 h-2.5 rounded-full border border-[var(--accent)] border-t-transparent animate-spin shrink-0" />}
         </div>
       </div>
 
       {/* Action Buttons: New Project & Add Module */}
-      <div className="p-3 pb-0 shrink-0 space-y-2 relative">
-        <Link href="/projects/create" className="w-full py-2 bg-slate-950 border border-slate-800 hover:border-sky-500/50 hover:text-sky-400 text-slate-300 rounded-xl font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-sm active:scale-98">
+      <div className="p-3 shrink-0 space-y-1.5 relative border-b border-[var(--border)] bg-[var(--surface-1)]">
+        <Link
+          href="/projects/create"
+          className="w-full py-1.5 px-3 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+        >
           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Nuevo Proyecto
         </Link>
@@ -208,16 +199,16 @@ export default function ProjectSidebar({ projectId, projectName, disciplines }: 
         <button
           type="button"
           onClick={() => setShowAddMenu(!showAddMenu)}
-          className="w-full py-1.5 bg-sky-500/10 border border-sky-500/30 hover:bg-sky-500/20 text-sky-300 rounded-xl font-bold text-[11px] transition flex items-center justify-center gap-1.5 active:scale-98"
+          className="w-full py-1 px-2.5 bg-[var(--surface-2)] border border-[var(--border)] hover:bg-[var(--surface-hover)] text-[var(--text-primary)] rounded-lg font-semibold text-[11px] transition flex items-center justify-center gap-1.5 cursor-pointer"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Unir Módulo / Disciplina
         </button>
 
         {/* Dropdown menu for adding/removing modules */}
         {showAddMenu && (
-          <div className="absolute top-full left-3 right-3 mt-1 bg-slate-950 border border-slate-800 rounded-xl shadow-2xl p-2 z-50 space-y-1">
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1 border-b border-slate-800">
+          <div className="absolute top-full left-3 right-3 mt-1 bg-[var(--surface-1)] border border-[var(--border-strong)] rounded-xl shadow-lg p-2 z-50 space-y-1">
+            <div className="text-[9.5px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider px-2 py-1 border-b border-[var(--border)]">
               Activar Módulos en este Proyecto
             </div>
             {ALL_DISCIPLINES.map(d => {
@@ -227,23 +218,18 @@ export default function ProjectSidebar({ projectId, projectName, disciplines }: 
                   key={d.id}
                   type="button"
                   onClick={() => toggleDiscipline(d.id)}
-                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] transition-all ${
+                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] transition-all cursor-pointer ${
                     active
-                      ? 'bg-sky-500/20 text-sky-300 font-semibold'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                      ? 'bg-[var(--accent-soft)] text-[var(--accent-text)] font-semibold'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]'
                   }`}
                 >
                   <span className="flex items-center gap-2">
-                    <span className={active ? 'text-sky-400' : 'text-slate-500'}>{d.icon}</span>
+                    <span className={active ? 'text-[var(--accent)]' : 'text-[var(--text-tertiary)]'}>{d.icon}</span>
                     <span>{d.name}</span>
-                    {!d.ready && (
-                      <span className="text-[8.5px] font-bold uppercase tracking-wide text-slate-600 border border-slate-700 rounded px-1">
-                        pronto
-                      </span>
-                    )}
                   </span>
                   {active && (
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-sky-400 shrink-0"><path d="M4 12.5 9.5 18 20 6.5"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--accent)] shrink-0"><path d="M4 12.5 9.5 18 20 6.5"/></svg>
                   )}
                 </button>
               )
@@ -253,10 +239,10 @@ export default function ProjectSidebar({ projectId, projectName, disciplines }: 
       </div>
 
       {/* Navigation Sections */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-4 scrollbar-thin select-none">
+      <div className="flex-1 overflow-y-auto p-2 space-y-4 scrollbar-thin">
         {categories.map((cat, idx) => (
           <div key={idx} className="space-y-1">
-            <span className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest block px-3 mb-1">
+            <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider block px-2.5 mb-1">
               {cat.label}
             </span>
             <div className="space-y-0.5">
@@ -265,25 +251,25 @@ export default function ProjectSidebar({ projectId, projectName, disciplines }: 
                   <div
                     key={sec.id}
                     title={`${sec.label} — módulo en desarrollo`}
-                    className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl text-[11px] text-slate-600 cursor-not-allowed border border-transparent"
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11.5px] text-[var(--text-tertiary)] cursor-not-allowed opacity-50"
                   >
-                    <span className="text-slate-700">{sec.icon}</span>
-                    {sec.label}
+                    <span>{sec.icon}</span>
+                    <span className="truncate">{sec.label}</span>
                   </div>
                 ) : (
                   <Link
                     key={sec.id}
                     href={sec.href}
-                    className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl text-[11px] transition-all border ${
+                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11.5px] transition-all border-l-2 ${
                       sec.active
-                        ? 'bg-sky-500/10 border-sky-500/20 text-sky-400 font-semibold shadow-inner shadow-sky-950/10'
-                        : 'bg-transparent border-transparent text-slate-400 hover:text-white hover:bg-slate-800/40'
+                        ? 'bg-[var(--surface-2)] border-l-[var(--accent)] text-[var(--text-primary)] font-semibold'
+                        : 'bg-transparent border-l-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]'
                     }`}
                   >
-                    <span className={sec.active ? 'text-sky-400' : 'text-slate-500'}>
+                    <span className={sec.active ? 'text-[var(--accent)]' : 'text-[var(--text-tertiary)]'}>
                       {sec.icon}
                     </span>
-                    {sec.label}
+                    <span className="truncate">{sec.label}</span>
                   </Link>
                 )
               ))}

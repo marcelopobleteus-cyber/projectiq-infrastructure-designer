@@ -1,140 +1,95 @@
 @import "tailwindcss";
 
-@custom-variant dark (&:where(.dark, .dark *));
-
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
-  --card: #ffffff;
-  --card-foreground: #0f172a;
-  --border: #e2e8f0;
-  --muted-foreground: #64748b;
-  --accent: #f1f5f9;
-  --accent-foreground: #0f172a;
-  --popover: #ffffff;
-  --popover-foreground: #0f172a;
-}
+  /* Surfaces */
+  --bg: #F7F7F5;
+  --surface-1: #FFFFFF;
+  --surface-2: #F4F4F1;
+  --surface-3: #EDEDE9;
+  --surface-hover: #EDEDEA;
 
-.dark {
-  --background: #090d16;
-  --foreground: #f1f5f9;
-  --card: #111726;
-  --card-foreground: #f1f5f9;
-  --border: #1e293b;
-  --muted-foreground: #94a3b8;
-  --accent: #1e293b;
-  --accent-foreground: #f1f5f9;
-  --popover: #111726;
-  --popover-foreground: #f1f5f9;
+  /* Borders */
+  --border: #E4E4DF;
+  --border-strong: #D6D6CF;
+
+  /* Text */
+  --text-primary: #171714;
+  --text-secondary: #6B6B63;
+  --text-tertiary: #9C9C93;
+
+  /* Brand — Orange is the ONLY accent/brand color */
+  --accent: #FF6600;
+  --accent-hover: #E65C00;
+  --accent-text: #C2480A;
+  --accent-soft: #FFF0E4;
+  --accent-border: #FFC299;
+
+  /* Semantic States */
+  --success: #16A34A;
+  --success-soft: #E9F8EF;
+  --warn: #B7791F;
+  --warn-soft: #FBF1DD;
+  --danger: #DC2626;
+  --pending: #9C9C93;
+
+  /* Legacy aliases mapped to new tokens for backwards safety */
+  --background: var(--bg);
+  --foreground: var(--text-primary);
+  --card: var(--surface-1);
+  --card-foreground: var(--text-primary);
+  --muted-foreground: var(--text-secondary);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
+  --color-bg: var(--bg);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-surface-hover: var(--surface-hover);
+
   --color-border: var(--border);
-  --color-muted-foreground: var(--muted-foreground);
+  --color-border-strong: var(--border-strong);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+
   --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-text: var(--accent-text);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-border: var(--accent-border);
 
-  --color-slate-350: #afbccc;
-  --color-slate-450: #7c8ba1;
-  --color-slate-550: #55647a;
-  --color-slate-650: #3d4b5f;
-  --color-slate-750: #283548;
-  --color-slate-850: #162033;
-  --color-slate-855: #131b2e;
-  --color-slate-955: #090f21;
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-pending: var(--pending);
 
-  --color-emerald-450: #22c68d;
-
-  --color-amber-550: #e78b09;
-
-  --color-rose-450: #f85871;
+  --font-sans: var(--font-geist-sans), var(--font-ui), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), var(--font-mono), monospace;
 }
 
 body {
-  background-color: var(--background);
-  color: var(--foreground);
+  background-color: var(--bg);
+  color: var(--text-primary);
   font-family: var(--font-sans);
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-/* Light mode overrides for old dark classes */
-:root:not(.dark) {
-  /* background overrides */
-  .bg-slate-950, 
-  .bg-slate-900, 
-  .bg-slate-950\/80, 
-  .bg-slate-955\/50,
-  .bg-slate-950\/70, 
-  .bg-slate-950\/60,
-  .bg-slate-950\/50, 
-  .bg-slate-950\/20,
-  .bg-slate-900\/60, 
-  .bg-slate-900\/40, 
-  .bg-slate-900\/20, 
-  .bg-slate-900\/10, 
-  .bg-\[\#020617\], 
-  .bg-\[\#0b1528\], 
-  .bg-black {
-    background-color: var(--card) !important;
-  }
-  
-  .bg-slate-955,
-  .bg-slate-950\/40 {
-    background-color: var(--accent) !important;
-  }
-  
-  /* Topbar breadcrumb and other light-gray surfaces */
-  .bg-slate-900\/30 {
-    background-color: rgba(255, 255, 255, 0.7) !important;
-  }
-  
-  /* text color overrides */
-  .text-white, 
-  .text-slate-100, 
-  .text-slate-200 {
-    color: var(--foreground) !important;
-  }
-  
-  .text-slate-300, 
-  .text-slate-350, 
-  .text-slate-400 {
-    color: var(--muted-foreground) !important;
-  }
-  
-  /* border overrides */
-  .border-slate-800, 
-  .border-slate-850, 
-  .border-slate-900, 
-  .border-slate-750, 
-  .border-slate-700\/50, 
-  .border-slate-800\/80 {
-    border-color: var(--border) !important;
-  }
-  
-  .divide-slate-850,
-  .divide-slate-900 {
-    border-color: var(--border) !important;
-    & > * + * {
-      border-color: var(--border) !important;
-    }
-  }
-  
-  /* hover overrides */
-  .hover\:bg-slate-800\/40:hover, 
-  .hover\:bg-slate-850\/50:hover, 
-  .hover\:bg-slate-855\/15:hover {
-    background-color: var(--accent) !important;
-  }
-  
-  .hover\:text-white:hover {
-    color: var(--foreground) !important;
-  }
+/* Custom scrollbars matching off-white surface */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--surface-2);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
 }
