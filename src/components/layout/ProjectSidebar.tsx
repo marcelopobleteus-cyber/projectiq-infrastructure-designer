@@ -21,7 +21,7 @@ const ALL_DISCIPLINES: { id: string; name: string; href: string; icon: React.Rea
     icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0z"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg>,
   },
   {
-    id: 'conduit', name: 'Canalización & Ductos', href: '', ready: false,
+    id: 'conduit', name: 'Canalización & Ductos', href: 'fiber', ready: true,
     icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h6a4 4 0 0 1 4 4v4a4 4 0 0 0 4 4h2"/><circle cx="4" cy="6" r="2"/><circle cx="20" cy="18" r="2"/></svg>,
   },
   {
@@ -37,7 +37,7 @@ const ALL_DISCIPLINES: { id: string; name: string; href: string; icon: React.Rea
     icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
   },
   {
-    id: 'lighting', name: 'Alumbrado Público', href: '', ready: false,
+    id: 'lighting', name: 'Alumbrado Público (En desarrollo)', href: '', ready: false,
     icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6M10 22h4M12 2a6 6 0 0 0-4 10.5c.6.55 1 1.36 1 2.5h6c0-1.14.4-1.95 1-2.5A6 6 0 0 0 12 2z"/></svg>,
   },
 ]
@@ -185,21 +185,13 @@ export default function ProjectSidebar({ projectId, projectName, disciplines }: 
         </div>
       </div>
 
-      {/* Action Buttons: New Project & Add Module */}
+      {/* Action Buttons: Add Module / Disciplines */}
       <div className="p-3 shrink-0 space-y-1.5 relative border-b border-[var(--border)] bg-[var(--surface-1)]">
-        <Link
-          href="/projects/create"
-          className="w-full py-1.5 px-3 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Nuevo Proyecto
-        </Link>
-
         {/* Dynamic + Unir Módulo Button */}
         <button
           type="button"
           onClick={() => setShowAddMenu(!showAddMenu)}
-          className="w-full py-1 px-2.5 bg-[var(--surface-2)] border border-[var(--border)] hover:bg-[var(--surface-hover)] text-[var(--text-primary)] rounded-lg font-semibold text-[11px] transition flex items-center justify-center gap-1.5 cursor-pointer"
+          className="w-full py-1.5 px-3 bg-[var(--surface-2)] border border-[var(--border)] hover:bg-[var(--surface-hover)] text-[var(--text-primary)] rounded-lg font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Unir Módulo / Disciplina
@@ -217,9 +209,12 @@ export default function ProjectSidebar({ projectId, projectName, disciplines }: 
                 <button
                   key={d.id}
                   type="button"
-                  onClick={() => toggleDiscipline(d.id)}
+                  onClick={() => d.ready && toggleDiscipline(d.id)}
+                  disabled={!d.ready}
                   className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] transition-all cursor-pointer ${
-                    active
+                    !d.ready
+                      ? 'text-[var(--text-tertiary)] opacity-50 cursor-not-allowed'
+                      : active
                       ? 'bg-[var(--accent-soft)] text-[var(--accent-text)] font-semibold'
                       : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]'
                   }`}

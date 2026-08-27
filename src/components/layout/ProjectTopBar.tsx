@@ -1,8 +1,9 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { deleteProject } from '@/app/projects/actions'
 
 interface ProjectTopBarProps {
   projectId: string
@@ -16,6 +17,9 @@ export default function ProjectTopBar({
   extraActionsSlot,
 }: ProjectTopBarProps) {
   const pathname = usePathname()
+  const router = useRouter()
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const tabs = [
     {
@@ -60,6 +64,28 @@ export default function ProjectTopBar({
     }
   ]
 
+  const handleDeleteProject = async () => {
+    if (projectId === 'demo-metro-cctv') {
+      alert('El proyecto de demostración no se puede eliminar.')
+      return
+    }
+
+    const confirmDelete = window.confirm(
+      `⚠️ ¿Estás seguro de ELIMINAR PERMANENTEMENTE el proyecto "${projectName}"?\n\nEsta acción borrará de la base de datos Supabase todas las cámaras, nodos de fibra, switches, cómputos métricos (BOM) y tareas asociadas.`
+    )
+    if (!confirmDelete) return
+
+    setIsDeleting(true)
+    const res = await deleteProject(projectId)
+    setIsDeleting(false)
+
+    if (res.error) {
+      alert(`Error al eliminar proyecto: ${res.error}`)
+    } else {
+      router.push('/projects')
+    }
+  }
+
   return (
     <header className="h-14 border-b border-[var(--border)] flex items-center justify-between px-6 bg-[var(--surface-1)] shrink-0 w-full relative z-20 font-sans">
       {/* Project Switcher & Name */}
@@ -82,7 +108,7 @@ export default function ProjectTopBar({
         </span>
       </div>
 
-      {/* Centered Navigation Tabs (Underlined in Orange) */}
+      {/* Centered Navigation Tabs */}
       <div className="flex items-center gap-1">
         {tabs.map((tab) => (
           <Link
@@ -100,8 +126,8 @@ export default function ProjectTopBar({
         ))}
       </div>
 
-      {/* Action Utilities (Export + Orange Primary Action) */}
-      <div className="flex items-center gap-3 shrink-0">
+      {/* Action Utilities (Export + Interactive Project Actions Dropdown) */}
+      <div className="flex items-center gap-3 shrink-0 relative">
         {extraActionsSlot && (
           <div className="flex items-center gap-2">
             {extraActionsSlot}
@@ -110,17 +136,69 @@ export default function ProjectTopBar({
 
         <Link
           href={`/projects/${projectId}/reports`}
-          className="px-3 py-1.5 bg-[var(--surface-1)] border border-[var(--border)] hover:bg-[var(--surface-hover)] text-[var(--text-primary)] font-semibold text-xs rounded-lg transition"
+          className="px-3 py-1.5 bg-[var(--surface-1)] border border-[var(--border)] hover:bg-[var(--surface-hover)] text-[var(--text-primary)] font-semibold text-xs rounded-lg transition shadow-xs"
         >
           Export
         </Link>
 
-        <Link
-          href={`/projects/${projectId}/overview`}
-          className="px-3.5 py-1.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold text-xs rounded-lg shadow-xs transition"
-        >
-          Project Actions
-        </Link>
+        {/* Real Interactive Project Actions Dropdown Menu */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            className="px-3.5 py-1.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold text-xs rounded-lg shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+          >
+            Project Actions
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${isMenuOpen ? 'rotate-180' : ''}`}><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+
+          {isMenuOpen && (
+            <div className="absolute right-0 mt-1.5 w-56 bg-[var(--surface-1)] border border-[var(--border-strong)] rounded-xl shadow-xl p-1.5 z-50 space-y-0.5 animate-in zoom-in-95 duration-100 font-sans">
+              <div className="px-2.5 py-1 text-[9.5px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider border-b border-[var(--border)] mb-1">
+                Acciones del Proyecto
+              </div>
+
+              <Link
+                href={`/projects/${projectId}/overview`}
+                onClick={() => setIsMenuOpen(false)}
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/></svg>
+                Dashboard del Proyecto
+              </Link>
+
+              <Link
+                href={`/projects/${projectId}/bom`}
+                onClick={() => setIsMenuOpen(false)}
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                Ver Cómputo Métrico (BOM)
+              </Link>
+
+              <Link
+                href={`/projects/${projectId}/reports`}
+                onClick={() => setIsMenuOpen(false)}
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                Exportar Reportes PDF
+              </Link>
+
+              <div className="border-t border-[var(--border)] pt-1 mt-1">
+                <button
+                  type="button"
+                  onClick={handleDeleteProject}
+                  disabled={isDeleting}
+                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-bold text-[var(--danger)] hover:bg-red-50 transition-colors cursor-pointer"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                  {isDeleting ? 'Eliminando...' : 'Eliminar Proyecto'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   )

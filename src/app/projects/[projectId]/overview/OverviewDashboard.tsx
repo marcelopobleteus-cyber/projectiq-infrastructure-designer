@@ -144,7 +144,7 @@ export default function OverviewDashboard({
                 href={`/projects/${project.id}/${nextRecommendedStep.relatedRoute}`}
                 className="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold text-xs rounded-lg shadow-xs transition flex items-center gap-1.5"
               >
-                Continue Workflow
+                {nextRecommendedStep.nextActionLabel}
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
               </Link>
             )}
