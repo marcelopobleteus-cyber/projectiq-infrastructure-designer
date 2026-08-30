@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { setOptions, importLibrary } from '@googlemaps/js-api-loader'
 import { updateProjectMetadata, deleteProject } from '../../actions'
+import ConfirmModal from '@/components/ui/ConfirmModal'
 
 interface ProjectData {
   id: string
@@ -26,6 +27,20 @@ export default function OverviewEditPanel({ project, googleMapsApiKey }: Overvie
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [placesAvailable, setPlacesAvailable] = useState(!!googleMapsApiKey)
   const [placesLoaded, setPlacesLoaded] = useState(false)
+
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false)
+
+  const confirmDeleteProject = async () => {
+    setSaving(true)
+    const res = await deleteProject(project.id)
+    setSaving(false)
+    setShowConfirmDelete(false)
+    if (res.error) {
+      setMessage({ type: 'error', text: res.error })
+    } else {
+      router.push('/projects')
+    }
+  }
 
   // Editable fields — initialized from server data
   const [name, setName] = useState(project.name)
@@ -320,20 +335,9 @@ export default function OverviewEditPanel({ project, googleMapsApiKey }: Overvie
           <div className="flex flex-col sm:flex-row gap-3 pt-2 border-t border-slate-100 dark:border-[var(--border)]">
             <button
               type="button"
-              onClick={async () => {
-                const confirmDelete = window.confirm(`⚠️ ¿Estás seguro de ELIMINAR PERMANENTEMENTE el proyecto "${project.name}"?\n\nEsta acción borrará de la base de datos todas las cámaras, nodos de fibra, switches, BOM y órdenes de trabajo asociadas. Esta acción NO se puede deshacer.`)
-                if (!confirmDelete) return
-                setSaving(true)
-                const res = await deleteProject(project.id)
-                setSaving(false)
-                if (res.error) {
-                  setMessage({ type: 'error', text: res.error })
-                } else {
-                  router.push('/projects')
-                }
-              }}
+              onClick={() => setShowConfirmDelete(true)}
               disabled={saving}
-              className="py-2.5 px-4 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-600 dark:text-red-400 font-semibold rounded-xl text-xs transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+              className="py-2.5 px-4 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-600 dark:text-red-400 font-semibold rounded-xl text-xs transition-all disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
               Delete Project
@@ -372,6 +376,19 @@ export default function OverviewEditPanel({ project, googleMapsApiKey }: Overvie
           </div>
         </div>
       )}
+
+      {/* Styled App Modal Confirmation for Project Deletion */}
+      <ConfirmModal
+        isOpen={showConfirmDelete}
+        title={`¿Eliminar proyecto "${project.name}"?`}
+        message={`Esta acción borrará PERMANENTEMENTE de la base de datos todas las cámaras, nodos de fibra, switches, BOM y órdenes de trabajo asociadas.\n\nEsta acción NO se puede deshacer.`}
+        confirmText="Eliminar Proyecto"
+        cancelText="Cancelar"
+        variant="danger"
+        isLoading={saving}
+        onConfirm={confirmDeleteProject}
+        onCancel={() => setShowConfirmDelete(false)}
+      />
     </div>
   )
 }

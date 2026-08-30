@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { deleteProject } from '@/app/projects/actions'
+import ConfirmModal from '@/components/ui/ConfirmModal'
 
 interface ProjectTopBarProps {
   projectId: string
@@ -20,6 +21,9 @@ export default function ProjectTopBar({
   const router = useRouter()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false)
+  const [demoNotice, setDemoNotice] = useState(false)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   const tabs = [
     {
@@ -64,24 +68,26 @@ export default function ProjectTopBar({
     }
   ]
 
-  const handleDeleteProject = async () => {
+  const promptDelete = () => {
+    setIsMenuOpen(false)
     if (projectId === 'demo-metro-cctv') {
-      alert('El proyecto de demostración no se puede eliminar.')
+      setDemoNotice(true)
       return
     }
+    setShowConfirmDelete(true)
+  }
 
-    const confirmDelete = window.confirm(
-      `⚠️ ¿Estás seguro de ELIMINAR PERMANENTEMENTE el proyecto "${projectName}"?\n\nEsta acción borrará de la base de datos Supabase todas las cámaras, nodos de fibra, switches, cómputos métricos (BOM) y tareas asociadas.`
-    )
-    if (!confirmDelete) return
-
+  const confirmDelete = async () => {
     setIsDeleting(true)
+    setErrorMsg(null)
     const res = await deleteProject(projectId)
     setIsDeleting(false)
 
     if (res.error) {
-      alert(`Error al eliminar proyecto: ${res.error}`)
+      setErrorMsg(res.error)
+      setShowConfirmDelete(false)
     } else {
+      setShowConfirmDelete(false)
       router.push('/projects')
     }
   }
@@ -188,7 +194,7 @@ export default function ProjectTopBar({
               <div className="border-t border-[var(--border)] pt-1 mt-1">
                 <button
                   type="button"
-                  onClick={handleDeleteProject}
+                  onClick={promptDelete}
                   disabled={isDeleting}
                   className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-bold text-[var(--danger)] hover:bg-red-50 transition-colors cursor-pointer"
                 >
@@ -200,6 +206,43 @@ export default function ProjectTopBar({
           )}
         </div>
       </div>
+
+      {/* Styled App Confirm Modal for Project Deletion */}
+      <ConfirmModal
+        isOpen={showConfirmDelete}
+        title={`¿Eliminar proyecto "${projectName}"?`}
+        message={`Esta acción borrará PERMANENTEMENTE de la base de datos Supabase todas las cámaras, nodos de fibra, switches, cómputos métricos (BOM) y órdenes de trabajo asociadas.\n\nEsta acción NO se puede deshacer.`}
+        confirmText="Eliminar Proyecto"
+        cancelText="Cancelar"
+        variant="danger"
+        isLoading={isDeleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setShowConfirmDelete(false)}
+      />
+
+      {/* Demo Notice Modal */}
+      <ConfirmModal
+        isOpen={demoNotice}
+        title="Proyecto Protegido"
+        message="El proyecto de demostración no se puede eliminar porque sirve como plantilla para nuevos usuarios."
+        confirmText="Entendido"
+        cancelText="Cerrar"
+        variant="info"
+        onConfirm={() => setDemoNotice(false)}
+        onCancel={() => setDemoNotice(false)}
+      />
+
+      {/* Error Notice Modal */}
+      <ConfirmModal
+        isOpen={Boolean(errorMsg)}
+        title="Error al Eliminar"
+        message={errorMsg || ''}
+        confirmText="Entendido"
+        cancelText="Cerrar"
+        variant="danger"
+        onConfirm={() => setErrorMsg(null)}
+        onCancel={() => setErrorMsg(null)}
+      />
     </header>
   )
 }

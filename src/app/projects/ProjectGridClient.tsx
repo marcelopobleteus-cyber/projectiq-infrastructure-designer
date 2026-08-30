@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { deleteProject, updateProjectStatus, ProjectStatusType } from './actions'
+import ConfirmModal from '@/components/ui/ConfirmModal'
 
 export interface Project {
   id: string
@@ -80,26 +81,30 @@ export default function ProjectGridClient({ initialProjects }: ProjectGridClient
     }
   }
 
-  // Handle project deletion
-  const handleDelete = async (projId: string, projName: string, e: React.MouseEvent) => {
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
+
+  // Trigger modal confirmation
+  const promptDelete = (projId: string, projName: string, e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-
-    const confirmDelete = window.confirm(
-      `⚠️ ¿Estás seguro de ELIMINAR PERMANENTEMENTE el proyecto "${projName}"?\n\nEsta acción borrará de la base de datos Supabase todas las cámaras, nodos de fibra, switches, cómputos métricos (BOM) y tareas asociadas.`
-    )
-    if (!confirmDelete) return
-
-    setDeletingId(projId)
-    setErrorMsg(null)
     setOpenMenuId(null)
-    const res = await deleteProject(projId)
+    setDeleteTarget({ id: projId, name: projName })
+  }
+
+  // Execute project deletion upon modal confirmation
+  const confirmDeleteProject = async () => {
+    if (!deleteTarget) return
+
+    setDeletingId(deleteTarget.id)
+    setErrorMsg(null)
+    const res = await deleteProject(deleteTarget.id)
     setDeletingId(null)
 
     if (res.error) {
       setErrorMsg(`Error al eliminar: ${res.error}`)
     } else {
-      setProjects(prev => prev.filter(p => p.id !== projId))
+      setProjects(prev => prev.filter(p => p.id !== deleteTarget.id))
+      setDeleteTarget(null)
     }
   }
 
@@ -367,7 +372,7 @@ export default function ProjectGridClient({ initialProjects }: ProjectGridClient
                           <div className="border-t border-[var(--border)] pt-1 mt-1">
                             <button
                               type="button"
-                              onClick={(e) => handleDelete(project.id, project.name, e)}
+                              onClick={(e) => promptDelete(project.id, project.name, e)}
                               disabled={deletingId === project.id}
                               className="w-full text-left px-2.5 py-1 text-xs text-[var(--danger)] font-bold hover:bg-red-50 rounded-md transition flex items-center gap-1.5 cursor-pointer"
                             >
@@ -492,7 +497,7 @@ export default function ProjectGridClient({ initialProjects }: ProjectGridClient
                           <div className="border-t border-[var(--border)] pt-1 mt-1">
                             <button
                               type="button"
-                              onClick={(e) => handleDelete(project.id, project.name, e)}
+                              onClick={(e) => promptDelete(project.id, project.name, e)}
                               disabled={deletingId === project.id}
                               className="w-full text-left px-2.5 py-1 text-xs text-[var(--danger)] font-bold hover:bg-red-50 rounded-md transition flex items-center gap-1.5 cursor-pointer"
                             >
@@ -514,6 +519,19 @@ export default function ProjectGridClient({ initialProjects }: ProjectGridClient
           ))}
         </div>
       )}
+
+      {/* Styled App Modal Confirmation for Project Deletion */}
+      <ConfirmModal
+        isOpen={Boolean(deleteTarget)}
+        title={`¿Eliminar proyecto "${deleteTarget?.name}"?`}
+        message={`Esta acción borrará PERMANENTEMENTE de la base de datos Supabase todas las cámaras, nodos de fibra, switches, cómputos métricos (BOM) y órdenes de trabajo asociadas.\n\nEsta acción NO se puede deshacer.`}
+        confirmText="Eliminar Proyecto"
+        cancelText="Cancelar"
+        variant="danger"
+        isLoading={Boolean(deletingId)}
+        onConfirm={confirmDeleteProject}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   )
 }
