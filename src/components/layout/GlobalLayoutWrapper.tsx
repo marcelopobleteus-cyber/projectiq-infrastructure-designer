@@ -19,6 +19,8 @@ export default function GlobalLayoutWrapper({ children }: GlobalLayoutWrapperPro
   const supabase = createClient()
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
+  const [orgBillingStatus, setOrgBillingStatus] = useState<string | null>(null)
+  const [isPastDueDismissed, setIsPastDueDismissed] = useState(false)
   const [loading, setLoading] = useState(true)
   const [isPending, startTransition] = useTransition()
 
@@ -39,6 +41,24 @@ export default function GlobalLayoutWrapper({ children }: GlobalLayoutWrapperPro
             .eq('id', user.id)
             .single()
           setProfile(profileData || null)
+
+          // Query organization billing status
+          const { data: member } = await supabase
+            .from('organization_members')
+            .select('organization_id, organizations!inner(status, billing_status)')
+            .eq('profile_id', user.id)
+            .limit(1)
+            .single()
+
+          const org = (member as any)?.organizations
+          if (org) {
+            setOrgBillingStatus(org.billing_status)
+            if (!profileData?.is_platform_admin && (org.status === 'suspended' || org.billing_status === 'canceled')) {
+              if (pathname !== '/inactive-workspace' && !pathname.startsWith('/admin')) {
+                router.replace('/inactive-workspace')
+              }
+            }
+          }
         }
       } catch (err) {
         console.error('Auth check failed:', err)
@@ -47,7 +67,7 @@ export default function GlobalLayoutWrapper({ children }: GlobalLayoutWrapperPro
       }
     }
     checkAuth()
-  }, [router, supabase])
+  }, [router, supabase, pathname])
 
   const handleSignOut = () => {
     startTransition(async () => {
@@ -81,6 +101,21 @@ export default function GlobalLayoutWrapper({ children }: GlobalLayoutWrapperPro
 
       {/* Main Content Area */}
       <ProjectsContentArea>
+        {orgBillingStatus === 'past_due' && !isPastDueDismissed && (
+          <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2.5 flex items-center justify-between text-xs text-amber-200 font-medium">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-amber-400">Notice:</span>
+              <span>Your workspace subscription payment is past due. Please update payment information in billing settings to avoid service interruption.</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsPastDueDismissed(true)}
+              className="text-amber-400 hover:text-white transition px-2 py-0.5 rounded text-[11px] font-bold"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
         {children}
       </ProjectsContentArea>
     </AppShell>

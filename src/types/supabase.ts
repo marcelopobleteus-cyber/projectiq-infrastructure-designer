@@ -2177,23 +2177,116 @@ export type Database = {
           },
         ]
       }
-      organizations: {
+      modules: {
         Row: {
           created_at: string
+          default_monthly_price_cents: number
+          description: string | null
           id: string
+          is_active: boolean
           name: string
-          updated_at: string | null
+          stripe_price_id: string | null
         }
         Insert: {
           created_at?: string
-          id?: string
+          default_monthly_price_cents?: number
+          description?: string | null
+          id: string
+          is_active?: boolean
           name: string
-          updated_at?: string | null
+          stripe_price_id?: string | null
         }
         Update: {
           created_at?: string
+          default_monthly_price_cents?: number
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          stripe_price_id?: string | null
+        }
+        Relationships: []
+      }
+      organization_modules: {
+        Row: {
+          canceled_at: string | null
+          enabled_at: string
+          id: string
+          module_id: string
+          organization_id: string
+          price_cents: number
+          status: 'active' | 'canceled'
+          stripe_subscription_item_id: string | null
+        }
+        Insert: {
+          canceled_at?: string | null
+          enabled_at?: string
+          id?: string
+          module_id: string
+          organization_id: string
+          price_cents: number
+          status?: 'active' | 'canceled'
+          stripe_subscription_item_id?: string | null
+        }
+        Update: {
+          canceled_at?: string | null
+          enabled_at?: string
+          id?: string
+          module_id?: string
+          organization_id?: string
+          price_cents?: number
+          status?: 'active' | 'canceled'
+          stripe_subscription_item_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_modules_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_modules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      organizations: {
+        Row: {
+          billing_status: 'trialing' | 'active' | 'past_due' | 'canceled'
+          created_at: string
+          current_period_end: string | null
+          id: string
+          name: string
+          status: 'active' | 'suspended'
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          billing_status?: 'trialing' | 'active' | 'past_due' | 'canceled'
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          name: string
+          status?: 'active' | 'suspended'
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          billing_status?: 'trialing' | 'active' | 'past_due' | 'canceled'
+          created_at?: string
+          current_period_end?: string | null
           id?: string
           name?: string
+          status?: 'active' | 'suspended'
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           updated_at?: string | null
         }
         Relationships: []

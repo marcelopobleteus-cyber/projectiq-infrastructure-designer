@@ -38,7 +38,6 @@ export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname
 
   if (BYPASS_AUTH) {
-    // When password access is disabled, redirect root, login, and register directly to /projects
     if (path === '/' || path === '/login' || path === '/register') {
       const url = request.nextUrl.clone()
       url.pathname = '/projects'
@@ -62,6 +61,36 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = '/projects'
     return NextResponse.redirect(url)
+  }
+
+  // Workspace suspension / cancellation check
+  if (isProtectedRoute && user && !path.startsWith('/admin') && path !== '/inactive-workspace') {
+    try {
+      const { data: member } = await supabase
+        .from('organization_members')
+        .select('organization_id, organizations!inner(status, billing_status)')
+        .eq('profile_id', user.id)
+        .limit(1)
+        .single()
+
+      const org = (member as any)?.organizations
+      if (org && (org.status === 'suspended' || org.billing_status === 'canceled')) {
+        // Check if user is platform admin (never block superadmin)
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('is_platform_admin')
+          .eq('id', user.id)
+          .single()
+
+        if (!prof?.is_platform_admin) {
+          const url = request.nextUrl.clone()
+          url.pathname = '/inactive-workspace'
+          return NextResponse.redirect(url)
+        }
+      }
+    } catch (e) {
+      // Continue if query fails
+    }
   }
 
   return supabaseResponse

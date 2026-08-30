@@ -6,12 +6,13 @@ import {
   PlatformOverviewData,
   PlatformOrganizationItem,
   PlatformUserItem,
-  PlatformActivityItem,
+  PlatformModuleItem,
   toggleUserPlatformAdmin,
   savePlatformSetting,
   createPlatformOrganization,
   deletePlatformOrganization,
-  getPlatformOverviewData,
+  updatePlatformModule,
+  toggleOrganizationSuspension,
 } from './actions'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 
@@ -21,1080 +22,1141 @@ interface AdminDashboardClientProps {
 
 export default function AdminDashboardClient({ initialData }: AdminDashboardClientProps) {
   const [data, setData] = useState<PlatformOverviewData>(initialData)
-  const [activeTab, setActiveTab] = useState<'overview' | 'tenants' | 'users' | 'audit' | 'settings'>('overview')
-  const [searchQuery, setSearchQuery] = useState('')
+  const [activeTab, setActiveTab] = useState<'overview' | 'organizations' | 'modules' | 'users' | 'activity' | 'settings'>('overview')
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  // Toast notification state
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null)
-  const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
+  // Create Organization Modal State
+  const [isCreateOrgOpen, setIsCreateOrgOpen] = useState(false)
+  const [newOrgName, setNewOrgName] = useState('')
+  const [newOrgOwnerEmail, setNewOrgOwnerEmail] = useState('')
+  const [selectedModulePrices, setSelectedModulePrices] = useState<Record<string, { selected: boolean; priceDollars: number }>>(() => {
+    const initial: Record<string, { selected: boolean; priceDollars: number }> = {}
+    initialData.modules.forEach(m => {
+      initial[m.id] = {
+        selected: m.id === 'cctv' || m.id === 'fiber',
+        priceDollars: (m.defaultMonthlyPriceCents || 0) / 100,
+      }
+    })
+    return initial
+  })
+  const [createdCheckoutUrl, setCreatedCheckoutUrl] = useState<string | null>(null)
+  const [createdOrgName, setCreatedOrgName] = useState<string | null>(null)
+
+  // Module Editing State
+  const [editingModule, setEditingModule] = useState<PlatformModuleItem | null>(null)
+  const [moduleName, setModuleName] = useState('')
+  const [moduleDesc, setModuleDesc] = useState('')
+  const [modulePriceDollars, setModulePriceDollars] = useState(0)
+  const [moduleStripePriceId, setModuleStripePriceId] = useState('')
+  const [moduleIsActive, setModuleIsActive] = useState(true)
+
+  // Organization Action Modals
+  const [orgToDelete, setOrgToDelete] = useState<PlatformOrganizationItem | null>(null)
+  const [userToToggleAdmin, setUserToToggleAdmin] = useState<PlatformUserItem | null>(null)
+
+  // Platform Settings State
+  const [maintenanceMode, setMaintenanceMode] = useState(initialData.platformSettings.maintenanceMode)
+  const [systemAnnouncement, setSystemAnnouncement] = useState(initialData.platformSettings.systemAnnouncement)
+  const [allowSignups, setAllowSignups] = useState(initialData.platformSettings.allowSignups)
+  const [defaultProjectLimit, setDefaultProjectLimit] = useState(initialData.platformSettings.defaultProjectLimit)
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToast({ message, type })
     setTimeout(() => setToast(null), 3500)
   }
 
-  // Refresh data handler
-  const refreshData = async () => {
-    try {
-      const refreshed = await getPlatformOverviewData()
-      setData(refreshed)
-    } catch (e) {
-      console.error('Failed to refresh admin data:', e)
-    }
+  // Handle Module Price Toggle in Creation Modal
+  const toggleModuleSelection = (moduleId: string) => {
+    setSelectedModulePrices(prev => ({
+      ...prev,
+      [moduleId]: {
+        ...prev[moduleId],
+        selected: !prev[moduleId]?.selected,
+      },
+    }))
   }
 
-  // Modal: Create Tenant
-  const [isCreateOrgOpen, setIsCreateOrgOpen] = useState(false)
-  const [newOrgName, setNewOrgName] = useState('')
-  const [newOrgOwnerEmail, setNewOrgOwnerEmail] = useState('')
-  const [isCreatingOrg, setIsCreatingOrg] = useState(false)
+  const updateModulePriceInModal = (moduleId: string, priceDollars: number) => {
+    setSelectedModulePrices(prev => ({
+      ...prev,
+      [moduleId]: {
+        ...prev[moduleId],
+        priceDollars: Math.max(0, priceDollars),
+      },
+    }))
+  }
 
-  const handleCreateOrg = async (e: React.FormEvent) => {
+  const computedModalMonthlyTotal = Object.entries(selectedModulePrices).reduce((acc, [_, item]) => {
+    return item.selected ? acc + (item.priceDollars || 0) : acc
+  }, 0)
+
+  // Handle Create Organization Submit
+  const handleCreateOrgSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newOrgName.trim()) return
-    setIsCreatingOrg(true)
-    try {
-      const res = await createPlatformOrganization(newOrgName, newOrgOwnerEmail)
+    if (!newOrgName.trim()) {
+      showToast('Organization name is required', 'error')
+      return
+    }
+
+    const selectedModules = Object.entries(selectedModulePrices)
+      .filter(([_, item]) => item.selected)
+      .map(([moduleId, item]) => ({
+        moduleId,
+        priceCents: Math.round((item.priceDollars || 0) * 100),
+      }))
+
+    startTransition(async () => {
+      const res = await createPlatformOrganization(newOrgName, newOrgOwnerEmail, selectedModules)
       if (res.error) {
         showToast(res.error, 'error')
       } else {
-        showToast(`Tenant "${newOrgName}" created successfully!`, 'success')
-        setIsCreateOrgOpen(false)
-        setNewOrgName('')
-        setNewOrgOwnerEmail('')
-        await refreshData()
+        showToast('Client Organization created successfully!', 'success')
+        setCreatedOrgName(newOrgName)
+        setCreatedCheckoutUrl(res.checkoutUrl || null)
+        if (!res.checkoutUrl) {
+          setIsCreateOrgOpen(false)
+          setNewOrgName('')
+          setNewOrgOwnerEmail('')
+        }
       }
-    } catch (err: any) {
-      showToast(err?.message || 'Error creating organization', 'error')
-    } finally {
-      setIsCreatingOrg(false)
-    }
+    })
   }
 
-  // Modal: Delete Tenant Confirmation
-  const [orgToDelete, setOrgToDelete] = useState<PlatformOrganizationItem | null>(null)
-  const [isDeletingOrg, setIsDeletingOrg] = useState(false)
+  // Handle Edit Module Click
+  const handleStartEditModule = (m: PlatformModuleItem) => {
+    setEditingModule(m)
+    setModuleName(m.name)
+    setModuleDesc(m.description || '')
+    setModulePriceDollars((m.defaultMonthlyPriceCents || 0) / 100)
+    setModuleStripePriceId(m.stripePriceId || '')
+    setModuleIsActive(m.isActive)
+  }
 
-  const handleConfirmDeleteOrg = async () => {
-    if (!orgToDelete) return
-    setIsDeletingOrg(true)
-    try {
-      const res = await deletePlatformOrganization(orgToDelete.id)
+  const handleSaveModule = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingModule) return
+
+    startTransition(async () => {
+      const priceCents = Math.round(modulePriceDollars * 100)
+      const res = await updatePlatformModule(
+        editingModule.id,
+        moduleName,
+        moduleDesc,
+        priceCents,
+        moduleStripePriceId,
+        moduleIsActive
+      )
       if (res.error) {
         showToast(res.error, 'error')
       } else {
-        showToast(`Tenant "${orgToDelete.name}" deleted.`, 'info')
-        setOrgToDelete(null)
-        await refreshData()
+        showToast(`Module ${moduleName} updated successfully!`, 'success')
+        setData(prev => ({
+          ...prev,
+          modules: prev.modules.map(m =>
+            m.id === editingModule.id
+              ? {
+                  ...m,
+                  name: moduleName,
+                  description: moduleDesc,
+                  defaultMonthlyPriceCents: priceCents,
+                  stripePriceId: moduleStripePriceId || null,
+                  isActive: moduleIsActive,
+                }
+              : m
+          ),
+        }))
+        setEditingModule(null)
       }
-    } catch (err: any) {
-      showToast(err?.message || 'Error deleting organization', 'error')
-    } finally {
-      setIsDeletingOrg(false)
-    }
+    })
   }
 
-  // Modal: Toggle Platform Admin Role Confirmation
-  const [userToToggleAdmin, setUserToToggleAdmin] = useState<{ user: PlatformUserItem; newStatus: boolean } | null>(null)
-  const [isTogglingAdmin, setIsTogglingAdmin] = useState(false)
-
-  const handleConfirmToggleAdmin = async () => {
-    if (!userToToggleAdmin) return
-    setIsTogglingAdmin(true)
-    try {
-      const res = await toggleUserPlatformAdmin(userToToggleAdmin.user.id, userToToggleAdmin.newStatus)
+  // Handle Toggle Suspension
+  const handleToggleSuspension = (org: PlatformOrganizationItem) => {
+    const nextStatus = org.status === 'suspended' ? 'active' : 'suspended'
+    startTransition(async () => {
+      const res = await toggleOrganizationSuspension(org.id, nextStatus)
       if (res.error) {
         showToast(res.error, 'error')
       } else {
         showToast(
-          userToToggleAdmin.newStatus
-            ? `Superadmin privileges granted to ${userToToggleAdmin.user.fullName}.`
-            : `Superadmin privileges revoked from ${userToToggleAdmin.user.fullName}.`,
+          nextStatus === 'suspended'
+            ? `Organization ${org.name} has been suspended.`
+            : `Organization ${org.name} has been reactivated.`,
           'success'
         )
-        setUserToToggleAdmin(null)
-        await refreshData()
+        setData(prev => ({
+          ...prev,
+          organizations: prev.organizations.map(o =>
+            o.id === org.id ? { ...o, status: nextStatus } : o
+          ),
+        }))
       }
-    } catch (err: any) {
-      showToast(err?.message || 'Error updating admin status', 'error')
-    } finally {
-      setIsTogglingAdmin(false)
-    }
+    })
   }
 
-  // Settings State Form
-  const [settingsForm, setSettingsForm] = useState(data.platformSettings)
-  const [isSavingSetting, setIsSavingSetting] = useState(false)
-
-  const handleSaveSetting = async (key: string, value: any) => {
-    setIsSavingSetting(true)
-    try {
-      const res = await savePlatformSetting(key, value)
+  // Handle Delete Org
+  const handleConfirmDeleteOrg = () => {
+    if (!orgToDelete) return
+    startTransition(async () => {
+      const res = await deletePlatformOrganization(orgToDelete.id)
       if (res.error) {
         showToast(res.error, 'error')
       } else {
-        showToast(`Platform setting "${key}" updated!`, 'success')
-        await refreshData()
+        showToast(`Organization ${orgToDelete.name} deleted.`, 'success')
+        setData(prev => ({
+          ...prev,
+          organizations: prev.organizations.filter(o => o.id !== orgToDelete.id),
+        }))
+        setOrgToDelete(null)
       }
-    } catch (err: any) {
-      showToast(err?.message || 'Error saving setting', 'error')
-    } finally {
-      setIsSavingSetting(false)
+    })
+  }
+
+  // Handle Toggle Admin
+  const handleConfirmToggleAdmin = () => {
+    if (!userToToggleAdmin) return
+    const newStatus = !userToToggleAdmin.isPlatformAdmin
+    startTransition(async () => {
+      const res = await toggleUserPlatformAdmin(userToToggleAdmin.id, newStatus)
+      if (res.error) {
+        showToast(res.error, 'error')
+      } else {
+        showToast(
+          newStatus
+            ? `Granted Platform Superadmin privileges to ${userToToggleAdmin.email}.`
+            : `Revoked Platform Superadmin privileges from ${userToToggleAdmin.email}.`,
+          'success'
+        )
+        setData(prev => ({
+          ...prev,
+          users: prev.users.map(u =>
+            u.id === userToToggleAdmin.id ? { ...u, isPlatformAdmin: newStatus } : u
+          ),
+        }))
+        setUserToToggleAdmin(null)
+      }
+    })
+  }
+
+  // Copy helper
+  const copyToClipboard = (text: string, label: string = 'Copied') => {
+    navigator.clipboard.writeText(text)
+    showToast(`${label} copied to clipboard!`, 'info')
+  }
+
+  const formatCentsToDollars = (cents: number) => {
+    return (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+  }
+
+  const getBillingBadge = (billingStatus: string, status: string) => {
+    if (status === 'suspended') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30">
+          <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+          Suspended
+        </span>
+      )
+    }
+
+    switch (billingStatus) {
+      case 'active':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            Active Subscription
+          </span>
+        )
+      case 'trialing':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-sky-500/20 text-sky-300 border border-sky-500/30">
+            <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+            Trialing
+          </span>
+        )
+      case 'past_due':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            Past Due ⚠️
+          </span>
+        )
+      case 'canceled':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-500/20 text-red-300 border border-red-500/30">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+            Canceled
+          </span>
+        )
+      default:
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300">
+            {billingStatus}
+          </span>
+        )
     }
   }
 
-  // Audit filter state
-  const [auditFilterAction, setAuditFilterAction] = useState<string>('all')
-
-  // Metadata Inspector Modal
-  const [inspectMetadata, setInspectMetadata] = useState<{ title: string; json: any } | null>(null)
-
-  // Filtered lists
-  const filteredOrgs = data.organizations.filter(
-    (o) =>
-      o.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      o.owners.some((own) => own.fullName.toLowerCase().includes(searchQuery.toLowerCase()) || own.email.toLowerCase().includes(searchQuery.toLowerCase()))
-  )
-
-  const filteredUsers = data.users.filter(
-    (u) =>
-      u.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.organizations.some((o) => o.orgName.toLowerCase().includes(searchQuery.toLowerCase()))
-  )
-
-  const filteredActivity = data.recentActivity.filter((a) => {
-    const matchSearch =
-      a.actorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      a.actorEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      a.organizationName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (a.projectName && a.projectName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      a.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      a.entityType.toLowerCase().includes(searchQuery.toLowerCase())
-
-    const matchAction = auditFilterAction === 'all' || a.action.startsWith(auditFilterAction)
-    return matchSearch && matchAction
-  })
-
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-[var(--bg)] text-[var(--text-primary)] font-sans relative">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text-primary)] font-sans pb-16">
       {/* Toast Notification */}
       {toast && (
-        <div className="fixed top-4 right-4 z-50 bg-[var(--surface-1)] border border-[var(--border-strong)] text-[var(--text-primary)] px-4 py-3 rounded-xl shadow-2xl text-xs font-bold flex items-center gap-2.5 animate-in slide-in-from-top-3 duration-200">
-          <span
-            className={`w-2 h-2 rounded-full ${
-              toast.type === 'success' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]' : toast.type === 'error' ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]' : 'bg-blue-500'
-            }`}
-          />
-          {toast.message}
+        <div
+          className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl border shadow-2xl flex items-center gap-3 text-xs font-bold animate-in slide-in-from-bottom-5 duration-200 ${
+            toast.type === 'error'
+              ? 'bg-red-950/95 border-red-500/50 text-red-200'
+              : toast.type === 'info'
+              ? 'bg-indigo-950/95 border-indigo-500/50 text-indigo-200'
+              : 'bg-emerald-950/95 border-emerald-500/50 text-emerald-200'
+          }`}
+        >
+          <span>{toast.message}</span>
         </div>
       )}
 
-      {/* Top Banner / System Status Header */}
-      <header className="px-6 py-4 border-b border-[var(--border)] bg-[var(--surface-1)] shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-600 to-pink-500 text-white flex items-center justify-center shadow-md font-black text-base">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            </svg>
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-base font-black tracking-tight text-[var(--text-primary)]">Platform Administration</h1>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-black tracking-wider uppercase bg-gradient-to-r from-purple-500/10 to-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
-                Superadmin
-              </span>
+      {/* Header Bar */}
+      <header className="border-b border-[var(--border)] bg-[var(--surface-1)]/80 backdrop-blur-md sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-white font-black text-lg shadow-md shadow-indigo-500/20">
+              👑
             </div>
-            <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
-              Global SaaS multi-tenant governance, system health, and access control.
-            </p>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-black text-[var(--text-primary)] tracking-tight">
+                  Platform Admin Console
+                </h1>
+                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 tracking-wider">
+                  Superadmin
+                </span>
+              </div>
+              <p className="text-xs text-[var(--text-secondary)] font-medium">
+                Multi-tenant commercial governance, Stripe subscriptions & discipline modules.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Link
+              href="/projects"
+              className="px-3.5 py-2 text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--surface-2)] hover:bg-[var(--surface-hover)] border border-[var(--border)] rounded-xl transition"
+            >
+              ← Back to App
+            </Link>
+            <button
+              onClick={() => {
+                setIsCreateOrgOpen(true)
+                setCreatedCheckoutUrl(null)
+              }}
+              className="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-600/20 transition cursor-pointer flex items-center gap-1.5"
+            >
+              <span>+</span> New Client Company
+            </button>
           </div>
         </div>
 
-        {/* Global Stats & Status Badges */}
-        <div className="flex items-center gap-3">
-          <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="font-semibold text-[var(--text-secondary)]">Database & RLS:</span>
-            <span className="font-bold text-emerald-600 dark:text-emerald-400">Optimal</span>
-          </div>
-
-          {data.platformSettings.maintenanceMode.enabled && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-bold">
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
-              Maintenance Mode Active
-            </div>
-          )}
-
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-xs font-mono text-[var(--text-secondary)]">
-            <div className="w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold">
-              {(data.callerName || 'A').substring(0, 1)}
-            </div>
-            <span className="font-semibold">{data.callerEmail}</span>
-          </div>
-        </div>
-      </header>
-
-      {/* Navigation Tabs Bar */}
-      <div className="px-6 border-b border-[var(--border)] bg-[var(--surface-1)] flex items-center justify-between gap-4 shrink-0 overflow-x-auto scrollbar-none">
-        <nav className="flex gap-1 py-2">
+        {/* Tab Navigation */}
+        <div className="max-w-7xl mx-auto px-6 flex space-x-1 border-t border-[var(--border)]/60 overflow-x-auto text-xs font-bold">
           {[
-            {
-              id: 'overview',
-              label: 'Overview & KPIs',
-              icon: (
-                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
-              ),
-            },
-            {
-              id: 'tenants',
-              label: `Organizations (${data.organizations.length})`,
-              icon: (
-                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-              ),
-            },
-            {
-              id: 'users',
-              label: `Global Users (${data.users.length})`,
-              icon: (
-                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-              ),
-            },
-            {
-              id: 'audit',
-              label: `Cross-Tenant Audit (${data.recentActivity.length})`,
-              icon: (
-                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-              ),
-            },
-            {
-              id: 'settings',
-              label: 'Platform Config',
-              icon: (
-                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-              ),
-            },
-          ].map((tab) => (
+            { id: 'overview', label: 'Overview & Billing' },
+            { id: 'organizations', label: `Client Companies (${data.organizations.length})` },
+            { id: 'modules', label: `Modules & Pricing (${data.modules.length})` },
+            { id: 'users', label: `Global Users (${data.users.length})` },
+            { id: 'activity', label: 'Cross-Tenant Audit' },
+            { id: 'settings', label: 'Platform Controls' },
+          ].map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`px-4 py-3 border-b-2 transition whitespace-nowrap cursor-pointer ${
                 activeTab === tab.id
-                  ? 'bg-[var(--accent)] text-white shadow-xs'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]'
+                  ? 'border-[var(--accent)] text-[var(--accent-text)]'
+                  : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
-              {tab.icon}
               {tab.label}
             </button>
           ))}
-        </nav>
-
-        {/* Global Search Input */}
-        <div className="flex items-center gap-2.5 py-2">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search across platform..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-[var(--surface-2)] border border-[var(--border)] rounded-lg pl-8 pr-3 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] font-medium w-48 sm:w-64 transition-all"
-            />
-            <svg
-              className="absolute left-2.5 top-2 text-[var(--text-tertiary)] pointer-events-none"
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            </svg>
-          </div>
-
-          <button
-            onClick={refreshData}
-            title="Refresh Platform Data"
-            className="p-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition cursor-pointer"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
-            </svg>
-          </button>
         </div>
-      </div>
+      </header>
 
-      {/* Main Tab Content Area */}
-      <main className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin">
-        {/* ========================================================================= */}
-        {/* TAB 1: OVERVIEW & KPIS */}
-        {/* ========================================================================= */}
+      {/* Main Container */}
+      <main className="max-w-7xl mx-auto px-6 pt-6 space-y-6">
+
+        {/* TAB 1: OVERVIEW */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
-            {/* Top Stat KPI Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-5 shadow-xs relative overflow-hidden group hover:border-[var(--border-strong)] transition">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider">Tenant Workspaces</span>
-                  <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-                  </div>
+            {/* Attention Required Banner (if any past_due accounts) */}
+            {data.pastDueOrganizations.length > 0 && (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-5 space-y-3">
+                <div className="flex items-center gap-2 text-amber-300 font-bold text-sm">
+                  <span>⚠️ Attention Required:</span>
+                  <span>{data.pastDueOrganizations.length} account(s) in past-due or suspended state.</span>
                 </div>
-                <div className="text-3xl font-black mt-2 text-[var(--text-primary)]">{data.metrics.totalOrganizations}</div>
-                <div className="text-[11px] text-[var(--text-secondary)] mt-1 flex items-center gap-1.5 font-medium">
-                  <span className="text-emerald-600 font-bold">100% active</span> multi-tenant isolation
-                </div>
-              </div>
-
-              <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-5 shadow-xs relative overflow-hidden group hover:border-[var(--border-strong)] transition">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider">Global User Accounts</span>
-                  <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-                  </div>
-                </div>
-                <div className="text-3xl font-black mt-2 text-[var(--text-primary)]">{data.metrics.totalUsers}</div>
-                <div className="text-[11px] text-[var(--text-secondary)] mt-1 flex items-center gap-1.5 font-medium">
-                  <span className="text-indigo-600 font-bold">{data.users.filter((u) => u.isPlatformAdmin).length} Superadmins</span>
-                </div>
-              </div>
-
-              <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-5 shadow-xs relative overflow-hidden group hover:border-[var(--border-strong)] transition">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider">Total Projects</span>
-                  <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                  </div>
-                </div>
-                <div className="text-3xl font-black mt-2 text-[var(--text-primary)]">{data.metrics.totalProjects}</div>
-                <div className="text-[11px] text-[var(--text-secondary)] mt-1 flex items-center gap-1.5 font-medium">
-                  <span className="text-emerald-600 font-bold">{data.metrics.activeProjects} active designs</span>
-                </div>
-              </div>
-
-              <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-5 shadow-xs relative overflow-hidden group hover:border-[var(--border-strong)] transition">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider">24h System Events</span>
-                  <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                  </div>
-                </div>
-                <div className="text-3xl font-black mt-2 text-[var(--text-primary)]">{data.metrics.activityCount24h}</div>
-                <div className="text-[11px] text-[var(--text-secondary)] mt-1 flex items-center gap-1.5 font-medium">
-                  Audit triggers active across all tables
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Actions & Platform Health */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Left 2 Cols: Recent Cross-Tenant Audit Log Preview */}
-              <div className="lg:col-span-2 bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-5 space-y-4 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-sm font-black uppercase text-[var(--text-primary)] tracking-wider">Live System Activity Stream</h2>
-                    <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Real-time audit log captured across all organizations.</p>
-                  </div>
-                  <button
-                    onClick={() => setActiveTab('audit')}
-                    className="text-xs font-bold text-[var(--accent)] hover:underline cursor-pointer"
-                  >
-                    View All &rarr;
-                  </button>
-                </div>
-
-                <div className="divide-y divide-[var(--border)]">
-                  {data.recentActivity.slice(0, 6).map((activity) => (
-                    <div key={activity.id} className="py-3 flex items-start justify-between gap-4 group">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                            {activity.action}
-                          </span>
-                          <span className="text-xs font-bold text-[var(--text-primary)]">{activity.actorName}</span>
-                          <span className="text-[11px] text-[var(--text-tertiary)]">in</span>
-                          <span className="text-xs font-semibold text-[var(--text-secondary)]">{activity.organizationName}</span>
-                        </div>
-                        {activity.projectName && (
-                          <p className="text-[11px] text-[var(--text-secondary)]">
-                            Project: <span className="font-bold text-[var(--text-primary)]">{activity.projectName}</span>
-                          </p>
-                        )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {data.pastDueOrganizations.map(org => (
+                    <div key={org.id} className="bg-[var(--surface-1)] border border-amber-500/20 rounded-xl p-3.5 space-y-1.5 text-xs">
+                      <div className="font-bold text-[var(--text-primary)] flex items-center justify-between">
+                        <span>{org.name}</span>
+                        {getBillingBadge(org.billingStatus, org.status)}
                       </div>
-                      <span className="text-[10px] font-mono text-[var(--text-tertiary)] shrink-0">
-                        {new Date(activity.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                      </span>
+                      <div className="text-[11px] text-[var(--text-secondary)] font-mono">
+                        MRR: {formatCentsToDollars(org.monthlyTotalCents)}
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
+            )}
 
-              {/* Right Col: Platform Controls & Health */}
-              <div className="space-y-6">
-                <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-5 space-y-4 shadow-xs">
-                  <h2 className="text-sm font-black uppercase text-[var(--text-primary)] tracking-wider">Quick Platform Actions</h2>
-                  <div className="flex flex-col gap-2">
-                    <button
-                      onClick={() => setIsCreateOrgOpen(true)}
-                      className="w-full flex items-center justify-between p-3 rounded-xl bg-[var(--surface-2)] hover:bg-[var(--surface-hover)] border border-[var(--border)] text-xs font-bold transition cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <span className="w-2 h-2 rounded-full bg-[var(--accent)]" />
-                        <span>Provision New Tenant Organization</span>
-                      </div>
-                      <span className="text-[var(--text-tertiary)]">+</span>
-                    </button>
-
-                    <button
-                      onClick={() => setActiveTab('users')}
-                      className="w-full flex items-center justify-between p-3 rounded-xl bg-[var(--surface-2)] hover:bg-[var(--surface-hover)] border border-[var(--border)] text-xs font-bold transition cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <span className="w-2 h-2 rounded-full bg-purple-500" />
-                        <span>Manage Superadmin Roles</span>
-                      </div>
-                      <span className="text-[var(--text-tertiary)]">&rarr;</span>
-                    </button>
-
-                    <button
-                      onClick={() => setActiveTab('settings')}
-                      className="w-full flex items-center justify-between p-3 rounded-xl bg-[var(--surface-2)] hover:bg-[var(--surface-hover)] border border-[var(--border)] text-xs font-bold transition cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <span className="w-2 h-2 rounded-full bg-amber-500" />
-                        <span>Configure Maintenance & Banners</span>
-                      </div>
-                      <span className="text-[var(--text-tertiary)]">&rarr;</span>
-                    </button>
+            {/* Commercial Billing Summary KPIs */}
+            <div>
+              <h2 className="text-xs font-black uppercase text-[var(--text-tertiary)] tracking-wider mb-3">
+                Commercial Revenue & Subscription Metrics
+              </h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+                <div className="bg-[var(--surface-1)] border border-emerald-500/30 rounded-2xl p-5 shadow-xs">
+                  <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Total MRR</div>
+                  <div className="text-2xl font-black text-emerald-300 mt-1">
+                    {formatCentsToDollars(data.billingMetrics.totalMrrCents)}
                   </div>
+                  <div className="text-[10px] text-[var(--text-tertiary)] mt-1 font-medium">Active subscriptions</div>
                 </div>
 
-                <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-5 space-y-3 shadow-xs">
-                  <h2 className="text-sm font-black uppercase text-[var(--text-primary)] tracking-wider">Architecture State</h2>
-                  <div className="space-y-2 text-xs">
-                    <div className="flex justify-between py-1 border-b border-[var(--border)]">
-                      <span className="text-[var(--text-secondary)]">Database Version</span>
-                      <span className="font-mono font-bold">PostgreSQL 15+ / Supabase</span>
-                    </div>
-                    <div className="flex justify-between py-1 border-b border-[var(--border)]">
-                      <span className="text-[var(--text-secondary)]">Active Migration</span>
-                      <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">020_platform_admin</span>
-                    </div>
-                    <div className="flex justify-between py-1 border-b border-[var(--border)]">
-                      <span className="text-[var(--text-secondary)]">Multi-Tenant Isolation</span>
-                      <span className="font-mono font-bold text-emerald-600">Row Level Security (RLS)</span>
-                    </div>
-                    <div className="flex justify-between py-1">
-                      <span className="text-[var(--text-secondary)]">Hardware Devices Tracked</span>
-                      <span className="font-mono font-bold">{data.metrics.totalDevices} units</span>
-                    </div>
+                <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-5 shadow-xs">
+                  <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Active Subs</div>
+                  <div className="text-2xl font-black text-[var(--text-primary)] mt-1">
+                    {data.billingMetrics.activeSubscriptionsCount}
                   </div>
+                  <div className="text-[10px] text-[var(--text-tertiary)] mt-1 font-medium">Paying monthly</div>
+                </div>
+
+                <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-5 shadow-xs">
+                  <div className="text-[10px] font-bold text-sky-400 uppercase tracking-wider">Trialing</div>
+                  <div className="text-2xl font-black text-[var(--text-primary)] mt-1">
+                    {data.billingMetrics.trialingCount}
+                  </div>
+                  <div className="text-[10px] text-[var(--text-tertiary)] mt-1 font-medium">In evaluation</div>
+                </div>
+
+                <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-5 shadow-xs">
+                  <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Past Due</div>
+                  <div className="text-2xl font-black text-amber-300 mt-1">
+                    {data.billingMetrics.pastDueCount}
+                  </div>
+                  <div className="text-[10px] text-[var(--text-tertiary)] mt-1 font-medium">Payment retry phase</div>
+                </div>
+
+                <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-5 shadow-xs">
+                  <div className="text-[10px] font-bold text-red-400 uppercase tracking-wider">Canceled</div>
+                  <div className="text-2xl font-black text-red-300 mt-1">
+                    {data.billingMetrics.canceledCount}
+                  </div>
+                  <div className="text-[10px] text-[var(--text-tertiary)] mt-1 font-medium">Churned accounts</div>
+                </div>
+
+                <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-5 shadow-xs">
+                  <div className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">Suspended</div>
+                  <div className="text-2xl font-black text-purple-300 mt-1">
+                    {data.billingMetrics.suspendedCount}
+                  </div>
+                  <div className="text-[10px] text-[var(--text-tertiary)] mt-1 font-medium">Manual admin lock</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Platform Resource Metrics */}
+            <div>
+              <h2 className="text-xs font-black uppercase text-[var(--text-tertiary)] tracking-wider mb-3">
+                Platform Technical Footprint
+              </h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+                <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-4 shadow-xs">
+                  <div className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Client Orgs</div>
+                  <div className="text-xl font-extrabold text-[var(--text-primary)] mt-1">{data.metrics.totalOrganizations}</div>
+                </div>
+                <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-4 shadow-xs">
+                  <div className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Total Users</div>
+                  <div className="text-xl font-extrabold text-[var(--text-primary)] mt-1">{data.metrics.totalUsers}</div>
+                </div>
+                <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-4 shadow-xs">
+                  <div className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Active Projects</div>
+                  <div className="text-xl font-extrabold text-[var(--text-primary)] mt-1">{data.metrics.activeProjects}</div>
+                </div>
+                <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-4 shadow-xs">
+                  <div className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Network Devices</div>
+                  <div className="text-xl font-extrabold text-[var(--text-primary)] mt-1">{data.metrics.totalDevices}</div>
+                </div>
+                <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-4 shadow-xs">
+                  <div className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Tasks Logged</div>
+                  <div className="text-xl font-extrabold text-[var(--text-primary)] mt-1">{data.metrics.totalTasks}</div>
+                </div>
+                <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-4 shadow-xs">
+                  <div className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">24h Audit Events</div>
+                  <div className="text-xl font-extrabold text-[var(--text-primary)] mt-1">{data.metrics.activityCount24h}</div>
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* ========================================================================= */}
-        {/* TAB 2: TENANT ORGANIZATIONS DIRECTORY */}
-        {/* ========================================================================= */}
-        {activeTab === 'tenants' && (
+        {/* TAB 2: CLIENT COMPANIES */}
+        {activeTab === 'organizations' && (
           <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-base font-black text-[var(--text-primary)]">SaaS Tenant Workspaces</h2>
-                <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
-                  Manage all isolated client organizations, seat counts, and project limits.
-                </p>
+                <h2 className="text-base font-black text-[var(--text-primary)]">Client Companies & Subscriptions</h2>
+                <p className="text-xs text-[var(--text-secondary)]">Manage tenant organizations, purchased engineering modules, and Stripe billing lifecycle.</p>
               </div>
               <button
-                onClick={() => setIsCreateOrgOpen(true)}
-                className="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-xs flex items-center gap-2 self-start"
+                onClick={() => {
+                  setIsCreateOrgOpen(true)
+                  setCreatedCheckoutUrl(null)
+                }}
+                className="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold rounded-xl transition cursor-pointer"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                Create Organization
+                + New Client Company
               </button>
             </div>
 
+            <div className="grid grid-cols-1 gap-4">
+              {data.organizations.map(org => (
+                <div key={org.id} className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-5 shadow-xs space-y-4">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2.5">
+                        <h3 className="text-base font-black text-[var(--text-primary)]">{org.name}</h3>
+                        {getBillingBadge(org.billingStatus, org.status)}
+                      </div>
+                      <div className="text-[11px] text-[var(--text-tertiary)] mt-1 font-mono flex items-center gap-3">
+                        <span>ID: {org.id}</span>
+                        <span>•</span>
+                        <span>Created: {new Date(org.createdAt).toLocaleDateString()}</span>
+                        {org.stripeCustomerId && (
+                          <>
+                            <span>•</span>
+                            <span>Stripe: {org.stripeCustomerId}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleSuspension(org)}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition cursor-pointer ${
+                          org.status === 'suspended'
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/30'
+                            : 'bg-amber-500/20 text-amber-300 border-amber-500/30 hover:bg-amber-500/30'
+                        }`}
+                      >
+                        {org.status === 'suspended' ? 'Reactivate Access' : 'Suspend Workspace'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOrgToDelete(org)}
+                        className="px-3 py-1.5 text-xs font-bold text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-xl transition cursor-pointer"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Modules Purchased & MRR Breakdown */}
+                  <div className="bg-[var(--surface-2)] border border-[var(--border)] rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">
+                        Purchased Modules ({org.modules.filter(m => m.status === 'active').length})
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {org.modules.length === 0 ? (
+                          <span className="text-xs text-[var(--text-tertiary)] italic">No specific modules mapped (All enabled)</span>
+                        ) : (
+                          org.modules.map(mod => (
+                            <span
+                              key={mod.id}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 ${
+                                mod.status === 'active'
+                                  ? 'bg-[var(--surface-1)] border border-[var(--border)] text-[var(--text-primary)]'
+                                  : 'bg-red-500/10 text-red-400 border border-red-500/20 line-through'
+                              }`}
+                            >
+                              <span>{mod.moduleName}</span>
+                              <span className="font-mono text-[11px] text-[var(--accent-text)]">
+                                {formatCentsToDollars(mod.priceCents)}/mo
+                              </span>
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <div className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Monthly MRR</div>
+                      <div className="text-lg font-black text-emerald-400">
+                        {formatCentsToDollars(org.monthlyTotalCents)}
+                        <span className="text-xs font-normal text-[var(--text-secondary)]">/mo</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Members and Owners */}
+                  <div className="flex flex-wrap items-center justify-between text-xs text-[var(--text-secondary)] gap-2 pt-1">
+                    <div className="flex items-center gap-4">
+                      <span>👥 {org.membersCount} member(s)</span>
+                      <span>📁 {org.projectsCount} project(s)</span>
+                    </div>
+                    <div>
+                      Owner:{' '}
+                      {org.owners.length > 0 ? (
+                        <span className="font-semibold text-[var(--text-primary)]">{org.owners.map(o => o.email).join(', ')}</span>
+                      ) : (
+                        <span className="text-[var(--text-tertiary)] italic">Unassigned</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: MODULES & PRICING */}
+        {activeTab === 'modules' && (
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-base font-black text-[var(--text-primary)]">Discipline Modules Catalog & Pricing</h2>
+              <p className="text-xs text-[var(--text-secondary)]">
+                Define the sellable engineering modules, set default catalog pricing in USD, and map Stripe Price IDs.
+              </p>
+            </div>
+
             <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-xs">
               <table className="w-full text-xs text-[var(--text-secondary)]">
-                <thead className="bg-[var(--surface-2)] text-[var(--text-tertiary)] uppercase text-[10px] tracking-wider border-b border-[var(--border)] font-sans">
+                <thead className="bg-[var(--surface-2)] text-[var(--text-tertiary)] uppercase text-[10px] tracking-wider border-b border-[var(--border)] font-bold">
                   <tr>
-                    <th className="text-left px-5 py-3 font-bold">Organization Name</th>
-                    <th className="text-left px-5 py-3 font-bold">Primary Owners / Admins</th>
-                    <th className="text-center px-5 py-3 font-bold">Members</th>
-                    <th className="text-center px-5 py-3 font-bold">Projects</th>
-                    <th className="text-left px-5 py-3 font-bold">Created Date</th>
-                    <th className="text-right px-5 py-3 font-bold">Actions</th>
+                    <th className="text-left px-5 py-3.5">Discipline Module</th>
+                    <th className="text-left px-4 py-3.5">Description</th>
+                    <th className="text-left px-4 py-3.5">Default Price / mo</th>
+                    <th className="text-left px-4 py-3.5">Stripe Price ID</th>
+                    <th className="text-left px-4 py-3.5">Status</th>
+                    <th className="text-right px-5 py-3.5">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[var(--border)] font-sans">
-                  {filteredOrgs.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="px-5 py-8 text-center text-xs text-[var(--text-tertiary)]">
-                        No organizations found matching "{searchQuery}".
+                <tbody className="divide-y divide-[var(--border)] font-medium">
+                  {data.modules.map(mod => (
+                    <tr key={mod.id} className="hover:bg-[var(--surface-hover)] transition-colors">
+                      <td className="px-5 py-4">
+                        <div className="font-black text-sm text-[var(--text-primary)]">{mod.name}</div>
+                        <div className="font-mono text-[10px] text-[var(--text-tertiary)] uppercase">id: {mod.id}</div>
+                      </td>
+                      <td className="px-4 py-4 max-w-xs text-xs leading-relaxed">{mod.description || '—'}</td>
+                      <td className="px-4 py-4 font-mono font-bold text-[var(--text-primary)] text-sm">
+                        {formatCentsToDollars(mod.defaultMonthlyPriceCents)}
+                      </td>
+                      <td className="px-4 py-4 font-mono text-[11px]">
+                        {mod.stripePriceId ? (
+                          <span className="text-indigo-300 font-bold bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">
+                            {mod.stripePriceId}
+                          </span>
+                        ) : (
+                          <span className="text-amber-400/80 italic">Not configured</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-4">
+                        {mod.isActive ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            Active
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400">
+                            Inactive
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-5 py-4 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleStartEditModule(mod)}
+                          className="px-3 py-1.5 bg-[var(--surface-2)] hover:bg-[var(--surface-hover)] border border-[var(--border)] text-[var(--accent-text)] font-bold rounded-xl transition cursor-pointer"
+                        >
+                          Edit Pricing & Stripe
+                        </button>
                       </td>
                     </tr>
-                  ) : (
-                    filteredOrgs.map((org) => (
-                      <tr key={org.id} className="hover:bg-[var(--surface-hover)] transition-colors">
-                        <td className="px-5 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-[var(--accent)] text-white flex items-center justify-center font-bold text-xs">
-                              {org.name.substring(0, 2).toUpperCase()}
-                            </div>
-                            <div>
-                              <p className="font-bold text-[var(--text-primary)] text-xs">{org.name}</p>
-                              <p className="font-mono text-[10px] text-[var(--text-tertiary)]">{org.id}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-5 py-4">
-                          {org.owners.length === 0 ? (
-                            <span className="text-[11px] text-[var(--text-tertiary)] italic">No assigned owner</span>
-                          ) : (
-                            <div className="space-y-0.5">
-                              {org.owners.map((owner, idx) => (
-                                <p key={idx} className="font-medium text-[var(--text-primary)] text-[11px]">
-                                  {owner.fullName} <span className="text-[var(--text-tertiary)]">({owner.email})</span>
-                                </p>
-                              ))}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-5 py-4 text-center">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-[var(--surface-2)] text-[var(--text-primary)] border border-[var(--border)]">
-                            {org.membersCount}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4 text-center">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                            {org.projectsCount}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4 text-[11px] font-mono text-[var(--text-tertiary)]">
-                          {new Date(org.createdAt).toLocaleDateString()}
-                        </td>
-                        <td className="px-5 py-4 text-right">
-                          <button
-                            onClick={() => setOrgToDelete(org)}
-                            className="text-xs text-rose-600 hover:text-rose-700 hover:underline font-bold cursor-pointer"
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
+                  ))}
                 </tbody>
               </table>
             </div>
           </div>
         )}
 
-        {/* ========================================================================= */}
-        {/* TAB 3: GLOBAL USERS DIRECTORY */}
-        {/* ========================================================================= */}
+        {/* TAB 4: USERS */}
         {activeTab === 'users' && (
           <div className="space-y-4">
             <div>
-              <h2 className="text-base font-black text-[var(--text-primary)]">Global Platform User Directory</h2>
-              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
-                Inspect registered users across all tenants and grant/revoke Platform Superadmin privileges.
-              </p>
+              <h2 className="text-base font-black text-[var(--text-primary)]">Global Users Directory</h2>
+              <p className="text-xs text-[var(--text-secondary)]">Manage tenant memberships and grant or revoke Platform Superadmin privileges.</p>
             </div>
 
             <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-xs">
               <table className="w-full text-xs text-[var(--text-secondary)]">
-                <thead className="bg-[var(--surface-2)] text-[var(--text-tertiary)] uppercase text-[10px] tracking-wider border-b border-[var(--border)] font-sans">
+                <thead className="bg-[var(--surface-2)] text-[var(--text-tertiary)] uppercase text-[10px] tracking-wider border-b border-[var(--border)] font-bold">
                   <tr>
-                    <th className="text-left px-5 py-3 font-bold">User</th>
-                    <th className="text-left px-5 py-3 font-bold">Email</th>
-                    <th className="text-left px-5 py-3 font-bold">Tenant Memberships</th>
-                    <th className="text-center px-5 py-3 font-bold">Platform Superadmin</th>
-                    <th className="text-right px-5 py-3 font-bold">Action</th>
+                    <th className="text-left px-5 py-3.5">User</th>
+                    <th className="text-left px-4 py-3.5">Tenants & Roles</th>
+                    <th className="text-left px-4 py-3.5">Platform Role</th>
+                    <th className="text-right px-5 py-3.5">Superadmin Toggle</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[var(--border)] font-sans">
-                  {filteredUsers.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-5 py-8 text-center text-xs text-[var(--text-tertiary)]">
-                        No users found matching "{searchQuery}".
+                <tbody className="divide-y divide-[var(--border)] font-medium">
+                  {data.users.map(u => (
+                    <tr key={u.id} className="hover:bg-[var(--surface-hover)] transition-colors">
+                      <td className="px-5 py-4">
+                        <div className="font-bold text-sm text-[var(--text-primary)]">{u.fullName}</div>
+                        <div className="font-mono text-[11px] text-[var(--text-tertiary)]">{u.email}</div>
                       </td>
-                    </tr>
-                  ) : (
-                    filteredUsers.map((u) => (
-                      <tr key={u.id} className="hover:bg-[var(--surface-hover)] transition-colors">
-                        <td className="px-5 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-[var(--surface-2)] border border-[var(--border)] flex items-center justify-center font-bold text-xs text-[var(--text-primary)]">
-                              {u.fullName.substring(0, 2).toUpperCase()}
-                            </div>
-                            <div>
-                              <p className="font-bold text-[var(--text-primary)] text-xs">{u.fullName}</p>
-                              <p className="font-mono text-[10px] text-[var(--text-tertiary)]">{u.id}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-5 py-4 font-mono font-bold text-xs text-[var(--text-primary)]">
-                          {u.email}
-                        </td>
-                        <td className="px-5 py-4">
-                          {u.organizations.length === 0 ? (
-                            <span className="text-[11px] text-[var(--text-tertiary)]">No organization assigned</span>
-                          ) : (
-                            <div className="flex flex-wrap gap-1.5">
-                              {u.organizations.map((orgAff, idx) => (
-                                <span
-                                  key={idx}
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-primary)]"
-                                >
-                                  {orgAff.orgName}
-                                  <span className="text-[var(--text-tertiary)] uppercase font-mono">({orgAff.role})</span>
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-5 py-4 text-center">
-                          {u.isPlatformAdmin ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-gradient-to-r from-purple-500/10 to-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
-                              Platform Superadmin
+                      <td className="px-4 py-4">
+                        <div className="flex flex-wrap gap-1.5">
+                          {u.organizations.map((org, i) => (
+                            <span key={i} className="px-2 py-0.5 rounded bg-[var(--surface-2)] border border-[var(--border)] text-[11px]">
+                              <span className="font-bold text-[var(--text-primary)]">{org.name}</span>{' '}
+                              <span className="capitalize text-[var(--text-tertiary)]">({org.role})</span>
                             </span>
-                          ) : (
-                            <span className="text-[11px] text-[var(--text-tertiary)] font-medium">Standard User</span>
-                          )}
-                        </td>
-                        <td className="px-5 py-4 text-right">
-                          <button
-                            onClick={() => setUserToToggleAdmin({ user: u, newStatus: !u.isPlatformAdmin })}
-                            className={`text-xs font-bold hover:underline cursor-pointer ${
-                              u.isPlatformAdmin ? 'text-amber-600 hover:text-amber-700' : 'text-indigo-600 hover:text-indigo-700'
-                            }`}
-                          >
-                            {u.isPlatformAdmin ? 'Revoke Superadmin' : 'Grant Superadmin'}
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* ========================================================================= */}
-        {/* TAB 4: CROSS-TENANT AUDIT LOG */}
-        {/* ========================================================================= */}
-        {activeTab === 'audit' && (
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h2 className="text-base font-black text-[var(--text-primary)]">System-Wide Activity & Audit Trail</h2>
-                <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
-                  Complete immutable ledger of project modifications, team mutations, and system changes.
-                </p>
-              </div>
-
-              {/* Action Filter dropdown */}
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-bold text-[var(--text-tertiary)] uppercase">Action Filter:</label>
-                <select
-                  value={auditFilterAction}
-                  onChange={(e) => setAuditFilterAction(e.target.value)}
-                  className="bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none cursor-pointer font-bold"
-                >
-                  <option value="all">All Actions</option>
-                  <option value="insert">Insert</option>
-                  <option value="update">Update</option>
-                  <option value="delete">Delete</option>
-                  <option value="member">Member Actions</option>
-                  <option value="platform_admin">Platform Admin Actions</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-xs">
-              <table className="w-full text-xs text-[var(--text-secondary)]">
-                <thead className="bg-[var(--surface-2)] text-[var(--text-tertiary)] uppercase text-[10px] tracking-wider border-b border-[var(--border)] font-sans">
-                  <tr>
-                    <th className="text-left px-5 py-3 font-bold">Timestamp</th>
-                    <th className="text-left px-5 py-3 font-bold">Action</th>
-                    <th className="text-left px-5 py-3 font-bold">Actor</th>
-                    <th className="text-left px-5 py-3 font-bold">Tenant / Workspace</th>
-                    <th className="text-left px-5 py-3 font-bold">Target Entity</th>
-                    <th className="text-right px-5 py-3 font-bold">Payload</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--border)] font-sans">
-                  {filteredActivity.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="px-5 py-8 text-center text-xs text-[var(--text-tertiary)]">
-                        No activity records found matching current criteria.
+                          ))}
+                        </div>
                       </td>
-                    </tr>
-                  ) : (
-                    filteredActivity.map((log) => (
-                      <tr key={log.id} className="hover:bg-[var(--surface-hover)] transition-colors">
-                        <td className="px-5 py-3.5 font-mono text-[11px] text-[var(--text-tertiary)] whitespace-nowrap">
-                          {new Date(log.createdAt).toLocaleString()}
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                            {log.action}
+                      <td className="px-4 py-4">
+                        {u.isPlatformAdmin ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                            👑 Superadmin
                           </span>
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <p className="font-bold text-[var(--text-primary)] text-xs">{log.actorName}</p>
-                          <p className="text-[10px] text-[var(--text-tertiary)]">{log.actorEmail}</p>
-                        </td>
-                        <td className="px-5 py-3.5 font-semibold text-[var(--text-primary)]">
-                          {log.organizationName}
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <div className="space-y-0.5">
-                            <span className="font-mono text-[10px] uppercase font-bold text-[var(--text-tertiary)]">
-                              {log.entityType}
-                            </span>
-                            {log.projectName && (
-                              <p className="text-[11px] text-[var(--text-primary)] font-medium">
-                                Proj: {log.projectName}
-                              </p>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-5 py-3.5 text-right">
-                          {log.metadata ? (
-                            <button
-                              onClick={() => setInspectMetadata({ title: `Event Payload: ${log.action}`, json: log.metadata })}
-                              className="text-xs font-bold text-[var(--accent)] hover:underline cursor-pointer"
-                            >
-                              Inspect JSON
-                            </button>
-                          ) : (
-                            <span className="text-[10px] text-[var(--text-tertiary)]">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  )}
+                        ) : (
+                          <span className="text-[var(--text-tertiary)]">Standard User</span>
+                        )}
+                      </td>
+                      <td className="px-5 py-4 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setUserToToggleAdmin(u)}
+                          className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition cursor-pointer ${
+                            u.isPlatformAdmin
+                              ? 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20'
+                              : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20 hover:bg-indigo-500/20'
+                          }`}
+                        >
+                          {u.isPlatformAdmin ? 'Revoke Superadmin' : 'Make Superadmin'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
           </div>
         )}
 
-        {/* ========================================================================= */}
-        {/* TAB 5: PLATFORM CONFIGURATION & GOVERNANCE */}
-        {/* ========================================================================= */}
-        {activeTab === 'settings' && (
-          <div className="max-w-4xl space-y-6">
+        {/* TAB 5: AUDIT LOG */}
+        {activeTab === 'activity' && (
+          <div className="space-y-4">
             <div>
-              <h2 className="text-base font-black text-[var(--text-primary)]">Platform Governance & Feature Flags</h2>
-              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
-                Control system maintenance mode, announcement broadcasts, and default tenant quotas.
-              </p>
+              <h2 className="text-base font-black text-[var(--text-primary)]">Cross-Tenant Audit Stream</h2>
+              <p className="text-xs text-[var(--text-secondary)]">Live immutable record of platform governance, creation, and Stripe billing events.</p>
             </div>
 
-            {/* Maintenance Mode Card */}
-            <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-6 space-y-4 shadow-xs">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-black uppercase text-[var(--text-primary)] tracking-wider">Maintenance Mode</h3>
-                  <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
-                    Locks designer modifications across all client workspaces and presents a maintenance notice.
-                  </p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={settingsForm.maintenanceMode.enabled}
-                    onChange={(e) => {
-                      const updated = { ...settingsForm.maintenanceMode, enabled: e.target.checked }
-                      setSettingsForm({ ...settingsForm, maintenanceMode: updated })
-                      handleSaveSetting('maintenance_mode', updated)
-                    }}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent)]" />
-                </label>
-              </div>
-
-              {settingsForm.maintenanceMode.enabled && (
-                <div className="space-y-2 pt-2 border-t border-[var(--border)]">
-                  <label className="text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider">Maintenance Message</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={settingsForm.maintenanceMode.message}
-                      onChange={(e) =>
-                        setSettingsForm({
-                          ...settingsForm,
-                          maintenanceMode: { ...settingsForm.maintenanceMode, message: e.target.value },
-                        })
-                      }
-                      className="flex-1 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3.5 py-2 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] font-semibold"
-                    />
-                    <button
-                      onClick={() => handleSaveSetting('maintenance_mode', settingsForm.maintenanceMode)}
-                      disabled={isSavingSetting}
-                      className="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg text-xs font-bold transition cursor-pointer"
-                    >
-                      Save Notice
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Global System Announcement Banner Card */}
-            <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-6 space-y-4 shadow-xs">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-black uppercase text-[var(--text-primary)] tracking-wider">Global System Announcement Banner</h3>
-                  <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
-                    Display a persistent top banner message across all active user sessions.
-                  </p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={settingsForm.systemAnnouncement.enabled}
-                    onChange={(e) => {
-                      const updated = { ...settingsForm.systemAnnouncement, enabled: e.target.checked }
-                      setSettingsForm({ ...settingsForm, systemAnnouncement: updated })
-                      handleSaveSetting('system_announcement', updated)
-                    }}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent)]" />
-                </label>
-              </div>
-
-              {settingsForm.systemAnnouncement.enabled && (
-                <div className="space-y-3 pt-2 border-t border-[var(--border)]">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="sm:col-span-2 flex flex-col gap-1">
-                      <label className="text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider">Announcement Text</label>
-                      <input
-                        type="text"
-                        value={settingsForm.systemAnnouncement.message}
-                        onChange={(e) =>
-                          setSettingsForm({
-                            ...settingsForm,
-                            systemAnnouncement: { ...settingsForm.systemAnnouncement, message: e.target.value },
-                          })
-                        }
-                        className="bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3.5 py-2 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] font-semibold"
-                      />
+            <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-xs divide-y divide-[var(--border)]">
+              {data.recentActivity.map(act => (
+                <div key={act.id} className="p-4 hover:bg-[var(--surface-hover)] transition-colors flex items-start justify-between gap-4 text-xs">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-[var(--accent-text)] bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">
+                        {act.action}
+                      </span>
+                      <span className="text-[var(--text-tertiary)] font-bold">•</span>
+                      <span className="font-bold text-[var(--text-primary)]">{act.organizationName}</span>
                     </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider">Banner Type</label>
-                      <select
-                        value={settingsForm.systemAnnouncement.type}
-                        onChange={(e) =>
-                          setSettingsForm({
-                            ...settingsForm,
-                            systemAnnouncement: { ...settingsForm.systemAnnouncement, type: e.target.value as any },
-                          })
-                        }
-                        className="bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3.5 py-2 text-xs text-[var(--text-primary)] focus:outline-none cursor-pointer font-bold"
-                      >
-                        <option value="info">Info (Blue)</option>
-                        <option value="warning">Warning (Amber)</option>
-                        <option value="critical">Critical (Rose)</option>
-                      </select>
+                    <div className="text-[var(--text-secondary)]">
+                      By <span className="font-bold text-[var(--text-primary)]">{act.actorEmail}</span> on {act.entityType} ({act.entityId || 'general'})
                     </div>
+                    {act.metadata && (
+                      <pre className="text-[10px] font-mono bg-[var(--surface-2)] p-2 rounded-lg text-[var(--text-tertiary)] overflow-x-auto max-w-2xl">
+                        {JSON.stringify(act.metadata, null, 2)}
+                      </pre>
+                    )}
                   </div>
-
-                  <button
-                    onClick={() => handleSaveSetting('system_announcement', settingsForm.systemAnnouncement)}
-                    disabled={isSavingSetting}
-                    className="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg text-xs font-bold transition cursor-pointer self-start"
-                  >
-                    Update Announcement
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Registration & Quotas */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-6 space-y-3 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-xs font-black uppercase text-[var(--text-primary)] tracking-wider">Self-Serve Signups</h3>
-                    <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5">Allow new users to self-register via /register.</p>
+                  <div className="text-[11px] text-[var(--text-tertiary)] shrink-0 font-mono">
+                    {new Date(act.createdAt).toLocaleString()}
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={settingsForm.allowSignups.enabled}
-                      onChange={(e) => {
-                        const updated = { enabled: e.target.checked }
-                        setSettingsForm({ ...settingsForm, allowSignups: updated })
-                        handleSaveSetting('allow_signups', updated)
-                      }}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent)]" />
-                  </label>
                 </div>
-              </div>
-
-              <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-6 space-y-3 shadow-xs">
-                <div>
-                  <h3 className="text-xs font-black uppercase text-[var(--text-primary)] tracking-wider">Default Project Limit</h3>
-                  <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5">Maximum projects allowed per new organization.</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min={1}
-                    max={500}
-                    value={settingsForm.defaultProjectLimit.limit}
-                    onChange={(e) =>
-                      setSettingsForm({
-                        ...settingsForm,
-                        defaultProjectLimit: { limit: parseInt(e.target.value, 10) || 50 },
-                      })
-                    }
-                    className="w-24 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none font-bold"
-                  />
-                  <button
-                    onClick={() => handleSaveSetting('default_project_limit', settingsForm.defaultProjectLimit)}
-                    disabled={isSavingSetting}
-                    className="px-3 py-1.5 bg-[var(--surface-2)] hover:bg-[var(--surface-hover)] border border-[var(--border)] rounded-lg text-xs font-bold transition cursor-pointer"
-                  >
-                    Set Limit
-                  </button>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
         )}
+
+        {/* TAB 6: SETTINGS */}
+        {activeTab === 'settings' && (
+          <div className="space-y-6 max-w-3xl">
+            <div>
+              <h2 className="text-base font-black text-[var(--text-primary)]">Global Platform Controls</h2>
+              <p className="text-xs text-[var(--text-secondary)]">Maintenance modes, announcement broadcasts, and security guardrails.</p>
+            </div>
+
+            {/* Maintenance Mode */}
+            <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-6 space-y-4 shadow-xs">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-[var(--text-primary)]">Emergency Maintenance Mode</h3>
+                  <p className="text-xs text-[var(--text-secondary)]">Blocks regular tenant logins while allowing Platform Admins to work.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={maintenanceMode.enabled}
+                  onChange={(e) => {
+                    const next = { ...maintenanceMode, enabled: e.target.checked }
+                    setMaintenanceMode(next)
+                    startTransition(async () => {
+                      await savePlatformSetting('maintenance_mode', next)
+                      showToast('Maintenance mode setting updated.', 'success')
+                    })
+                  }}
+                  className="w-5 h-5 accent-indigo-600 rounded cursor-pointer"
+                />
+              </div>
+              {maintenanceMode.enabled && (
+                <div className="space-y-2 pt-2 border-t border-[var(--border)]">
+                  <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Maintenance Message</label>
+                  <textarea
+                    rows={2}
+                    value={maintenanceMode.message}
+                    onChange={(e) => setMaintenanceMode({ ...maintenanceMode, message: e.target.value })}
+                    onBlur={() => {
+                      startTransition(async () => {
+                        await savePlatformSetting('maintenance_mode', maintenanceMode)
+                        showToast('Maintenance message saved.', 'success')
+                      })
+                    }}
+                    className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl p-3 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Signups Toggle */}
+            <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-6 flex items-center justify-between shadow-xs">
+              <div>
+                <h3 className="text-sm font-bold text-[var(--text-primary)]">Allow Public Self-Serve Signups</h3>
+                <p className="text-xs text-[var(--text-secondary)]">When disabled, accounts can only be created via Platform Admin invitation.</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={allowSignups}
+                onChange={(e) => {
+                  const val = e.target.checked
+                  setAllowSignups(val)
+                  startTransition(async () => {
+                    await savePlatformSetting('allow_signups', val)
+                    showToast('Signups configuration updated.', 'success')
+                  })
+                }}
+                className="w-5 h-5 accent-indigo-600 rounded cursor-pointer"
+              />
+            </div>
+          </div>
+        )}
+
       </main>
 
-      {/* ========================================================================= */}
-      {/* MODALS */}
-      {/* ========================================================================= */}
-
-      {/* Modal: Create Organization */}
+      {/* MODAL: CREATE CLIENT COMPANY */}
       {isCreateOrgOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-xs" onClick={() => setIsCreateOrgOpen(false)} />
-          <form onSubmit={handleCreateOrg} className="relative bg-[var(--surface-1)] border border-[var(--border-strong)] p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl animate-in zoom-in-95 duration-150">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-xs" onClick={() => setIsCreateOrgOpen(false)} />
+          <div className="relative bg-[var(--surface-1)] border border-[var(--border-strong)] p-6 md:p-8 rounded-2xl w-full max-w-xl space-y-6 shadow-2xl animate-in zoom-in-95 duration-150">
             <div>
-              <h3 className="text-sm font-black uppercase text-[var(--accent-text)] tracking-wider">Provision Tenant Organization</h3>
-              <p className="text-xs text-[var(--text-secondary)] mt-1">Create a brand-new multi-tenant workspace.</p>
+              <h3 className="text-base font-black text-[var(--text-primary)]">Create Client Company</h3>
+              <p className="text-xs text-[var(--text-secondary)] mt-1">
+                Provision a new workspace, select purchased engineering modules, and generate a Stripe Checkout subscription link.
+              </p>
             </div>
+
+            {createdCheckoutUrl ? (
+              <div className="space-y-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-5 text-xs">
+                <div className="font-bold text-emerald-300 text-sm">
+                  🎉 {createdOrgName} Created Successfully!
+                </div>
+                <p className="text-[var(--text-secondary)] leading-relaxed">
+                  Send this Stripe Checkout link to the client's account owner to complete their subscription payment:
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={createdCheckoutUrl}
+                    className="flex-1 bg-[var(--surface-2)] border border-[var(--border)] px-3 py-2 rounded-lg font-mono text-[11px] text-[var(--text-primary)] select-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(createdCheckoutUrl, 'Stripe Checkout link')}
+                    className="px-3.5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold rounded-lg transition text-xs shrink-0 cursor-pointer shadow-xs"
+                  >
+                    Copy Link
+                  </button>
+                </div>
+                <div className="pt-2 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCreateOrgOpen(false)
+                      setCreatedCheckoutUrl(null)
+                      setNewOrgName('')
+                      setNewOrgOwnerEmail('')
+                    }}
+                    className="px-4 py-2 bg-[var(--surface-2)] text-[var(--text-primary)] font-bold rounded-lg text-xs"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleCreateOrgSubmit} className="space-y-5">
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider mb-1">
+                      Company / Organization Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Apex Infrastructure Partners"
+                      value={newOrgName}
+                      onChange={(e) => setNewOrgName(e.target.value)}
+                      className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3.5 py-2.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] font-semibold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider mb-1">
+                      Client Owner Email Address (Optional)
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="owner@clientcompany.com"
+                      value={newOrgOwnerEmail}
+                      onChange={(e) => setNewOrgOwnerEmail(e.target.value)}
+                      className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3.5 py-2.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] font-semibold"
+                    />
+                  </div>
+
+                  {/* Modules Multi-select with Custom Prices */}
+                  <div className="pt-2 border-t border-[var(--border)]">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider">
+                        Select Purchased Modules & Custom Monthly Pricing ($/mo)
+                      </label>
+                      <div className="text-xs font-black text-emerald-400 font-mono">
+                        Total: {computedModalMonthlyTotal.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}/mo
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                      {data.modules.map(mod => {
+                        const isSelected = selectedModulePrices[mod.id]?.selected ?? false
+                        const priceDollars = selectedModulePrices[mod.id]?.priceDollars ?? (mod.defaultMonthlyPriceCents / 100)
+
+                        return (
+                          <div
+                            key={mod.id}
+                            className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 transition ${
+                              isSelected
+                                ? 'bg-indigo-500/10 border-indigo-500/40 text-[var(--text-primary)]'
+                                : 'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text-secondary)] opacity-60'
+                            }`}
+                          >
+                            <label className="flex items-center gap-2.5 cursor-pointer flex-1 min-w-0">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleModuleSelection(mod.id)}
+                                className="w-4 h-4 accent-indigo-600 rounded cursor-pointer shrink-0"
+                              />
+                              <div className="min-w-0">
+                                <div className="font-bold text-xs truncate">{mod.name}</div>
+                                <div className="text-[10px] text-[var(--text-tertiary)] truncate">{mod.description || mod.id}</div>
+                              </div>
+                            </label>
+
+                            {isSelected && (
+                              <div className="flex items-center gap-1 shrink-0">
+                                <span className="text-xs font-bold text-[var(--text-tertiary)]">$</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="1"
+                                  value={priceDollars}
+                                  onChange={(e) => updateModulePriceInModal(mod.id, parseFloat(e.target.value) || 0)}
+                                  className="w-20 bg-[var(--surface-1)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs font-mono font-bold text-[var(--text-primary)] text-right focus:outline-none focus:border-[var(--accent)]"
+                                />
+                                <span className="text-[10px] text-[var(--text-tertiary)]">/mo</span>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2.5 pt-3 border-t border-[var(--border)]">
+                  <button
+                    type="button"
+                    onClick={() => setIsCreateOrgOpen(false)}
+                    disabled={isPending}
+                    className="px-4 py-2 text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isPending}
+                    className="px-5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs flex items-center gap-2"
+                  >
+                    {isPending && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                    Create & Generate Checkout
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EDIT MODULE */}
+      {editingModule && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-xs" onClick={() => setEditingModule(null)} />
+          <form onSubmit={handleSaveModule} className="relative bg-[var(--surface-1)] border border-[var(--border-strong)] p-6 md:p-8 rounded-2xl w-full max-w-md space-y-4 shadow-2xl animate-in zoom-in-95 duration-150">
+            <div>
+              <h3 className="text-base font-black text-[var(--text-primary)]">Edit Module: {editingModule.name}</h3>
+              <p className="text-xs text-[var(--text-secondary)] mt-1">Configure default catalog monthly pricing and map your Stripe Price ID.</p>
+            </div>
+
             <div className="space-y-3">
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider">Organization Name</label>
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider mb-1">Module Name</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Apex Telecom Group"
-                  value={newOrgName}
-                  onChange={(e) => setNewOrgName(e.target.value)}
-                  className="bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3.5 py-2 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] font-semibold"
+                  value={moduleName}
+                  onChange={(e) => setModuleName(e.target.value)}
+                  className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3.5 py-2 text-xs text-[var(--text-primary)] font-semibold"
                 />
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider">Primary Owner Email (Optional)</label>
-                <input
-                  type="email"
-                  placeholder="owner@company.com"
-                  value={newOrgOwnerEmail}
-                  onChange={(e) => setNewOrgOwnerEmail(e.target.value)}
-                  className="bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3.5 py-2 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] font-semibold"
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider mb-1">Description</label>
+                <textarea
+                  rows={2}
+                  value={moduleDesc}
+                  onChange={(e) => setModuleDesc(e.target.value)}
+                  className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3.5 py-2 text-xs text-[var(--text-primary)]"
                 />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider mb-1">
+                  Default Monthly Catalog Price ($ USD / mo)
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-[var(--text-tertiary)]">$</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    required
+                    value={modulePriceDollars}
+                    onChange={(e) => setModulePriceDollars(parseFloat(e.target.value) || 0)}
+                    className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3.5 py-2 text-xs text-[var(--text-primary)] font-mono font-bold"
+                  />
+                  <span className="text-xs text-[var(--text-tertiary)] font-bold">/mo</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider mb-1">
+                  Stripe Recurring Price ID (e.g. price_1N...)
+                </label>
+                <input
+                  type="text"
+                  placeholder="price_..."
+                  value={moduleStripePriceId}
+                  onChange={(e) => setModuleStripePriceId(e.target.value)}
+                  className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3.5 py-2 text-xs text-[var(--text-primary)] font-mono font-semibold"
+                />
+                <p className="text-[10px] text-[var(--text-tertiary)] mt-1">
+                  Paste the recurring Price ID from your Stripe Dashboard Product Catalog.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="moduleIsActiveCheck"
+                  checked={moduleIsActive}
+                  onChange={(e) => setModuleIsActive(e.target.checked)}
+                  className="w-4 h-4 accent-indigo-600 rounded cursor-pointer"
+                />
+                <label htmlFor="moduleIsActiveCheck" className="text-xs font-bold text-[var(--text-primary)] cursor-pointer">
+                  Module is Active in Catalog
+                </label>
               </div>
             </div>
-            <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
+
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-[var(--border)]">
               <button
                 type="button"
-                onClick={() => setIsCreateOrgOpen(false)}
-                disabled={isCreatingOrg}
-                className="px-4 py-2 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition"
+                onClick={() => setEditingModule(null)}
+                className="px-4 py-2 text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={isCreatingOrg}
-                className="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg text-xs font-bold transition cursor-pointer shadow-xs flex items-center gap-1.5"
+                disabled={isPending}
+                className="px-5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs"
               >
-                {isCreatingOrg && <span className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin shrink-0" />}
-                Create Tenant
+                Save Module
               </button>
             </div>
           </form>
         </div>
       )}
 
-      {/* Modal: Metadata JSON Inspector */}
-      {inspectMetadata && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-xs" onClick={() => setInspectMetadata(null)} />
-          <div className="relative bg-[var(--surface-1)] border border-[var(--border-strong)] p-6 rounded-2xl w-full max-w-lg space-y-4 shadow-2xl animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-black uppercase text-[var(--accent-text)] tracking-wider">{inspectMetadata.title}</h3>
-              <button onClick={() => setInspectMetadata(null)} className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] text-xs font-bold">
-                ✕
-              </button>
-            </div>
-            <pre className="bg-[var(--surface-2)] p-4 rounded-xl text-xs font-mono text-[var(--text-primary)] overflow-x-auto max-h-72 border border-[var(--border)]">
-              {JSON.stringify(inspectMetadata.json, null, 2)}
-            </pre>
-            <div className="flex justify-end pt-2 border-t border-[var(--border)]">
-              <button
-                type="button"
-                onClick={() => setInspectMetadata(null)}
-                className="px-4 py-2 bg-[var(--surface-2)] text-[var(--text-primary)] hover:bg-[var(--surface-hover)] rounded-lg text-xs font-bold transition"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Confirm Modal: Delete Organization */}
+      {/* CONFIRM MODAL: DELETE ORG */}
       <ConfirmModal
         isOpen={Boolean(orgToDelete)}
-        title={`¿Eliminar Tenant "${orgToDelete?.name}"?`}
-        message="Esta acción es irreversible y eliminará todos los proyectos, asignaciones y miembros pertenecientes a esta organización."
-        confirmText="Eliminar Organización"
-        cancelText="Cancelar"
+        title={`Delete Organization "${orgToDelete?.name}"?`}
+        message="This action will permanently delete the organization, its associated project data, and member associations. This cannot be undone."
+        confirmText="Delete Organization"
+        cancelText="Cancel"
         variant="danger"
-        isLoading={isDeletingOrg}
+        isLoading={isPending}
         onConfirm={handleConfirmDeleteOrg}
         onCancel={() => setOrgToDelete(null)}
       />
 
-      {/* Confirm Modal: Toggle Platform Admin Status */}
+      {/* CONFIRM MODAL: TOGGLE ADMIN */}
       <ConfirmModal
         isOpen={Boolean(userToToggleAdmin)}
-        title={
-          userToToggleAdmin?.newStatus
-            ? `¿Otorgar rol de Superadmin de Plataforma a ${userToToggleAdmin?.user.fullName}?`
-            : `¿Revocar rol de Superadmin de Plataforma a ${userToToggleAdmin?.user.fullName}?`
-        }
+        title={userToToggleAdmin?.isPlatformAdmin ? `Revoke Superadmin from ${userToToggleAdmin?.email}?` : `Grant Superadmin to ${userToToggleAdmin?.email}?`}
         message={
-          userToToggleAdmin?.newStatus
-            ? `El usuario ${userToToggleAdmin?.user.email} tendrá acceso completo para administrar todas las organizaciones, proyectos y registros de auditoría de toda la plataforma.`
-            : `El usuario ${userToToggleAdmin?.user.email} perderá acceso al panel de administración general (/admin).`
+          userToToggleAdmin?.isPlatformAdmin
+            ? 'This user will lose access to the /admin platform console and cross-tenant management.'
+            : 'This user will gain full unrestricted superadmin access to all tenant organizations, billing management, and platform controls.'
         }
-        confirmText={userToToggleAdmin?.newStatus ? 'Otorgar Superadmin' : 'Revocar Acceso'}
-        cancelText="Cancelar"
-        variant={userToToggleAdmin?.newStatus ? 'default' : 'danger'}
-        isLoading={isTogglingAdmin}
+        confirmText={userToToggleAdmin?.isPlatformAdmin ? 'Revoke Superadmin' : 'Grant Superadmin'}
+        cancelText="Cancel"
+        variant={userToToggleAdmin?.isPlatformAdmin ? 'danger' : 'primary'}
+        isLoading={isPending}
         onConfirm={handleConfirmToggleAdmin}
         onCancel={() => setUserToToggleAdmin(null)}
       />
