@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import React from 'react'
 import Link from 'next/link'
@@ -7,10 +7,11 @@ import { usePathname } from 'next/navigation'
 interface MainSidebarProps {
   userEmail?: string | null
   userName?: string | null
+  isPlatformAdmin?: boolean
   onSignOut: () => void
 }
 
-export default function MainSidebar({ userEmail, userName, onSignOut }: MainSidebarProps) {
+export default function MainSidebar({ userEmail, userName, isPlatformAdmin, onSignOut }: MainSidebarProps) {
   const pathname = usePathname()
 
   const items = [
@@ -64,6 +65,23 @@ export default function MainSidebar({ userEmail, userName, onSignOut }: MainSide
       enabled: true,
       active: pathname === '/settings',
     },
+    ...(isPlatformAdmin
+      ? [
+          {
+            id: 'admin',
+            label: 'Platform Admin',
+            icon: (
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+            ),
+            href: '/admin',
+            enabled: true,
+            active: pathname.startsWith('/admin'),
+            highlight: true,
+          },
+        ]
+      : []),
   ]
 
   return (
@@ -88,6 +106,8 @@ export default function MainSidebar({ userEmail, userName, onSignOut }: MainSide
                 className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all group relative ${
                   item.active
                     ? 'bg-[var(--surface-2)] text-[var(--text-primary)] font-semibold border-l-2 border-l-[var(--accent)]'
+                    : item.highlight
+                    ? 'text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10'
                     : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]'
                 }`}
               >
@@ -112,6 +132,9 @@ export default function MainSidebar({ userEmail, userName, onSignOut }: MainSide
           <span className="absolute left-16 bottom-0 bg-[var(--surface-1)] text-[var(--text-primary)] text-xs font-semibold p-3 rounded-xl border border-[var(--border)] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 shadow-md">
             <p className="text-[var(--text-primary)] font-bold">{userName || 'User'}</p>
             <p className="text-[10px] text-[var(--text-tertiary)] mt-0.5">{userEmail}</p>
+            {isPlatformAdmin && (
+              <p className="text-[9px] font-black uppercase text-indigo-600 dark:text-indigo-400 mt-1">Platform Admin</p>
+            )}
           </span>
         </div>
 

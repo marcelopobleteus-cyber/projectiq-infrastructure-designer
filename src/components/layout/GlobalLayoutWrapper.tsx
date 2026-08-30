@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import React, { useEffect, useState, useTransition } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
@@ -7,6 +7,7 @@ import MainSidebar from '@/components/layout/MainSidebar'
 import ProjectsContentArea from '@/components/layout/ProjectsContentArea'
 import { createClient } from '@/utils/supabase/client'
 import { logout } from '@/app/auth/actions'
+import { BYPASS_AUTH } from '@/config/auth'
 
 interface GlobalLayoutWrapperProps {
   children: React.ReactNode
@@ -25,18 +26,20 @@ export default function GlobalLayoutWrapper({ children }: GlobalLayoutWrapperPro
     async function checkAuth() {
       try {
         const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
+        if (!user && !BYPASS_AUTH) {
           router.replace('/login')
           return
         }
         setUser(user)
 
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single()
-        setProfile(profileData || null)
+        if (user) {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single()
+          setProfile(profileData || null)
+        }
       } catch (err) {
         console.error('Auth check failed:', err)
       } finally {
@@ -64,12 +67,15 @@ export default function GlobalLayoutWrapper({ children }: GlobalLayoutWrapperPro
     )
   }
 
+  const isPlatformAdmin = Boolean(profile?.is_platform_admin) || BYPASS_AUTH
+
   return (
     <AppShell>
       {/* Narrow Primary Left Sidebar */}
       <MainSidebar
         userEmail={user?.email}
         userName={profile?.full_name || 'User'}
+        isPlatformAdmin={isPlatformAdmin}
         onSignOut={handleSignOut}
       />
 

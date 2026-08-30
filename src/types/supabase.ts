@@ -2198,25 +2198,63 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_settings: {
+        Row: {
+          description: string | null
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          description?: string | null
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Update: {
+          description?: string | null
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
+          email: string | null
           full_name: string | null
           id: string
+          is_platform_admin: boolean
           theme_preference: string | null
           updated_at: string | null
         }
         Insert: {
           avatar_url?: string | null
+          email?: string | null
           full_name?: string | null
           id: string
+          is_platform_admin?: boolean
           theme_preference?: string | null
           updated_at?: string | null
         }
         Update: {
           avatar_url?: string | null
+          email?: string | null
           full_name?: string | null
           id?: string
+          is_platform_admin?: boolean
           theme_preference?: string | null
           updated_at?: string | null
         }
