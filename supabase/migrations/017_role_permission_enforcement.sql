@@ -36,7 +36,7 @@ USING (EXISTS (
   SELECT 1 FROM public.organization_members WHERE organization_id = public.projects.organization_id AND profile_id = auth.uid()
 ));
 
-CREATE POLICY write_projects ON public.projects FOR INSERT, UPDATE, DELETE TO authenticated
+CREATE POLICY write_projects ON public.projects FOR ALL TO authenticated
 USING (public.is_org_editor_or_above(organization_id, auth.uid()))
 WITH CHECK (public.is_org_editor_or_above(organization_id, auth.uid()));
 
@@ -52,7 +52,7 @@ USING (EXISTS (
   WHERE p.id = public.camera_locations.project_id AND om.profile_id = auth.uid()
 ));
 
-CREATE POLICY write_camera_locations ON public.camera_locations FOR INSERT, UPDATE, DELETE TO authenticated
+CREATE POLICY write_camera_locations ON public.camera_locations FOR ALL TO authenticated
 USING (EXISTS (
   SELECT 1 FROM public.projects p
   WHERE p.id = public.camera_locations.project_id AND public.is_org_editor_or_above(p.organization_id, auth.uid())
@@ -74,7 +74,7 @@ USING (EXISTS (
   WHERE p.id = public.network_devices.project_id AND om.profile_id = auth.uid()
 ));
 
-CREATE POLICY write_network_devices ON public.network_devices FOR INSERT, UPDATE, DELETE TO authenticated
+CREATE POLICY write_network_devices ON public.network_devices FOR ALL TO authenticated
 USING (EXISTS (
   SELECT 1 FROM public.projects p
   WHERE p.id = public.network_devices.project_id AND public.is_org_editor_or_above(p.organization_id, auth.uid())
@@ -91,19 +91,22 @@ DROP POLICY IF EXISTS write_switch_ports ON public.switch_ports;
 
 CREATE POLICY select_switch_ports ON public.switch_ports FOR SELECT TO authenticated
 USING (EXISTS (
-  SELECT 1 FROM public.projects p
+  SELECT 1 FROM public.network_devices nd
+  JOIN public.projects p ON nd.project_id = p.id
   JOIN public.organization_members om ON p.organization_id = om.organization_id
-  WHERE p.id = public.switch_ports.project_id AND om.profile_id = auth.uid()
+  WHERE nd.id = public.switch_ports.network_device_id AND om.profile_id = auth.uid()
 ));
 
-CREATE POLICY write_switch_ports ON public.switch_ports FOR INSERT, UPDATE, DELETE TO authenticated
+CREATE POLICY write_switch_ports ON public.switch_ports FOR ALL TO authenticated
 USING (EXISTS (
-  SELECT 1 FROM public.projects p
-  WHERE p.id = public.switch_ports.project_id AND public.is_org_editor_or_above(p.organization_id, auth.uid())
+  SELECT 1 FROM public.network_devices nd
+  JOIN public.projects p ON nd.project_id = p.id
+  WHERE nd.id = public.switch_ports.network_device_id AND public.is_org_editor_or_above(p.organization_id, auth.uid())
 ))
 WITH CHECK (EXISTS (
-  SELECT 1 FROM public.projects p
-  WHERE p.id = public.switch_ports.project_id AND public.is_org_editor_or_above(p.organization_id, auth.uid())
+  SELECT 1 FROM public.network_devices nd
+  JOIN public.projects p ON nd.project_id = p.id
+  WHERE nd.id = public.switch_ports.network_device_id AND public.is_org_editor_or_above(p.organization_id, auth.uid())
 ));
 
 -- Field Tasks Policies
@@ -118,7 +121,7 @@ USING (EXISTS (
   WHERE p.id = public.field_tasks.project_id AND om.profile_id = auth.uid()
 ));
 
-CREATE POLICY write_field_tasks ON public.field_tasks FOR INSERT, UPDATE, DELETE TO authenticated
+CREATE POLICY write_field_tasks ON public.field_tasks FOR ALL TO authenticated
 USING (EXISTS (
   SELECT 1 FROM public.projects p
   WHERE p.id = public.field_tasks.project_id AND public.is_org_editor_or_above(p.organization_id, auth.uid())
@@ -140,7 +143,7 @@ USING (EXISTS (
   WHERE p.id = public.camera_tasks.project_id AND om.profile_id = auth.uid()
 ));
 
-CREATE POLICY write_camera_tasks ON public.camera_tasks FOR INSERT, UPDATE, DELETE TO authenticated
+CREATE POLICY write_camera_tasks ON public.camera_tasks FOR ALL TO authenticated
 USING (EXISTS (
   SELECT 1 FROM public.projects p
   WHERE p.id = public.camera_tasks.project_id AND public.is_org_editor_or_above(p.organization_id, auth.uid())
@@ -162,7 +165,7 @@ USING (EXISTS (
   WHERE p.id = public.bom_items.project_id AND om.profile_id = auth.uid()
 ));
 
-CREATE POLICY write_bom_items ON public.bom_items FOR INSERT, UPDATE, DELETE TO authenticated
+CREATE POLICY write_bom_items ON public.bom_items FOR ALL TO authenticated
 USING (EXISTS (
   SELECT 1 FROM public.projects p
   WHERE p.id = public.bom_items.project_id AND public.is_org_editor_or_above(p.organization_id, auth.uid())

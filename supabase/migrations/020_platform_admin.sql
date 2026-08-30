@@ -1,4 +1,4 @@
-﻿-- Migration: 020_platform_admin.sql
+-- Migration: 020_platform_admin.sql
 -- Description: Adds platform superadmin role flag to profiles, creates platform_settings table,
 -- configures global RLS bypass policies for platform superadmins across all tenants, and seeds initial platform settings.
 
