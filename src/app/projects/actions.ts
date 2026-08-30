@@ -429,3 +429,106 @@ export async function deleteProject(projectId: string): Promise<{ success?: bool
     return { error: err.message || 'Failed to delete project from database.' }
   }
 }
+
+export type ProjectStatusType = 'planning' | 'in_progress' | 'on_hold' | 'completed' | 'closed'
+
+export async function updateProjectStatus(
+  projectId: string,
+  status: ProjectStatusType
+): Promise<{ success?: boolean; error?: string }> {
+  const validStatuses = ['planning', 'in_progress', 'on_hold', 'completed', 'closed']
+  if (!validStatuses.includes(status)) {
+    return { error: 'Invalid project status value.' }
+  }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user && !BYPASS_AUTH) return { error: 'Not authenticated' }
+
+  const { data: project } = await supabase
+    .from('projects')
+    .select('organization_id')
+    .eq('id', projectId)
+    .single()
+
+  if (!project) return { error: 'Project not found' }
+
+  if (user) {
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', project.organization_id)
+      .eq('profile_id', user.id)
+      .single()
+
+    if (!membership && !BYPASS_AUTH) return { error: 'Access denied' }
+  }
+
+  const { error } = await supabase
+    .from('projects')
+    .update({ status: status as any, updated_at: new Date().toISOString() })
+    .eq('id', projectId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/projects')
+  revalidatePath(`/projects/${projectId}`)
+  revalidatePath(`/projects/${projectId}/overview`)
+
+  return { success: true }
+}
+
+export async function syncProjectStatusFromTasks(projectId: string) {
+  try {
+    const supabase = await createClient()
+
+    // 1. Fetch current project status
+    const { data: project } = await supabase
+      .from('projects')
+      .select('status')
+      .eq('id', projectId)
+      .single()
+
+    if (!project) return
+
+    const currentStatus = project.status as string
+
+    // CRITICAL REQUIREMENT: If project is currently on_hold or closed, DO NOT auto-update!
+    if (currentStatus === 'on_hold' || currentStatus === 'closed') {
+      return
+    }
+
+    // 2. Fetch all camera_tasks for this project
+    const { data: tasks } = await supabase
+      .from('camera_tasks')
+      .select('status')
+      .eq('project_id', projectId)
+
+    const tasksTotal = tasks?.length || 0
+    const tasksComplete = (tasks || []).filter(t => t.status === 'Complete').length
+
+    let newStatus: ProjectStatusType = 'planning'
+
+    if (tasksTotal === 0) {
+      newStatus = 'planning'
+    } else if (tasksComplete === tasksTotal) {
+      newStatus = 'completed'
+    } else {
+      newStatus = 'in_progress'
+    }
+
+    if (newStatus !== currentStatus) {
+      await supabase
+        .from('projects')
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', projectId)
+
+      revalidatePath('/projects')
+      revalidatePath(`/projects/${projectId}`)
+      revalidatePath(`/projects/${projectId}/overview`)
+    }
+  } catch (err) {
+    console.error('Error syncing project status from tasks:', err)
+  }
+}
+

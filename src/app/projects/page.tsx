@@ -41,10 +41,40 @@ export default async function ProjectsPage() {
     projects = (data && data.length > 0) ? data : [DEMO_PROJECT]
   }
 
-  projects.sort((a, b) => {
-    const timeA = new Date(a.updated_at || a.created_at).getTime()
-    const timeB = new Date(b.updated_at || b.created_at).getTime()
-    return timeB - timeA
+  const projectIds = projects.map(p => p.id)
+  let taskStatsMap: Record<string, { total: number; complete: number }> = {}
+  if (projectIds.length > 0) {
+    const { data: taskRows } = await supabase
+      .from('camera_tasks')
+      .select('project_id, status')
+      .in('project_id', projectIds)
+
+    for (const t of taskRows || []) {
+      if (!t.project_id) continue
+      if (!taskStatsMap[t.project_id]) {
+        taskStatsMap[t.project_id] = { total: 0, complete: 0 }
+      }
+      taskStatsMap[t.project_id].total += 1
+      if (t.status === 'Complete') {
+        taskStatsMap[t.project_id].complete += 1
+      }
+    }
+  }
+
+  const enrichedProjects = projects.map(p => {
+    const stats = taskStatsMap[p.id] || { total: 0, complete: 0 }
+    let status = p.status
+    if (!status) {
+      if (stats.total === 0) status = 'planning'
+      else if (stats.complete === stats.total) status = 'completed'
+      else status = 'in_progress'
+    }
+    return {
+      ...p,
+      status,
+      tasksTotal: stats.total,
+      tasksComplete: stats.complete
+    }
   })
 
   return (
@@ -63,7 +93,7 @@ export default async function ProjectsPage() {
         </Link>
       </div>
 
-      <ProjectGridClient initialProjects={projects} />
+      <ProjectGridClient initialProjects={enrichedProjects} />
     </div>
   )
 }

@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/server'
 import { Database } from '@/types/supabase'
 import { BYPASS_AUTH } from '@/config/auth'
 import { DEMO_CAMERAS, DEMO_TASKS } from '@/lib/demoData'
+import { syncProjectStatusFromTasks } from './actions'
 
 type CameraLocationInsert = Database['public']['Tables']['camera_locations']['Insert']
 type CameraLocationUpdate = Database['public']['Tables']['camera_locations']['Update']
@@ -993,6 +994,7 @@ export async function createFieldTask(params: {
     return { error: `Failed to create field task: ${error.message}` }
   }
 
+  await syncProjectStatusFromTasks(params.projectId)
   revalidatePath(`/projects/${params.projectId}/tasks`)
   return { success: true, data }
 }
@@ -1043,6 +1045,7 @@ export async function updateFieldTask(params: {
     return { error: `Failed to update field task: ${error.message}` }
   }
 
+  await syncProjectStatusFromTasks(params.projectId)
   revalidatePath(`/projects/${params.projectId}/tasks`)
   return { success: true, data }
 }
@@ -1079,6 +1082,7 @@ export async function deleteFieldTask(params: {
     return { error: `Failed to delete field task: ${error.message}` }
   }
 
+  await syncProjectStatusFromTasks(params.projectId)
   revalidatePath(`/projects/${params.projectId}/tasks`)
   return { success: true }
 }
