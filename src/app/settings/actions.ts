@@ -82,7 +82,7 @@ export async function getOrganizationTeamData(): Promise<OrganizationTeamData> {
   // 2. Fetch all members in organization
   const { data: memberRows } = await supabase
     .from('organization_members')
-    .select('id, profile_id, role, created_at, profiles(id, full_name)')
+    .select('id, profile_id, role, created_at, profiles(id, full_name, email)')
     .eq('organization_id', orgId)
 
   // Fetch real emails from auth.users via admin client if available
@@ -98,15 +98,27 @@ export async function getOrganizationTeamData(): Promise<OrganizationTeamData> {
     const profile = (m.profiles as any) || {}
     const fullName = profile.full_name || 'Team Member'
     
-    let email = m.profile_id === user?.id ? user.email || 'user@company.com' : ''
+    // Check if email is already available in the profiles table (added via migration 019)
+    let email = profile.email || ''
+    
+    if (!email) {
+      email = m.profile_id === user?.id ? (user?.email || 'user@company.com') : ''
+    }
     
     if (!email && adminClient) {
       try {
-        const { data: adminUser } = await adminClient.auth.admin.getUserById(m.profile_id)
+        // Hard timeout of 3 seconds to prevent indefinite hanging in Vercel
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Admin API Timeout')), 3000)
+        )
+        const fetchPromise = adminClient.auth.admin.getUserById(m.profile_id)
+        
+        const { data: adminUser } = await Promise.race([fetchPromise, timeoutPromise]) as any
         if (adminUser?.user?.email) {
           email = adminUser.user.email
         }
       } catch (e) {
+        console.warn('adminClient fetch failed or timed out:', e)
         // ignore
       }
     }
