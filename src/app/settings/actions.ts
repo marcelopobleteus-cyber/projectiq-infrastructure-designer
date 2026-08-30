@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { BYPASS_AUTH } from '@/config/auth'
 
 export interface TeamMemberItem {
@@ -32,8 +33,12 @@ export interface OrganizationTeamData {
 }
 
 export async function getOrganizationTeamData(): Promise<OrganizationTeamData> {
+  console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: START`)
   const supabase = await createClient()
+  
+  console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: fetching user`)
   const { data: { user } } = await supabase.auth.getUser()
+  console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: auth.getUser() complete, user: ${user?.id || 'none'}`)
 
   if (!user && !BYPASS_AUTH) {
     return {
@@ -50,24 +55,29 @@ export async function getOrganizationTeamData(): Promise<OrganizationTeamData> {
   let currentUserRole: 'owner' | 'admin' | 'editor' | 'viewer' = 'owner'
 
   if (user) {
-    const { data: membership } = await supabase
+    console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: fetching membership`)
+    const { data: membershipRows } = await supabase
       .from('organization_members')
       .select('organization_id, role')
       .eq('profile_id', user.id)
       .limit(1)
 
-    if (membership && membership.length > 0) {
-      orgId = membership[0].organization_id
-      currentUserRole = (membership[0].role as any) || 'owner'
+    const membership = membershipRows?.[0]
+
+    if (membership) {
+      orgId = membership.organization_id
+      currentUserRole = (membership.role as any) || 'owner'
     }
   }
 
   if (!orgId) {
+    console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: no orgId from membership, checking projects`)
     const { data: firstProj } = await supabase.from('projects').select('organization_id').limit(1)
     orgId = firstProj?.[0]?.organization_id || ''
   }
 
   if (!orgId) {
+    console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: no orgId from projects, checking organizations`)
     const { data: firstOrg } = await supabase.from('organizations').select('id').limit(1)
     orgId = firstOrg?.[0]?.id || ''
   }
@@ -75,26 +85,31 @@ export async function getOrganizationTeamData(): Promise<OrganizationTeamData> {
   // Fetch Organization Name
   let organizationName = 'Company Workspace'
   if (orgId) {
+    console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: fetching orgName`)
     const { data: orgRow } = await supabase.from('organizations').select('name').eq('id', orgId).limit(1)
     if (orgRow?.[0]?.name) organizationName = orgRow[0].name
   }
 
   // 2. Fetch all members in organization
+  console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: fetching memberRows for orgId: ${orgId}`)
   const { data: memberRows } = await supabase
     .from('organization_members')
     .select('id, profile_id, role, created_at, profiles(id, full_name, email)')
     .eq('organization_id', orgId)
+  
+  console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: memberRows fetched, count: ${memberRows?.length || 0}`)
 
   // Fetch real emails from auth.users via admin client if available
   let adminClient: any = null
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (serviceRoleKey) {
-    const { createClient: createAdminClient } = require('@supabase/supabase-js')
+    console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: creating admin client`)
     adminClient = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey)
   }
 
   const members: TeamMemberItem[] = []
   for (const m of memberRows || []) {
+    console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: processing member ${m.profile_id}`)
     const profile = (m.profiles as any) || {}
     const fullName = profile.full_name || 'Team Member'
     
@@ -107,6 +122,7 @@ export async function getOrganizationTeamData(): Promise<OrganizationTeamData> {
     
     if (!email && adminClient) {
       try {
+        console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: calling admin getUserById for ${m.profile_id}`)
         // Hard timeout of 3 seconds to prevent indefinite hanging in Vercel
         const timeoutPromise = new Promise((_, reject) => 
           setTimeout(() => reject(new Error('Admin API Timeout')), 3000)
@@ -114,11 +130,12 @@ export async function getOrganizationTeamData(): Promise<OrganizationTeamData> {
         const fetchPromise = adminClient.auth.admin.getUserById(m.profile_id)
         
         const { data: adminUser } = await Promise.race([fetchPromise, timeoutPromise]) as any
+        console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: admin getUserById resolved`)
         if (adminUser?.user?.email) {
           email = adminUser.user.email
         }
       } catch (e) {
-        console.warn('adminClient fetch failed or timed out:', e)
+        console.warn(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: adminClient fetch failed or timed out:`, e)
         // ignore
       }
     }
@@ -139,6 +156,7 @@ export async function getOrganizationTeamData(): Promise<OrganizationTeamData> {
   }
 
   // 3. Fetch pending invites in organization
+  console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: fetching pending invites`)
   const { data: inviteRows } = await supabase
     .from('organization_invites')
     .select('id, email, role, created_at, status')
@@ -146,15 +164,18 @@ export async function getOrganizationTeamData(): Promise<OrganizationTeamData> {
     .eq('status', 'pending')
     .order('created_at', { ascending: false })
 
+  console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: invites fetched, count: ${inviteRows?.length || 0}`)
+  
   const invites: PendingInviteItem[] = (inviteRows || []).map(i => ({
     id: i.id,
     email: i.email,
     role: i.role as any,
-    invitedBy: 'Admin',
+    invitedBy: 'System',
     createdAt: i.created_at,
     status: 'pending',
   }))
 
+  console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: END`)
   return {
     currentUserRole,
     organizationId: orgId,
