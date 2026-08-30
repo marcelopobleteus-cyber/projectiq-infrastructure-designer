@@ -16,6 +16,7 @@ export interface Project {
   status?: ProjectStatusType
   tasksTotal?: number
   tasksComplete?: number
+  lastUpdatedBy?: string
 }
 
 interface ProjectGridClientProps {
@@ -397,10 +398,17 @@ export default function ProjectGridClient({ initialProjects }: ProjectGridClient
 
               {/* Card Footer */}
               <div className="pt-4 border-t border-[var(--border)] flex items-center justify-between text-xs text-[var(--text-tertiary)]">
-                <span className="flex items-center gap-1.5 font-mono text-[11px]">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                  {new Date(project.created_at).toLocaleDateString()}
-                </span>
+                <div className="flex flex-col text-[11px] font-mono leading-tight">
+                  <span className="flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    {new Date(project.created_at).toLocaleDateString()}
+                  </span>
+                  {project.lastUpdatedBy && (
+                    <span className="text-[10px] text-[var(--text-tertiary)] font-sans mt-0.5 truncate max-w-[140px]" title={`By ${project.lastUpdatedBy}`}>
+                      By {project.lastUpdatedBy}
+                    </span>
+                  )}
+                </div>
 
                 <Link
                   href={`/projects/${project.id}/overview`}

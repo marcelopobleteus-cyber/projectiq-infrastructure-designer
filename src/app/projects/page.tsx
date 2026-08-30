@@ -43,6 +43,8 @@ export default async function ProjectsPage() {
 
   const projectIds = projects.map(p => p.id)
   let taskStatsMap: Record<string, { total: number; complete: number }> = {}
+  let lastUpdatedMap: Record<string, string> = {}
+
   if (projectIds.length > 0) {
     const { data: taskRows } = await supabase
       .from('camera_tasks')
@@ -59,6 +61,23 @@ export default async function ProjectsPage() {
         taskStatsMap[t.project_id].complete += 1
       }
     }
+
+    try {
+      const { data: activityRows } = await supabase
+        .from('activity_log')
+        .select('project_id, created_at, actor_id, profiles(full_name)')
+        .in('project_id', projectIds)
+        .order('created_at', { ascending: false })
+
+      for (const a of activityRows || []) {
+        if (a.project_id && !lastUpdatedMap[a.project_id]) {
+          const actorName = (a.profiles as any)?.full_name || 'System Admin'
+          lastUpdatedMap[a.project_id] = actorName
+        }
+      }
+    } catch (e) {
+      console.warn('Activity log fetch notice:', e)
+    }
   }
 
   const enrichedProjects = projects.map(p => {
@@ -73,7 +92,8 @@ export default async function ProjectsPage() {
       ...p,
       status,
       tasksTotal: stats.total,
-      tasksComplete: stats.complete
+      tasksComplete: stats.complete,
+      lastUpdatedBy: lastUpdatedMap[p.id] || 'Marcelo Poblete'
     }
   })
 
