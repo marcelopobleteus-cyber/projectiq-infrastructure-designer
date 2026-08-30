@@ -55,29 +55,28 @@ export async function getOrganizationTeamData(): Promise<OrganizationTeamData> {
       .select('organization_id, role')
       .eq('profile_id', user.id)
       .limit(1)
-      .single()
 
-    if (membership) {
-      orgId = membership.organization_id
-      currentUserRole = (membership.role as any) || 'owner'
+    if (membership && membership.length > 0) {
+      orgId = membership[0].organization_id
+      currentUserRole = (membership[0].role as any) || 'owner'
     }
   }
 
   if (!orgId) {
-    const { data: firstProj } = await supabase.from('projects').select('organization_id').limit(1).single()
-    orgId = firstProj?.organization_id || ''
+    const { data: firstProj } = await supabase.from('projects').select('organization_id').limit(1)
+    orgId = firstProj?.[0]?.organization_id || ''
   }
 
   if (!orgId) {
-    const { data: firstOrg } = await supabase.from('organizations').select('id').limit(1).single()
-    orgId = firstOrg?.id || ''
+    const { data: firstOrg } = await supabase.from('organizations').select('id').limit(1)
+    orgId = firstOrg?.[0]?.id || ''
   }
 
   // Fetch Organization Name
   let organizationName = 'Company Workspace'
   if (orgId) {
-    const { data: orgRow } = await supabase.from('organizations').select('name').eq('id', orgId).single()
-    if (orgRow?.name) organizationName = orgRow.name
+    const { data: orgRow } = await supabase.from('organizations').select('name').eq('id', orgId).limit(1)
+    if (orgRow?.[0]?.name) organizationName = orgRow[0].name
   }
 
   // 2. Fetch all members in organization
@@ -86,17 +85,41 @@ export async function getOrganizationTeamData(): Promise<OrganizationTeamData> {
     .select('id, profile_id, role, created_at, profiles(id, full_name)')
     .eq('organization_id', orgId)
 
-  // Fetch emails from auth.users (if available) or profiles
+  // Fetch real emails from auth.users via admin client if available
+  let adminClient: any = null
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (serviceRoleKey) {
+    const { createClient: createAdminClient } = require('@supabase/supabase-js')
+    adminClient = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey)
+  }
+
   const members: TeamMemberItem[] = []
   for (const m of memberRows || []) {
     const profile = (m.profiles as any) || {}
     const fullName = profile.full_name || 'Team Member'
     
+    let email = m.profile_id === user?.id ? user.email || 'user@company.com' : ''
+    
+    if (!email && adminClient) {
+      try {
+        const { data: adminUser } = await adminClient.auth.admin.getUserById(m.profile_id)
+        if (adminUser?.user?.email) {
+          email = adminUser.user.email
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    
+    if (!email) {
+      email = `${m.profile_id.substring(0, 8)}@company.com`
+    }
+
     members.push({
       id: m.id,
       profileId: m.profile_id,
       fullName,
-      email: m.profile_id === user?.id ? user.email || 'user@company.com' : `${m.profile_id.substring(0, 8)}@company.com`,
+      email,
       role: m.role as any,
       joinedAt: m.created_at || new Date().toISOString(),
       status: 'active',
@@ -148,12 +171,13 @@ export async function inviteTeamMember(
   let orgId = ''
 
   if (user) {
-    const { data: membership } = await supabase
+    const { data: membershipRows } = await supabase
       .from('organization_members')
       .select('organization_id, role')
       .eq('profile_id', user.id)
       .limit(1)
-      .single()
+
+    const membership = membershipRows?.[0]
 
     if (!membership && !BYPASS_AUTH) return { error: 'Access denied' }
     if (membership) {
@@ -211,12 +235,13 @@ export async function updateMemberRole(
   let orgId = ''
 
   if (user) {
-    const { data: membership } = await supabase
+    const { data: membershipRows } = await supabase
       .from('organization_members')
       .select('organization_id, role')
       .eq('profile_id', user.id)
       .limit(1)
-      .single()
+
+    const membership = membershipRows?.[0]
 
     if (!membership && !BYPASS_AUTH) return { error: 'Access denied' }
     if (membership) {
@@ -230,12 +255,13 @@ export async function updateMemberRole(
   }
 
   // Fetch target member
-  const { data: targetMember } = await supabase
+  const { data: targetMemberRows } = await supabase
     .from('organization_members')
     .select('id, organization_id, profile_id, role')
     .eq('id', memberId)
-    .single()
+    .limit(1)
 
+  const targetMember = targetMemberRows?.[0]
   if (!targetMember) return { error: 'Member not found.' }
 
   if (targetMember.organization_id !== orgId && !BYPASS_AUTH) {
@@ -282,12 +308,13 @@ export async function removeMember(memberId: string): Promise<{ success?: boolea
   let orgId = ''
 
   if (user) {
-    const { data: membership } = await supabase
+    const { data: membershipRows } = await supabase
       .from('organization_members')
       .select('organization_id, role')
       .eq('profile_id', user.id)
       .limit(1)
-      .single()
+
+    const membership = membershipRows?.[0]
 
     if (!membership && !BYPASS_AUTH) return { error: 'Access denied' }
     if (membership) {
@@ -301,12 +328,13 @@ export async function removeMember(memberId: string): Promise<{ success?: boolea
   }
 
   // Fetch target member
-  const { data: targetMember } = await supabase
+  const { data: targetMemberRows } = await supabase
     .from('organization_members')
     .select('id, organization_id, profile_id, role')
     .eq('id', memberId)
-    .single()
+    .limit(1)
 
+  const targetMember = targetMemberRows?.[0]
   if (!targetMember) return { error: 'Member not found.' }
 
   if (targetMember.organization_id !== orgId && !BYPASS_AUTH) {

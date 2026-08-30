@@ -22,6 +22,7 @@ export default function GlobalSettingsPage() {
   // Real team data state
   const [teamData, setTeamData] = useState<OrganizationTeamData | null>(null)
   const [loadingTeam, setLoadingTeam] = useState(false)
+  const [teamLoadError, setTeamLoadError] = useState(false)
 
   // Invite modal state
   const [isInviteOpen, setIsInviteOpen] = useState(false)
@@ -41,9 +42,16 @@ export default function GlobalSettingsPage() {
   // Load live organization team data
   const loadTeamData = async () => {
     setLoadingTeam(true)
-    const data = await getOrganizationTeamData()
-    setTeamData(data)
-    setLoadingTeam(false)
+    setTeamLoadError(false)
+    try {
+      const data = await getOrganizationTeamData()
+      setTeamData(data)
+    } catch (e) {
+      console.error('Error loading team data:', e)
+      setTeamLoadError(true)
+    } finally {
+      setLoadingTeam(false)
+    }
   }
 
   useEffect(() => {
@@ -189,7 +197,7 @@ export default function GlobalSettingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-extrabold text-[var(--text-primary)]">Users & Team Permissions</h2>
-                <p className="text-xs text-[var(--text-secondary)] mt-1">Manage team members, multi-tenant roles, and pending invitations for {teamData?.organizationName}.</p>
+                <p className="text-xs text-[var(--text-secondary)] mt-1">Manage team members, multi-tenant roles, and pending invitations{teamData?.organizationName ? ` for ${teamData.organizationName}` : ''}.</p>
               </div>
 
               {isOrgAdmin && (
@@ -204,7 +212,7 @@ export default function GlobalSettingsPage() {
               )}
             </div>
 
-            {!isOrgAdmin && (
+            {!isOrgAdmin && !teamLoadError && !loadingTeam && (
               <div className="p-3 bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-secondary)] rounded-xl text-xs font-medium flex items-center gap-2">
                 <span>🔒</span>
                 <span>Administrative controls (invites, role changes, and member removal) require Owner or Admin role.</span>
@@ -225,7 +233,14 @@ export default function GlobalSettingsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--border)] font-sans">
-                    {loadingTeam ? (
+                    {teamLoadError ? (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-8 text-center text-xs">
+                          <p className="text-[var(--danger)] font-bold mb-2">Couldn't load team members.</p>
+                          <button onClick={loadTeamData} className="text-[var(--accent)] hover:underline font-semibold cursor-pointer">Try again</button>
+                        </td>
+                      </tr>
+                    ) : loadingTeam ? (
                       <tr>
                         <td colSpan={4} className="px-4 py-8 text-center text-xs text-[var(--text-tertiary)]">Loading team members...</td>
                       </tr>
