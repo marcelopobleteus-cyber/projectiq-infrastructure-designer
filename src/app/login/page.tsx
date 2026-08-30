@@ -49,7 +49,7 @@ export default function LoginPage() {
               name="email"
               type="email"
               required
-              defaultValue="demo@nextqtechs.com"
+              defaultValue="marcelopoblete.us+test654@gmail.com"
               placeholder="you@example.com"
               className="w-full px-3.5 py-2.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)] transition-all text-xs font-semibold"
             />
