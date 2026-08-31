@@ -1,7 +1,6 @@
-﻿import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { NextResponse } from 'next/server'
 import { getStripe } from '@/utils/stripe'
-import { Database } from '@/types/supabase'
+import { createAdminClient } from '@/utils/supabase/admin'
 
 export async function POST(request: Request) {
   const stripe = getStripe()
@@ -27,9 +26,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 })
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  const supabase = createClient<Database>(supabaseUrl, supabaseKey)
+  // Use the admin client (service_role) to bypass RLS for server-to-server webhook execution
+  const supabase = createAdminClient()
 
   try {
     switch (event.type) {
@@ -51,6 +49,7 @@ export async function POST(request: Request) {
         }
 
         if (targetOrgId) {
+          // 1. Update organization billing status
           await supabase
             .from('organizations')
             .update({
@@ -60,6 +59,15 @@ export async function POST(request: Request) {
             })
             .eq('id', targetOrgId)
 
+          // 2. Activate purchased organization modules
+          await supabase
+            .from('organization_modules')
+            .update({
+              status: 'active',
+            })
+            .eq('organization_id', targetOrgId)
+
+          // 3. Log audit event
           await supabase.from('activity_log').insert({
             organization_id: targetOrgId,
             actor_id: null,
@@ -72,6 +80,8 @@ export async function POST(request: Request) {
               customer_id: customerId,
             },
           })
+
+          console.log(`[Stripe Webhook] Activated organization ${targetOrgId} from checkout session ${session.id}`)
         }
         break
       }
@@ -108,6 +118,13 @@ export async function POST(request: Request) {
             })
             .eq('id', org.id)
 
+          if (mappedStatus === 'canceled') {
+            await supabase
+              .from('organization_modules')
+              .update({ status: 'canceled' })
+              .eq('organization_id', org.id)
+          }
+
           await supabase.from('activity_log').insert({
             organization_id: org.id,
             actor_id: null,
@@ -120,6 +137,8 @@ export async function POST(request: Request) {
               current_period_end: currentPeriodEnd,
             },
           })
+
+          console.log(`[Stripe Webhook] Updated organization ${org.id} to billing_status=${mappedStatus}`)
         }
         break
       }
@@ -143,6 +162,13 @@ export async function POST(request: Request) {
             })
             .eq('id', org.id)
 
+          await supabase
+            .from('organization_modules')
+            .update({
+              status: 'canceled',
+            })
+            .eq('organization_id', org.id)
+
           await supabase.from('activity_log').insert({
             organization_id: org.id,
             actor_id: null,
@@ -151,8 +177,11 @@ export async function POST(request: Request) {
             entity_id: org.id,
             metadata: {
               subscription_id: subscriptionId,
+              customer_id: customerId,
             },
           })
+
+          console.log(`[Stripe Webhook] Canceled organization ${org.id} subscription ${subscriptionId}`)
         }
         break
       }
@@ -188,6 +217,8 @@ export async function POST(request: Request) {
               amount_due: invoice.amount_due,
             },
           })
+
+          console.log(`[Stripe Webhook] Set organization ${org.id} to past_due from failed invoice ${invoice.id}`)
         }
         break
       }
