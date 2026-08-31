@@ -220,10 +220,17 @@ export async function getPlatformOverviewData(): Promise<PlatformOverviewData | 
 
   const membersList = rawMembers || []
 
-  const { data: rawProfiles } = await supabase
+  // NOTE: `profiles` has no `created_at` column. Ordering by it made this query
+  // fail silently, leaving profilesList empty — which blanked owners, the users
+  // tab, activity actor names and the caller profile. Order by `updated_at`.
+  const { data: rawProfiles, error: profilesError } = await supabase
     .from('profiles')
     .select('*')
-    .order('created_at', { ascending: false })
+    .order('updated_at', { ascending: false })
+
+  if (profilesError) {
+    console.error('Failed to load profiles for admin console:', profilesError)
+  }
 
   const profilesList = rawProfiles || []
 
@@ -399,7 +406,7 @@ export async function getPlatformOverviewData(): Promise<PlatformOverviewData | 
     email: p.email || `${p.id.substring(0, 8)}@company.com`,
     avatarUrl: p.avatar_url || null,
     isPlatformAdmin: Boolean(p.is_platform_admin),
-    createdAt: p.created_at,
+    createdAt: p.updated_at || '',
     organizations: userOrgsMap.get(p.id) || [],
   }))
 
