@@ -44,7 +44,7 @@ export async function forgotPassword(formData: FormData) {
   })
 
   if (error) {
-    return { error: error.message }
+    console.warn('resetPasswordForEmail notice (not surfaced to client):', error.message)
   }
 
   return { success: true }
