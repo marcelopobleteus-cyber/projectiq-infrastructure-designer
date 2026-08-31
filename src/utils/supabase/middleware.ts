@@ -1,4 +1,4 @@
-﻿import { createServerClient } from '@supabase/ssr'
+import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { Database } from '@/types/supabase'
 import { BYPASS_AUTH } from '@/config/auth'
@@ -46,9 +46,21 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse
   }
 
-  // Protect protected application routes
-  const protectedPrefixes = ['/projects', '/settings', '/admin', '/dashboard', '/equipment-catalog', '/reports']
-  const isProtectedRoute = protectedPrefixes.some((prefix) => path.startsWith(prefix))
+  // Fetch platform-admin status once, reused by every check below.
+  let isPlatformAdmin = false
+  if (user) {
+    const { data: prof } = await supabase
+      .from('profiles')
+      .select('is_platform_admin')
+      .eq('id', user.id)
+      .single()
+    isPlatformAdmin = Boolean(prof?.is_platform_admin)
+  }
+
+  const tenantAppPrefixes = ['/projects', '/settings', '/dashboard', '/equipment-catalog', '/reports', '/mobile']
+  const isTenantAppRoute = tenantAppPrefixes.some((prefix) => path.startsWith(prefix))
+  const isAdminRoute = path.startsWith('/admin')
+  const isProtectedRoute = isTenantAppRoute || isAdminRoute
 
   if (isProtectedRoute && !user) {
     const url = request.nextUrl.clone()
@@ -56,15 +68,26 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Redirect logged in user away from /login, /register, and root redirect
   if ((path === '/login' || path === '/register' || path === '/') && user) {
+    const url = request.nextUrl.clone()
+    url.pathname = isPlatformAdmin ? '/admin' : '/projects'
+    return NextResponse.redirect(url)
+  }
+
+  // Full separation: a platform admin never sees the tenant app; a regular user never sees /admin.
+  if (user && isPlatformAdmin && isTenantAppRoute) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/admin'
+    return NextResponse.redirect(url)
+  }
+  if (user && !isPlatformAdmin && isAdminRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/projects'
     return NextResponse.redirect(url)
   }
 
-  // Workspace suspension / cancellation check
-  if (isProtectedRoute && user && !path.startsWith('/admin') && path !== '/inactive-workspace') {
+  // Workspace suspension / cancellation check — only runs for non-admins on tenant app routes
+  if (isTenantAppRoute && user && !isPlatformAdmin && path !== '/inactive-workspace') {
     try {
       const { data: member } = await supabase
         .from('organization_members')
@@ -75,18 +98,9 @@ export async function updateSession(request: NextRequest) {
 
       const org = (member as any)?.organizations
       if (org && (org.status === 'suspended' || org.billing_status === 'canceled')) {
-        // Check if user is platform admin (never block superadmin)
-        const { data: prof } = await supabase
-          .from('profiles')
-          .select('is_platform_admin')
-          .eq('id', user.id)
-          .single()
-
-        if (!prof?.is_platform_admin) {
-          const url = request.nextUrl.clone()
-          url.pathname = '/inactive-workspace'
-          return NextResponse.redirect(url)
-        }
+        const url = request.nextUrl.clone()
+        url.pathname = '/inactive-workspace'
+        return NextResponse.redirect(url)
       }
     } catch (e) {
       // Continue if query fails

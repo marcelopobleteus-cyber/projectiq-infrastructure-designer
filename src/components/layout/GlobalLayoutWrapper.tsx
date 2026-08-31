@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import React, { useEffect, useState, useTransition } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
@@ -41,6 +41,12 @@ export default function GlobalLayoutWrapper({ children }: GlobalLayoutWrapperPro
             .eq('id', user.id)
             .single()
           setProfile(profileData || null)
+
+          // Defense-in-depth: Platform admin should never be inside the tenant app
+          if (profileData?.is_platform_admin && !BYPASS_AUTH) {
+            router.replace('/admin')
+            return
+          }
 
           // Query organization billing status
           const { data: member } = await supabase

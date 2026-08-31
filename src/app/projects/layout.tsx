@@ -26,6 +26,11 @@ export default async function ProjectsLayout({
     .eq('id', user.id)
     .single() : { data: null }
 
+  // Defense-in-depth: Platform admins should never see the tenant app
+  if (profile?.is_platform_admin && !BYPASS_AUTH) {
+    redirect('/admin')
+  }
+
   const handleSignOut = async () => {
     'use server'
     await logout()
@@ -47,4 +52,3 @@ export default async function ProjectsLayout({
     </AppShell>
   )
 }
-

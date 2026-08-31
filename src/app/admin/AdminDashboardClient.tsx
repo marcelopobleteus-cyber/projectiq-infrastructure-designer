@@ -16,6 +16,7 @@ import {
   updatePlatformOrganization,
 } from './actions'
 import ConfirmModal from '@/components/ui/ConfirmModal'
+import { logout } from '@/app/auth/actions'
 import { createClient } from '@/utils/supabase/client'
 
 interface AdminDashboardClientProps {
@@ -75,6 +76,13 @@ export default function AdminDashboardClient({ initialData }: AdminDashboardClie
   const [systemAnnouncement, setSystemAnnouncement] = useState(initialData.platformSettings.systemAnnouncement)
   const [allowSignups, setAllowSignups] = useState(initialData.platformSettings.allowSignups)
   const [defaultProjectLimit, setDefaultProjectLimit] = useState(initialData.platformSettings.defaultProjectLimit)
+
+  const handleAdminSignOut = () => {
+    startTransition(async () => {
+      await logout()
+      window.location.href = '/login'
+    })
+  }
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToast({ message, type })
@@ -465,12 +473,13 @@ export default function AdminDashboardClient({ initialData }: AdminDashboardClie
           </div>
 
           <div className="flex items-center gap-3">
-            <Link
-              href="/projects"
-              className="px-3.5 py-2 text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--surface-2)] hover:bg-[var(--surface-hover)] border border-[var(--border)] rounded-xl transition"
+            <button
+              type="button"
+              onClick={handleAdminSignOut}
+              className="px-3.5 py-2 text-xs font-bold text-[var(--text-secondary)] hover:text-red-400 bg-[var(--surface-2)] hover:bg-red-500/10 border border-[var(--border)] hover:border-red-500/30 rounded-xl transition cursor-pointer flex items-center gap-1.5"
             >
-              ← Back to App
-            </Link>
+              <span>🚪</span> Sign Out
+            </button>
             <button
               onClick={() => {
                 setIsCreateOrgOpen(true)
