@@ -20,6 +20,12 @@ export async function login(formData: FormData) {
     return { error: error.message }
   }
 
+  try {
+    await supabase.rpc('reconcile_pending_invites')
+  } catch (e) {
+    console.error('Error reconciling pending invites during login:', e)
+  }
+
   revalidatePath('/', 'layout')
   redirect('/projects')
 }
