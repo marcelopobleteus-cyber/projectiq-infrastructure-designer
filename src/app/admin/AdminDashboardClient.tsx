@@ -13,14 +13,17 @@ import {
   deletePlatformOrganization,
   updatePlatformModule,
   toggleOrganizationSuspension,
+  updatePlatformOrganization,
 } from './actions'
 import ConfirmModal from '@/components/ui/ConfirmModal'
+import { createClient } from '@/utils/supabase/client'
 
 interface AdminDashboardClientProps {
   initialData: PlatformOverviewData
 }
 
 export default function AdminDashboardClient({ initialData }: AdminDashboardClientProps) {
+  const supabase = createClient()
   const [data, setData] = useState<PlatformOverviewData>(initialData)
   const [activeTab, setActiveTab] = useState<'overview' | 'organizations' | 'modules' | 'users' | 'activity' | 'settings'>('overview')
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
@@ -42,6 +45,18 @@ export default function AdminDashboardClient({ initialData }: AdminDashboardClie
   })
   const [createdCheckoutUrl, setCreatedCheckoutUrl] = useState<string | null>(null)
   const [createdOrgName, setCreatedOrgName] = useState<string | null>(null)
+
+  // Edit Organization Modal State
+  const [editingOrg, setEditingOrg] = useState<PlatformOrganizationItem | null>(null)
+  const [editOrgName, setEditOrgName] = useState('')
+  const [editLogoUrl, setEditLogoUrl] = useState<string | null>(null)
+  const [editContactName, setEditContactName] = useState('')
+  const [editContactEmail, setEditContactEmail] = useState('')
+  const [editContactPhone, setEditContactPhone] = useState('')
+  const [editAddress, setEditAddress] = useState('')
+  const [selectedLogoFile, setSelectedLogoFile] = useState<File | null>(null)
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null)
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false)
 
   // Module Editing State
   const [editingModule, setEditingModule] = useState<PlatformModuleItem | null>(null)
@@ -121,6 +136,119 @@ export default function AdminDashboardClient({ initialData }: AdminDashboardClie
         }
       }
     })
+  }
+
+  // Handle Open Edit Org Modal
+  const handleStartEditOrg = (org: PlatformOrganizationItem) => {
+    setEditingOrg(org)
+    setEditOrgName(org.name)
+    setEditLogoUrl(org.logoUrl)
+    setEditContactName(org.contactName || '')
+    setEditContactEmail(org.contactEmail || '')
+    setEditContactPhone(org.contactPhone || '')
+    setEditAddress(org.address || '')
+    setSelectedLogoFile(null)
+    setLogoPreviewUrl(org.logoUrl)
+  }
+
+  // Handle File Input Change for Logo
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      showToast('Please select a valid image file (PNG, JPG, SVG, WebP).', 'error')
+      return
+    }
+
+    // 2MB size limit
+    if (file.size > 2 * 1024 * 1024) {
+      showToast('Logo image must be under 2MB.', 'error')
+      return
+    }
+
+    setSelectedLogoFile(file)
+    const preview = URL.createObjectURL(file)
+    setLogoPreviewUrl(preview)
+  }
+
+  // Handle Save Edit Organization
+  const handleSaveEditOrg = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingOrg) return
+
+    if (!editOrgName.trim()) {
+      showToast('Company name cannot be empty.', 'error')
+      return
+    }
+
+    setIsUploadingLogo(true)
+    let finalLogoUrl = editLogoUrl
+
+    try {
+      if (selectedLogoFile) {
+        const fileExt = selectedLogoFile.name.split('.').pop() || 'png'
+        const filePath = `${editingOrg.id}-${Date.now()}.${fileExt}`
+
+        const { error: uploadError } = await supabase.storage
+          .from('company-logos')
+          .upload(filePath, selectedLogoFile, {
+            cacheControl: '3600',
+            upsert: true,
+          })
+
+        if (uploadError) {
+          showToast(`Failed to upload logo: ${uploadError.message}`, 'error')
+          setIsUploadingLogo(false)
+          return
+        }
+
+        const { data: publicUrlData } = supabase.storage
+          .from('company-logos')
+          .getPublicUrl(filePath)
+
+        finalLogoUrl = publicUrlData.publicUrl
+      }
+
+      startTransition(async () => {
+        const res = await updatePlatformOrganization(editingOrg.id, {
+          name: editOrgName,
+          logoUrl: finalLogoUrl,
+          contactName: editContactName,
+          contactEmail: editContactEmail,
+          contactPhone: editContactPhone,
+          address: editAddress,
+        })
+
+        setIsUploadingLogo(false)
+
+        if (res.error) {
+          showToast(res.error, 'error')
+        } else {
+          showToast('Company details updated successfully!', 'success')
+          setData(prev => ({
+            ...prev,
+            organizations: prev.organizations.map(o =>
+              o.id === editingOrg.id
+                ? {
+                    ...o,
+                    name: editOrgName.trim(),
+                    logoUrl: finalLogoUrl,
+                    contactName: editContactName.trim() || null,
+                    contactEmail: editContactEmail.trim() || null,
+                    contactPhone: editContactPhone.trim() || null,
+                    address: editAddress.trim() || null,
+                  }
+                : o
+            ),
+          }))
+          setEditingOrg(null)
+        }
+      })
+    } catch (err: any) {
+      setIsUploadingLogo(false)
+      showToast(err.message || 'Error updating organization', 'error')
+    }
   }
 
   // Handle Edit Module Click
@@ -506,7 +634,7 @@ export default function AdminDashboardClient({ initialData }: AdminDashboardClie
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-base font-black text-[var(--text-primary)]">Client Companies & Subscriptions</h2>
-                <p className="text-xs text-[var(--text-secondary)]">Manage tenant organizations, purchased engineering modules, and Stripe billing lifecycle.</p>
+                <p className="text-xs text-[var(--text-secondary)]">Manage tenant organizations, logos, contact info, purchased modules, and Stripe billing lifecycle.</p>
               </div>
               <button
                 onClick={() => {
@@ -523,25 +651,47 @@ export default function AdminDashboardClient({ initialData }: AdminDashboardClie
               {data.organizations.map(org => (
                 <div key={org.id} className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-5 shadow-xs space-y-4">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2.5">
-                        <h3 className="text-base font-black text-[var(--text-primary)]">{org.name}</h3>
-                        {getBillingBadge(org.billingStatus, org.status)}
-                      </div>
-                      <div className="text-[11px] text-[var(--text-tertiary)] mt-1 font-mono flex items-center gap-3">
-                        <span>ID: {org.id}</span>
-                        <span>•</span>
-                        <span>Created: {new Date(org.createdAt).toLocaleDateString()}</span>
-                        {org.stripeCustomerId && (
-                          <>
-                            <span>•</span>
-                            <span>Stripe: {org.stripeCustomerId}</span>
-                          </>
-                        )}
+                    <div className="flex items-start gap-3.5">
+                      {/* Logo or Default Icon */}
+                      {org.logoUrl ? (
+                        <img
+                          src={org.logoUrl}
+                          alt={org.name}
+                          className="w-12 h-12 rounded-xl object-contain bg-[var(--surface-2)] border border-[var(--border)] p-1 shrink-0"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 border border-[var(--border)] flex items-center justify-center text-lg shrink-0 text-slate-400 font-black">
+                          🏢
+                        </div>
+                      )}
+
+                      <div>
+                        <div className="flex items-center gap-2.5">
+                          <h3 className="text-base font-black text-[var(--text-primary)]">{org.name}</h3>
+                          {getBillingBadge(org.billingStatus, org.status)}
+                        </div>
+                        <div className="text-[11px] text-[var(--text-tertiary)] mt-1 font-mono flex flex-wrap items-center gap-2">
+                          <span>ID: {org.id}</span>
+                          <span>•</span>
+                          <span>Created: {new Date(org.createdAt).toLocaleDateString()}</span>
+                          {org.stripeCustomerId && (
+                            <>
+                              <span>•</span>
+                              <span>Stripe: {org.stripeCustomerId}</span>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleStartEditOrg(org)}
+                        className="px-3 py-1.5 text-xs font-bold text-[var(--text-primary)] hover:text-white bg-[var(--surface-2)] hover:bg-[var(--surface-hover)] border border-[var(--border)] rounded-xl transition cursor-pointer flex items-center gap-1.5"
+                      >
+                        <span>✏️</span> Edit
+                      </button>
                       <button
                         type="button"
                         onClick={() => handleToggleSuspension(org)}
@@ -562,6 +712,33 @@ export default function AdminDashboardClient({ initialData }: AdminDashboardClie
                       </button>
                     </div>
                   </div>
+
+                  {/* Business & Contact Information Summary */}
+                  {(org.contactName || org.contactEmail || org.contactPhone || org.address) && (
+                    <div className="bg-[var(--surface-2)]/60 border border-[var(--border)]/70 rounded-xl px-3.5 py-2 text-xs flex flex-wrap items-center justify-between gap-2 text-[var(--text-secondary)]">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-bold text-[var(--text-primary)]">Contact:</span>
+                        <span>{org.contactName || '—'}</span>
+                        {org.contactEmail && (
+                          <>
+                            <span className="text-[var(--text-tertiary)]">•</span>
+                            <span className="font-mono text-indigo-300">{org.contactEmail}</span>
+                          </>
+                        )}
+                        {org.contactPhone && (
+                          <>
+                            <span className="text-[var(--text-tertiary)]">•</span>
+                            <span>{org.contactPhone}</span>
+                          </>
+                        )}
+                      </div>
+                      {org.address && (
+                        <div className="text-[11px] text-[var(--text-tertiary)] truncate max-w-md">
+                          📍 {org.address}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Modules Purchased & MRR Breakdown */}
                   <div className="bg-[var(--surface-2)] border border-[var(--border)] rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1027,6 +1204,160 @@ export default function AdminDashboardClient({ initialData }: AdminDashboardClie
               </form>
             )}
           </div>
+        </div>
+      )}
+
+      {/* MODAL: EDIT CLIENT COMPANY */}
+      {editingOrg && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-xs" onClick={() => setEditingOrg(null)} />
+          <form onSubmit={handleSaveEditOrg} className="relative bg-[var(--surface-1)] border border-[var(--border-strong)] p-6 md:p-8 rounded-2xl w-full max-w-lg space-y-5 shadow-2xl animate-in zoom-in-95 duration-150">
+            <div>
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-black text-[var(--text-primary)]">Edit Client Company</h3>
+                <span className="text-[10px] font-mono text-[var(--text-tertiary)]">ID: {editingOrg.id.substring(0, 8)}...</span>
+              </div>
+              <p className="text-xs text-[var(--text-secondary)] mt-1">
+                Update company name, branding logo, primary contact details, and physical address.
+              </p>
+            </div>
+
+            <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+              {/* Company Name */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider mb-1">
+                  Company Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editOrgName}
+                  onChange={(e) => setEditOrgName(e.target.value)}
+                  className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3.5 py-2.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] font-semibold"
+                />
+              </div>
+
+              {/* Logo Upload & Preview */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider mb-1.5">
+                  Company Logo
+                </label>
+                <div className="flex items-center gap-4 p-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl">
+                  {logoPreviewUrl ? (
+                    <img
+                      src={logoPreviewUrl}
+                      alt="Logo preview"
+                      className="w-14 h-14 rounded-xl object-contain bg-[var(--surface-1)] border border-[var(--border)] p-1 shrink-0"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-xl shrink-0 text-slate-500 font-bold">
+                      🏢
+                    </div>
+                  )}
+
+                  <div className="flex-1 space-y-1.5 min-w-0">
+                    <input
+                      type="file"
+                      accept="image/png, image/jpeg, image/webp, image/svg+xml"
+                      onChange={handleLogoFileChange}
+                      className="block w-full text-[11px] text-[var(--text-secondary)] file:mr-2.5 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-[var(--accent)] file:text-white hover:file:bg-[var(--accent-hover)] file:cursor-pointer"
+                    />
+                    <div className="flex items-center justify-between text-[10px] text-[var(--text-tertiary)]">
+                      <span>Max size: 2MB (PNG, JPG, WebP, SVG)</span>
+                      {logoPreviewUrl && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedLogoFile(null)
+                            setLogoPreviewUrl(null)
+                            setEditLogoUrl(null)
+                          }}
+                          className="text-red-400 hover:text-red-300 font-semibold cursor-pointer"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contact Person & Email */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider mb-1">
+                    Contact Person Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. John Doe"
+                    value={editContactName}
+                    onChange={(e) => setEditContactName(e.target.value)}
+                    className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3.5 py-2 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider mb-1">
+                    Contact Email Address
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="contact@company.com"
+                    value={editContactEmail}
+                    onChange={(e) => setEditContactEmail(e.target.value)}
+                    className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3.5 py-2 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Phone & Address */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider mb-1">
+                  Contact Phone Number
+                </label>
+                <input
+                  type="text"
+                  placeholder="+1 (555) 012-3456"
+                  value={editContactPhone}
+                  onChange={(e) => setEditContactPhone(e.target.value)}
+                  className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3.5 py-2 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider mb-1">
+                  Physical / Billing Address
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="123 Main St, Suite 400, Atlanta, GA 30301"
+                  value={editAddress}
+                  onChange={(e) => setEditAddress(e.target.value)}
+                  className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3.5 py-2 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-[var(--border)]">
+              <button
+                type="button"
+                onClick={() => setEditingOrg(null)}
+                disabled={isPending || isUploadingLogo}
+                className="px-4 py-2 text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isPending || isUploadingLogo}
+                className="px-5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs flex items-center gap-2"
+              >
+                {(isPending || isUploadingLogo) && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                {isUploadingLogo ? 'Uploading Logo...' : isPending ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

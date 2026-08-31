@@ -2263,6 +2263,11 @@ export type Database = {
           id: string
           name: string
           status: 'active' | 'suspended'
+          logo_url?: string | null
+          contact_name?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          address?: string | null
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           updated_at: string | null
