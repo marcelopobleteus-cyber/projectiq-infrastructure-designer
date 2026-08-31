@@ -1,28 +1,50 @@
 'use client'
 
-import React, { useState, useTransition, Suspense } from 'react'
+import React, { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
-import { login } from '../auth/actions'
+import { createClient } from '@/utils/supabase/client'
 
-function LoginForm() {
-  const searchParams = useSearchParams()
-  const resetSuccess = searchParams.get('reset') === 'success'
-  const [error, setError] = useState<string | null>(null)
+export default function ResetPasswordPage() {
+  const router = useRouter()
+  const supabase = createClient()
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [isPending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+  const [isPending, setIsPending] = useState(false)
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setError(null)
-    const formData = new FormData(event.currentTarget)
 
-    startTransition(async () => {
-      const res = await login(formData)
-      if (res?.error) {
-        setError(res.error)
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.')
+      return
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long.')
+      return
+    }
+
+    setIsPending(true)
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({ password })
+
+      if (updateError) {
+        setError(updateError.message)
+        setIsPending(false)
+        return
       }
-    })
+
+      // Sign out to require clean login with new password
+      await supabase.auth.signOut()
+      router.push('/login?reset=success')
+    } catch (err: any) {
+      setError(err.message || 'An unexpected error occurred. Please try again.')
+      setIsPending(false)
+    }
   }
 
   return (
@@ -32,16 +54,11 @@ function LoginForm() {
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[var(--accent)] text-white mb-4 font-black text-xl tracking-wider shadow-xs">
             NQ
           </div>
-          <h1 className="text-2xl font-extrabold text-[var(--text-primary)] tracking-tight">Welcome Back</h1>
-          <p className="text-xs text-[var(--text-secondary)] mt-1.5 font-medium">Sign in to your NextQ workspace</p>
+          <h1 className="text-2xl font-extrabold text-[var(--text-primary)] tracking-tight">Set your password</h1>
+          <p className="text-xs text-[var(--text-secondary)] mt-1.5 font-medium">
+            Choose a password to access your NextQ workspace.
+          </p>
         </div>
-
-        {resetSuccess && (
-          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold p-3 rounded-lg mb-6 flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-            Password set successfully! Please sign in with your new password.
-          </div>
-        )}
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-[var(--danger)] text-xs font-semibold p-3 rounded-lg mb-6">
@@ -51,38 +68,18 @@ function LoginForm() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="email" className="block text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider mb-1.5">
-              Email Address
+            <label htmlFor="password" className="block text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider mb-1.5">
+              New Password
             </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              required
-              placeholder="you@example.com"
-              className="w-full px-3.5 py-2.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)] transition-all text-xs font-semibold"
-            />
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label htmlFor="password" className="block text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">
-                Password
-              </label>
-              <Link
-                href="/forgot-password"
-                className="text-[11px] font-semibold text-[var(--accent-text)] hover:underline"
-              >
-                Forgot password?
-              </Link>
-            </div>
             <div className="relative">
               <input
                 id="password"
                 name="password"
                 type={showPassword ? 'text' : 'password'}
                 required
-                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="At least 6 characters"
                 className="w-full px-3.5 py-2.5 pr-10 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)] transition-all text-xs font-semibold"
               />
               <button
@@ -100,23 +97,37 @@ function LoginForm() {
             </div>
           </div>
 
+          <div>
+            <label htmlFor="confirmPassword" className="block text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider mb-1.5">
+              Confirm Password
+            </label>
+            <input
+              id="confirmPassword"
+              name="confirmPassword"
+              type={showPassword ? 'text' : 'password'}
+              required
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Confirm new password"
+              className="w-full px-3.5 py-2.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)] transition-all text-xs font-semibold"
+            />
+          </div>
+
           <button
             type="submit"
             disabled={isPending}
             className="w-full py-2.5 px-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold rounded-lg transition-all shadow-xs text-xs cursor-pointer disabled:opacity-50"
           >
-            {isPending ? 'Signing In...' : 'Sign In'}
+            {isPending ? 'Saving Password...' : 'Set Password'}
           </button>
+
+          <div className="pt-2 text-center">
+            <Link href="/login" className="text-xs font-bold text-[var(--accent-text)] hover:underline">
+              ← Back to Sign In
+            </Link>
+          </div>
         </form>
       </div>
     </main>
-  )
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen bg-[var(--bg)]" />}>
-      <LoginForm />
-    </Suspense>
   )
 }

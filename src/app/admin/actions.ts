@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
+import { sendInviteEmail } from '@/utils/supabase/admin'
 import { createStripeCustomer, createStripeSubscriptionCheckout } from '@/utils/stripe'
 
 export interface PlatformModuleItem {
@@ -744,12 +745,19 @@ export async function createPlatformOrganization(
 
     // 4. If owner email is specified, create pending invitation
     if (ownerEmail && ownerEmail.trim()) {
+      const cleanOwnerEmail = ownerEmail.trim().toLowerCase()
       await supabase.from('organization_invites').insert({
         organization_id: newOrg.id,
-        email: ownerEmail.trim().toLowerCase(),
+        email: cleanOwnerEmail,
         role: 'owner',
         invited_by: user?.id,
       })
+
+      try {
+        await sendInviteEmail(cleanOwnerEmail)
+      } catch (inviteErr) {
+        console.warn('Notice: Failed to send Supabase invite email to owner:', inviteErr)
+      }
     }
 
     // 5. Log activity

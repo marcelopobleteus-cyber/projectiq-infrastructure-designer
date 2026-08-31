@@ -14,7 +14,7 @@ export async function login(formData: FormData) {
     return { error: 'Email and password are required' }
   }
 
-  const { error } = await supabase.auth.signInWithPassword({ email, password })
+  const { error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password })
 
   if (error) {
     return { error: error.message }
@@ -30,34 +30,24 @@ export async function login(formData: FormData) {
   redirect('/projects')
 }
 
-export async function register(formData: FormData) {
+export async function forgotPassword(formData: FormData) {
   const supabase = await createClient()
+  const email = (formData.get('email') as string)?.trim().toLowerCase()
 
-  const email = formData.get('email') as string
-  const password = formData.get('password') as string
-  const fullName = formData.get('fullName') as string
-
-  if (!email || !password || !fullName) {
-    return { error: 'All fields are required' }
+  if (!email) {
+    return { error: 'Email is required' }
   }
 
-  const { error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback`,
-      data: {
-        full_name: fullName,
-      },
-    },
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://designer.nextqtechs.com'
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${siteUrl}/auth/callback?next=/reset-password`,
   })
 
   if (error) {
     return { error: error.message }
   }
 
-  revalidatePath('/', 'layout')
-  redirect('/projects')
+  return { success: true }
 }
 
 export async function logout() {

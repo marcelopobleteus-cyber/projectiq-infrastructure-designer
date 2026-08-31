@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
+import { sendInviteEmail } from '@/utils/supabase/admin'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { BYPASS_AUTH } from '@/config/auth'
 
@@ -238,14 +239,9 @@ export async function inviteTeamMember(
     return { error: `Failed to create invite: ${inviteErr.message}` }
   }
 
-  // Attempt to send Supabase auth invite email (server-side only)
+  // Attempt to send Supabase auth invite email with redirect to /reset-password
   try {
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (serviceRoleKey) {
-      const { createClient: createAdminClient } = require('@supabase/supabase-js')
-      const adminClient = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey)
-      await adminClient.auth.admin.inviteUserByEmail(email.trim().toLowerCase())
-    }
+    await sendInviteEmail(email.trim().toLowerCase())
   } catch (e) {
     console.warn('Supabase auth inviteUserByEmail notice:', e)
   }

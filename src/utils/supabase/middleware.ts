@@ -38,7 +38,7 @@ export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname
 
   if (BYPASS_AUTH) {
-    if (path === '/' || path === '/login' || path === '/register') {
+    if (path === '/' || path === '/login') {
       const url = request.nextUrl.clone()
       url.pathname = '/projects'
       return NextResponse.redirect(url)
@@ -68,7 +68,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  if ((path === '/login' || path === '/register' || path === '/') && user) {
+  if ((path === '/login' || path === '/') && user) {
     const url = request.nextUrl.clone()
     url.pathname = isPlatformAdmin ? '/admin' : '/projects'
     return NextResponse.redirect(url)
