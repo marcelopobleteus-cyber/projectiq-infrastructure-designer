@@ -14,6 +14,64 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          metadata: Json | null
+          organization_id: string
+          project_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          metadata?: Json | null
+          organization_id: string
+          project_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          metadata?: Json | null
+          organization_id?: string
+          project_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_log_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_log_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bom_items: {
         Row: {
           category: string
@@ -1190,42 +1248,6 @@ export type Database = {
         }
         Relationships: []
       }
-      fiber_hardware_catalog: {
-        Row: {
-          category: string
-          created_at: string
-          description: string
-          id: string
-          manufacturer: string
-          part_number: string
-          unit: string
-          unit_cost: number
-          updated_at: string | null
-        }
-        Insert: {
-          category: string
-          created_at?: string
-          description: string
-          id?: string
-          manufacturer?: string
-          part_number: string
-          unit?: string
-          unit_cost: number
-          updated_at?: string | null
-        }
-        Update: {
-          category?: string
-          created_at?: string
-          description?: string
-          id?: string
-          manufacturer?: string
-          part_number?: string
-          unit?: string
-          unit_cost?: number
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       fiber_distribution_units: {
         Row: {
           assigned_backbone_cable_id: string | null
@@ -1406,6 +1428,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      fiber_hardware_catalog: {
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          id: string
+          manufacturer: string
+          part_number: string
+          unit: string
+          unit_cost: number
+          updated_at: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description: string
+          id?: string
+          manufacturer?: string
+          part_number: string
+          unit?: string
+          unit_cost: number
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          id?: string
+          manufacturer?: string
+          part_number?: string
+          unit?: string
+          unit_cost?: number
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       fiber_nodes: {
         Row: {
@@ -2063,6 +2121,36 @@ export type Database = {
           },
         ]
       }
+      modules: {
+        Row: {
+          created_at: string
+          default_monthly_price_cents: number
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          stripe_price_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          default_monthly_price_cents?: number
+          description?: string | null
+          id: string
+          is_active?: boolean
+          name: string
+          stripe_price_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          default_monthly_price_cents?: number
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          stripe_price_id?: string | null
+        }
+        Relationships: []
+      }
       network_devices: {
         Row: {
           cabinet_id: string | null
@@ -2138,6 +2226,54 @@ export type Database = {
           },
         ]
       }
+      organization_invites: {
+        Row: {
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string | null
+          organization_id: string
+          role: Database["public"]["Enums"]["user_role"]
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          invited_by?: string | null
+          organization_id: string
+          role?: Database["public"]["Enums"]["user_role"]
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string | null
+          organization_id?: string
+          role?: Database["public"]["Enums"]["user_role"]
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_invites_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_invites_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_members: {
         Row: {
           created_at: string
@@ -2177,36 +2313,6 @@ export type Database = {
           },
         ]
       }
-      modules: {
-        Row: {
-          created_at: string
-          default_monthly_price_cents: number
-          description: string | null
-          id: string
-          is_active: boolean
-          name: string
-          stripe_price_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          default_monthly_price_cents?: number
-          description?: string | null
-          id: string
-          is_active?: boolean
-          name: string
-          stripe_price_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          default_monthly_price_cents?: number
-          description?: string | null
-          id?: string
-          is_active?: boolean
-          name?: string
-          stripe_price_id?: string | null
-        }
-        Relationships: []
-      }
       organization_modules: {
         Row: {
           canceled_at: string | null
@@ -2215,7 +2321,7 @@ export type Database = {
           module_id: string
           organization_id: string
           price_cents: number
-          status: 'active' | 'canceled'
+          status: string
           stripe_subscription_item_id: string | null
         }
         Insert: {
@@ -2225,7 +2331,7 @@ export type Database = {
           module_id: string
           organization_id: string
           price_cents: number
-          status?: 'active' | 'canceled'
+          status?: string
           stripe_subscription_item_id?: string | null
         }
         Update: {
@@ -2235,7 +2341,7 @@ export type Database = {
           module_id?: string
           organization_id?: string
           price_cents?: number
-          status?: 'active' | 'canceled'
+          status?: string
           stripe_subscription_item_id?: string | null
         }
         Relationships: [
@@ -2252,44 +2358,54 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
       organizations: {
         Row: {
-          billing_status: 'trialing' | 'active' | 'past_due' | 'canceled'
+          address: string | null
+          billing_status: string
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
           created_at: string
           current_period_end: string | null
           id: string
+          logo_url: string | null
           name: string
-          status: 'active' | 'suspended'
-          logo_url?: string | null
-          contact_name?: string | null
-          contact_email?: string | null
-          contact_phone?: string | null
-          address?: string | null
+          status: string
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           updated_at: string | null
         }
         Insert: {
-          billing_status?: 'trialing' | 'active' | 'past_due' | 'canceled'
+          address?: string | null
+          billing_status?: string
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
           created_at?: string
           current_period_end?: string | null
           id?: string
+          logo_url?: string | null
           name: string
-          status?: 'active' | 'suspended'
+          status?: string
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           updated_at?: string | null
         }
         Update: {
-          billing_status?: 'trialing' | 'active' | 'past_due' | 'canceled'
+          address?: string | null
+          billing_status?: string
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
           created_at?: string
           current_period_end?: string | null
           id?: string
+          logo_url?: string | null
           name?: string
-          status?: 'active' | 'suspended'
+          status?: string
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           updated_at?: string | null
@@ -2325,7 +2441,7 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
       profiles: {
@@ -2370,6 +2486,7 @@ export type Database = {
           name: string
           organization_id: string
           parent_id: string | null
+          status: Database["public"]["Enums"]["project_status"]
           updated_at: string | null
         }
         Insert: {
@@ -2383,6 +2500,7 @@ export type Database = {
           name: string
           organization_id: string
           parent_id?: string | null
+          status?: Database["public"]["Enums"]["project_status"]
           updated_at?: string | null
         }
         Update: {
@@ -2396,6 +2514,7 @@ export type Database = {
           name?: string
           organization_id?: string
           parent_id?: string | null
+          status?: Database["public"]["Enums"]["project_status"]
           updated_at?: string | null
         }
         Relationships: [
@@ -2572,9 +2691,22 @@ export type Database = {
         Args: { org_id: string; user_id: string }
         Returns: boolean
       }
+      is_org_editor_or_above: {
+        Args: { org_id: string; user_id: string }
+        Returns: boolean
+      }
       is_org_member: {
         Args: { org_id: string; user_id: string }
         Returns: boolean
+      }
+      is_platform_admin: { Args: { user_id: string }; Returns: boolean }
+      reconcile_pending_invites: {
+        Args: never
+        Returns: {
+          member_role: Database["public"]["Enums"]["user_role"]
+          organization_id: string
+          organization_name: string
+        }[]
       }
       unassign_camera_from_switch_port: {
         Args: { camera_id: string }
@@ -2631,6 +2763,12 @@ export type Database = {
         | "fiber_uplink"
         | "fiber_lc"
       power_type: "poe" | "poe+" | "local" | "solar"
+      project_status:
+        | "planning"
+        | "in_progress"
+        | "on_hold"
+        | "completed"
+        | "closed"
       route_purpose:
         | "camera_backbone"
         | "camera_drop"
@@ -2639,7 +2777,7 @@ export type Database = {
         | "spare"
       splice_status: "planned" | "installed" | "tested" | "abandoned"
       task_status: "pending" | "in_progress" | "completed" | "blocked"
-      user_role: "owner" | "admin" | "member"
+      user_role: "owner" | "admin" | "member" | "editor" | "viewer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2811,6 +2949,13 @@ export const Constants = {
         "fiber_lc",
       ],
       power_type: ["poe", "poe+", "local", "solar"],
+      project_status: [
+        "planning",
+        "in_progress",
+        "on_hold",
+        "completed",
+        "closed",
+      ],
       route_purpose: [
         "camera_backbone",
         "camera_drop",
@@ -2820,7 +2965,7 @@ export const Constants = {
       ],
       splice_status: ["planned", "installed", "tested", "abandoned"],
       task_status: ["pending", "in_progress", "completed", "blocked"],
-      user_role: ["owner", "admin", "member"],
+      user_role: ["owner", "admin", "member", "editor", "viewer"],
     },
   },
 } as const
