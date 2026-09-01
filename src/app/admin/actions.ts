@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
-import { sendInviteEmail } from '@/utils/supabase/admin'
+import { createAdminClient, sendInviteEmail } from '@/utils/supabase/admin'
 import { createStripeCustomer, createStripeSubscriptionCheckout } from '@/utils/stripe'
 
 export interface PlatformModuleItem {
@@ -662,8 +662,26 @@ export async function savePlatformSetting(
 export async function createPlatformOrganization(
   name: string,
   ownerEmail?: string,
-  selectedModules?: { moduleId: string; priceCents: number }[]
-): Promise<{ success?: boolean; error?: string; organizationId?: string; checkoutUrl?: string | null }> {
+  selectedModules?: { moduleId: string; priceCents: number }[],
+  options?: {
+    /** Billing/contact address for the company. Defaults to the owner's email. */
+    contactEmail?: string
+    contactName?: string
+    contactPhone?: string
+    /**
+     * When set, the owner account is created immediately with this password and a
+     * confirmed email, instead of relying on an invitation email arriving.
+     */
+    tempPassword?: string
+  }
+): Promise<{
+  success?: boolean
+  error?: string
+  organizationId?: string
+  checkoutUrl?: string | null
+  warnings?: string[]
+  ownerProvisioned?: boolean
+}> {
   const { isAuthorized, user, supabase } = await verifyPlatformAdmin()
 
   if (!isAuthorized) {
@@ -674,6 +692,17 @@ export async function createPlatformOrganization(
     return { error: 'Organization name is required.' }
   }
 
+  const cleanOwnerEmail = ownerEmail?.trim().toLowerCase() || ''
+  const tempPassword = options?.tempPassword?.trim() || ''
+
+  if (tempPassword && !cleanOwnerEmail) {
+    return { error: 'An owner email is required to create the owner account.' }
+  }
+
+  if (tempPassword && tempPassword.length < 8) {
+    return { error: 'The temporary password must be at least 8 characters long.' }
+  }
+
   try {
     // 1. Create Organization in Supabase
     const { data: newOrg, error: orgError } = await supabase
@@ -682,6 +711,11 @@ export async function createPlatformOrganization(
         name: name.trim(),
         billing_status: 'trialing',
         status: 'active',
+        // These columns existed but were never populated at creation time, so every new
+        // company started with empty contact details until someone opened the Edit modal.
+        contact_email: options?.contactEmail?.trim() || cleanOwnerEmail || null,
+        contact_name: options?.contactName?.trim() || null,
+        contact_phone: options?.contactPhone?.trim() || null,
       })
       .select('id, name')
       .single()
@@ -708,19 +742,27 @@ export async function createPlatformOrganization(
       }
     }
 
-    // 3. Create Stripe Customer and Checkout Session if Stripe is configured
+    // 3. Create Stripe Customer and Checkout Session if Stripe is configured.
+    // Both helpers take a single params object and return { ..., error }; they are never
+    // null. Calling them positionally and reading `.id` produced an object where a URL was
+    // expected, which the modal rendered as "[object Object]".
     let checkoutUrl: string | null = null
+    const warnings: string[] = []
     try {
-      const stripeCustomer = await createStripeCustomer(
-        newOrg.id,
-        newOrg.name,
-        ownerEmail?.trim() || undefined
-      )
+      const stripeCustomer = await createStripeCustomer({
+        organizationId: newOrg.id,
+        name: newOrg.name,
+        email: ownerEmail?.trim() || '',
+      })
 
-      if (stripeCustomer) {
+      if (stripeCustomer.error) {
+        warnings.push(`Stripe customer not created: ${stripeCustomer.error}`)
+      }
+
+      if (stripeCustomer.customerId) {
         await supabase
           .from('organizations')
-          .update({ stripe_customer_id: stripeCustomer.id })
+          .update({ stripe_customer_id: stripeCustomer.customerId })
           .eq('id', newOrg.id)
 
         // Fetch stripe_price_ids for selected modules
@@ -734,38 +776,109 @@ export async function createPlatformOrganization(
           const modulePriceMap = new Map<string, string | null>()
           modsWithPrice?.forEach(m => modulePriceMap.set(m.id, m.stripe_price_id))
 
-          const stripeItems = selectedModules.map(m => ({
-            moduleId: m.moduleId,
-            priceCents: m.priceCents,
-            stripePriceId: modulePriceMap.get(m.moduleId) || null,
-          }))
+          const lineItems = selectedModules
+            .map(m => modulePriceMap.get(m.moduleId))
+            .filter((priceId): priceId is string => Boolean(priceId))
+            .map(priceId => ({ priceId, quantity: 1 }))
 
-          checkoutUrl = await createStripeSubscriptionCheckout(
-            newOrg.id,
-            stripeCustomer.id,
-            stripeItems,
-            ownerEmail?.trim() || undefined
-          )
+          if (lineItems.length === 0) {
+            warnings.push(
+              'No checkout link: the selected modules have no stripe_price_id configured.'
+            )
+          } else {
+            const checkout = await createStripeSubscriptionCheckout({
+              customerId: stripeCustomer.customerId,
+              customerEmail: ownerEmail?.trim() || undefined,
+              organizationId: newOrg.id,
+              organizationName: newOrg.name,
+              lineItems,
+            })
+
+            if (checkout.error) {
+              warnings.push(`No checkout link: ${checkout.error}`)
+            }
+            checkoutUrl = checkout.checkoutUrl ?? null
+          }
         }
       }
     } catch (stripeErr) {
       console.warn('Stripe integration notice during org creation:', stripeErr)
+      warnings.push('Stripe step failed; the workspace was still created.')
     }
 
-    // 4. If owner email is specified, create pending invitation
-    if (ownerEmail && ownerEmail.trim()) {
-      const cleanOwnerEmail = ownerEmail.trim().toLowerCase()
-      await supabase.from('organization_invites').insert({
-        organization_id: newOrg.id,
-        email: cleanOwnerEmail,
-        role: 'owner',
-        invited_by: user?.id,
-      })
+    // 4. If owner email is specified, create pending invitation.
+    //
+    // This must go through the admin client. `organization_invites` is guarded by
+    // `manage_invites: is_org_admin(organization_id, auth.uid())`, and a platform admin
+    // creating a brand-new organization is not a member of it — so the session client's
+    // insert was silently denied by RLS and no invite row was ever written.
+    // The pending invite row is what wires the owner to THIS organization. The
+    // `on_auth_user_created` trigger looks for a pending, unexpired invite matching the
+    // new user's email: if it finds one the user joins that organization with the invited
+    // role; if it does not, the trigger creates a separate "<name>'s Org" and makes them
+    // owner of that instead. So the invite must exist before the account does.
+    let ownerProvisioned = false
+
+    if (cleanOwnerEmail) {
+      let inviteRecorded = false
 
       try {
-        await sendInviteEmail(cleanOwnerEmail)
-      } catch (inviteErr) {
-        console.warn('Notice: Failed to send Supabase invite email to owner:', inviteErr)
+        const admin = createAdminClient()
+        const { error: inviteInsertError } = await admin
+          .from('organization_invites')
+          .insert({
+            organization_id: newOrg.id,
+            email: cleanOwnerEmail,
+            role: 'owner',
+            invited_by: user?.id,
+          })
+
+        if (inviteInsertError) {
+          console.error('Failed to record organization invite:', inviteInsertError)
+          warnings.push(`Invitation not recorded: ${inviteInsertError.message}`)
+        } else {
+          inviteRecorded = true
+        }
+      } catch (adminErr: any) {
+        console.error('Admin client unavailable while recording invite:', adminErr)
+        warnings.push(`Invitation not recorded: ${adminErr?.message || 'admin client unavailable'}`)
+      }
+
+      if (tempPassword) {
+        // Provision the owner directly. This path does not depend on email delivery:
+        // the account exists and can sign in as soon as this returns.
+        if (!inviteRecorded) {
+          warnings.push(
+            'Owner account not created: without the invite row the new user would land in a separate organization.'
+          )
+        } else {
+          try {
+            const admin = createAdminClient()
+            const { error: createUserError } = await admin.auth.admin.createUser({
+              email: cleanOwnerEmail,
+              password: tempPassword,
+              email_confirm: true,
+            })
+
+            if (createUserError) {
+              console.error('Failed to create owner account:', createUserError)
+              warnings.push(`Owner account not created: ${createUserError.message}`)
+            } else {
+              ownerProvisioned = true
+            }
+          } catch (createErr: any) {
+            console.error('Owner account creation threw:', createErr)
+            warnings.push(`Owner account not created: ${createErr?.message || 'unknown error'}`)
+          }
+        }
+      } else {
+        // sendInviteEmail returns { sent, error } — it does not throw. The old code only
+        // guarded against a throw, so a failed send left no trace anywhere.
+        const invite = await sendInviteEmail(cleanOwnerEmail)
+        if (!invite.sent) {
+          console.error('Invite email not sent to', cleanOwnerEmail, '-', invite.error)
+          warnings.push(`Invite email not sent: ${invite.error || 'unknown error'}`)
+        }
       }
     }
 
@@ -788,7 +901,13 @@ export async function createPlatformOrganization(
     }
 
     revalidatePath('/admin')
-    return { success: true, organizationId: newOrg.id, checkoutUrl }
+    return {
+      success: true,
+      organizationId: newOrg.id,
+      checkoutUrl,
+      warnings: warnings.length > 0 ? warnings : undefined,
+      ownerProvisioned,
+    }
   } catch (err: any) {
     return { error: err.message || 'Failed to create organization' }
   }

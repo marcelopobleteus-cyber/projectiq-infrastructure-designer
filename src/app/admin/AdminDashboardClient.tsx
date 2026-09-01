@@ -34,6 +34,8 @@ export default function AdminDashboardClient({ initialData }: AdminDashboardClie
   const [isCreateOrgOpen, setIsCreateOrgOpen] = useState(false)
   const [newOrgName, setNewOrgName] = useState('')
   const [newOrgOwnerEmail, setNewOrgOwnerEmail] = useState('')
+  const [newOrgContactEmail, setNewOrgContactEmail] = useState('')
+  const [newOrgTempPassword, setNewOrgTempPassword] = useState('')
   const [selectedModulePrices, setSelectedModulePrices] = useState<Record<string, { selected: boolean; priceDollars: number }>>(() => {
     const initial: Record<string, { selected: boolean; priceDollars: number }> = {}
     initialData.modules.forEach(m => {
@@ -130,17 +132,33 @@ export default function AdminDashboardClient({ initialData }: AdminDashboardClie
       }))
 
     startTransition(async () => {
-      const res = await createPlatformOrganization(newOrgName, newOrgOwnerEmail, selectedModules)
+      const res = await createPlatformOrganization(newOrgName, newOrgOwnerEmail, selectedModules, {
+        contactEmail: newOrgContactEmail,
+        tempPassword: newOrgTempPassword,
+      })
       if (res.error) {
         showToast(res.error, 'error')
       } else {
-        showToast('Client Organization created successfully!', 'success')
+        // The workspace can be created while the invite or the Stripe step still fails.
+        // Say so, instead of reporting an unqualified success.
+        if (res.warnings && res.warnings.length > 0) {
+          showToast(`Workspace created, but: ${res.warnings.join(' · ')}`, 'error')
+        } else if (res.ownerProvisioned) {
+          showToast(
+            `Workspace created. ${newOrgOwnerEmail} can sign in now with the temporary password.`,
+            'success'
+          )
+        } else {
+          showToast('Client Organization created successfully!', 'success')
+        }
         setCreatedOrgName(newOrgName)
         setCreatedCheckoutUrl(res.checkoutUrl || null)
         if (!res.checkoutUrl) {
           setIsCreateOrgOpen(false)
           setNewOrgName('')
           setNewOrgOwnerEmail('')
+          setNewOrgContactEmail('')
+          setNewOrgTempPassword('')
         }
       }
     })
@@ -1122,7 +1140,7 @@ export default function AdminDashboardClient({ initialData }: AdminDashboardClie
 
                   <div>
                     <label className="block text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider mb-1">
-                      Client Owner Email Address (Optional)
+                      Account Owner Email
                     </label>
                     <input
                       type="email"
@@ -1131,6 +1149,39 @@ export default function AdminDashboardClient({ initialData }: AdminDashboardClie
                       onChange={(e) => setNewOrgOwnerEmail(e.target.value)}
                       className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3.5 py-2.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] font-semibold"
                     />
+                    <p className="text-[11px] text-[var(--text-tertiary)] mt-1">
+                      This person signs in and owns the workspace.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider mb-1">
+                      Billing Contact Email (Optional)
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="Same as the owner if left empty"
+                      value={newOrgContactEmail}
+                      onChange={(e) => setNewOrgContactEmail(e.target.value)}
+                      className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3.5 py-2.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] font-semibold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider mb-1">
+                      Temporary Password (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Leave empty to send an invitation email instead"
+                      value={newOrgTempPassword}
+                      onChange={(e) => setNewOrgTempPassword(e.target.value)}
+                      className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3.5 py-2.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] font-mono"
+                    />
+                    <p className="text-[11px] text-[var(--text-tertiary)] mt-1">
+                      Creates the owner account right away, so it works without email. At least
+                      8 characters. Ask the client to change it after their first sign-in.
+                    </p>
                   </div>
 
                   {/* Modules Multi-select with Custom Prices */}

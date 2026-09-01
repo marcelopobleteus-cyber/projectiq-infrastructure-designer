@@ -370,20 +370,23 @@ export async function removeMember(memberId: string): Promise<{ success?: boolea
     return { error: 'Access denied.' }
   }
 
-  // Check last owner protection
-  if (targetMember.role === 'owner') {
-    if (callerRole !== 'owner') {
-      return { error: 'Only an owner can remove an owner.' }
+  // Nobody removes themselves. The last-owner check below is not enough on its own: an
+  // owner can promote someone else to owner and then delete their own row, which passes
+  // the count check and locks them out of the organization they were managing — with no
+  // way back from inside the app.
+  if (user && targetMember.profile_id === user.id && !BYPASS_AUTH) {
+    return {
+      error: 'You cannot remove yourself from the organization. Ask another owner to do it.',
     }
+  }
 
-    const { count: ownerCount } = await supabase
-      .from('organization_members')
-      .select('id', { count: 'exact', head: true })
-      .eq('organization_id', orgId)
-      .eq('role', 'owner')
-
-    if ((ownerCount ?? 0) <= 1) {
-      return { error: 'Cannot remove the organization’s last remaining owner.' }
+  // Owners are not removable from the client app at all — not by themselves, not by
+  // another owner. Ownership is managed by the platform administrator from /admin.
+  // Counting owners was not enough: promoting a second owner first made the count pass.
+  if (targetMember.role === 'owner') {
+    return {
+      error:
+        'Owners cannot be removed here. Contact the platform administrator to change the account owner.',
     }
   }
 
