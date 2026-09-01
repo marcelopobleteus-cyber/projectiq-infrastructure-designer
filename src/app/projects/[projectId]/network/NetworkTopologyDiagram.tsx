@@ -332,31 +332,18 @@ export default function NetworkTopologyDiagram({
         }
       })
 
-      // Link main switches directly to Router or NVR (if not linked to another switch)
+      // Link main switches directly to Router or NVR.
+      //
+      // There used to be a branch here that linked a switch to a parent switch via
+      // `sw.assigned_switch_id`. That column does not exist on `network_devices`, so the
+      // value was always undefined and the branch never ran. It was removed rather than
+      // left as dead code. To support switch-to-switch links, add the column in a
+      // migration and reinstate this with a way to assign the parent in the UI.
       switches.forEach((sw) => {
         const swId = `device-${sw.id}`
         const swPos = positions[swId]
         if (swPos) {
-          // If switch has an assigned parent switch, link it to that parent
-          if (sw.assigned_switch_id) {
-            const parentId = `device-${sw.assigned_switch_id}`
-            const parentPos = positions[parentId]
-            if (parentPos) {
-              list.push({
-                id: `link-switch-switch-${sw.id}`,
-                fromX: parentPos.x,
-                fromY: parentPos.y,
-                toX: swPos.x,
-                toY: swPos.y,
-                fromNodeId: parentId,
-                toNodeId: swId,
-                isActive: hoveredNodeId === parentId || hoveredNodeId === swId
-              })
-              return // skip linking to gateway
-            }
-          }
-
-          // Otherwise link switch to Core Gateway
+          // Link switch to Core Gateway
           list.push({
             id: `link-gateway-switch-${sw.id}`,
             fromX: gatePos.x,
