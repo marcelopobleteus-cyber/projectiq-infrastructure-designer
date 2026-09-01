@@ -1937,7 +1937,7 @@ export default function ProjectMapCanvas({
               showCameras={showCameras}
               showFiberNodes={showFiberNodes}
               showFiberRoutes={showFiberRoutes}
-              showNetworkDevices={showNetworkDevices}
+              showNetworkDevices={showDevices}
               onToggleMapEngine={() => setUseLeafletEngine(false)}
               activeEngineLabel={mapsAuthError ? 'OpenStreetMap & Satélite Esri (Fallback Activo)' : 'OpenStreetMap & Satélite Esri'}
             />
