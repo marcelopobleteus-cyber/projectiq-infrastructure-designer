@@ -291,23 +291,34 @@ export default function ProjectGridClient({ initialProjects }: ProjectGridClient
         </div>
       </div>
 
-      {/* Empty Search Results Notice */}
+      {/* Empty state — a workspace with no projects yet is not the same as a search
+          that matched nothing, and the copy has to say which one this is. */}
       {filteredAndSortedProjects.length === 0 ? (
         <div className="border border-dashed border-[var(--border-strong)] rounded-xl p-10 text-center bg-[var(--surface-1)] max-w-xl mx-auto my-8 font-sans">
           <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-[var(--surface-2)] text-[var(--text-secondary)] border border-[var(--border)] mb-3">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            {searchQuery ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            )}
           </div>
-          <h3 className="text-sm font-bold text-[var(--text-primary)]">No matching projects found</h3>
+          <h3 className="text-sm font-bold text-[var(--text-primary)]">
+            {searchQuery ? 'No matching projects found' : 'No projects yet'}
+          </h3>
           <p className="text-xs text-[var(--text-secondary)] mt-1">
-            No projects match "{searchQuery}". Try adjusting your search query.
+            {searchQuery
+              ? `No projects match "${searchQuery}". Try adjusting your search query.`
+              : 'Create your first project to start planning cameras, fiber routes and devices.'}
           </p>
-          <button
-            type="button"
-            onClick={() => setSearchQuery('')}
-            className="mt-4 px-3 py-1.5 bg-[var(--surface-2)] hover:bg-[var(--surface-hover)] border border-[var(--border)] text-[var(--text-primary)] text-xs font-bold rounded-lg transition"
-          >
-            Clear Search
-          </button>
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="mt-4 px-3 py-1.5 bg-[var(--surface-2)] hover:bg-[var(--surface-hover)] border border-[var(--border)] text-[var(--text-primary)] text-xs font-bold rounded-lg transition"
+            >
+              Clear Search
+            </button>
+          )}
         </div>
       ) : viewMode === 'grid' ? (
         /* GRID VIEW LAYOUT */

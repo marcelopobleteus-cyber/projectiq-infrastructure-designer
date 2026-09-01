@@ -2,7 +2,6 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { BYPASS_AUTH } from '@/config/auth'
-import { DEMO_PROJECT } from '@/lib/demoData'
 import ProjectGridClient from './ProjectGridClient'
 
 export default async function ProjectsPage() {
@@ -33,13 +32,14 @@ export default async function ProjectsPage() {
     }
   }
 
-  if (projects.length === 0) {
-    const { data } = await supabase
-      .from('projects')
-      .select('*')
-      .order('updated_at', { ascending: false })
-    projects = (data && data.length > 0) ? data : [DEMO_PROJECT]
-  }
+  // A workspace with no projects shows an empty state — nothing else.
+  //
+  // This used to fall back to querying every project with NO organization filter, and
+  // then to injecting DEMO_PROJECT ("Atlanta Beltline Fiber & CCTV Infrastructure Grid")
+  // when even that came back empty. A client opening their brand-new workspace was shown
+  // a project that was not theirs, with nothing marking it as a sample — which reads as a
+  // data leak between tenants. DEMO_PROJECT also carries the non-UUID id
+  // 'demo-metro-cctv', the source of "invalid input syntax for type uuid" in production.
 
   const projectIds = projects.map(p => p.id)
   let taskStatsMap: Record<string, { total: number; complete: number }> = {}

@@ -929,6 +929,21 @@ export async function deletePlatformOrganization(
       .eq('id', orgId)
       .single()
 
+    // Remove the memberships first, while the organization still exists.
+    //
+    // Deleting the organization cascades to organization_members, and the audit trigger
+    // on that table writes an activity_log row referencing the organization — which by
+    // then is gone. Postgres rejects the whole statement with a foreign key violation, so
+    // deleting any organization that still had members simply failed.
+    const { error: membersError } = await supabase
+      .from('organization_members')
+      .delete()
+      .eq('organization_id', orgId)
+
+    if (membersError) {
+      return { error: `Could not remove the organization’s members: ${membersError.message}` }
+    }
+
     const { error } = await supabase
       .from('organizations')
       .delete()
