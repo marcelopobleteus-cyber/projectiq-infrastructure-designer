@@ -386,7 +386,28 @@ export async function deleteProject(projectId: string): Promise<{ success?: bool
   }
 
   try {
-    // 1. Delete associated data from child tables to maintain referential integrity
+    // 1a. switch_ports has no project_id — it hangs off network_devices. Deleting it by
+    // project_id silently matched nothing and left orphaned rows behind on every delete.
+    // It also has to run before network_devices is deleted, so it can't sit in the
+    // parallel batch below.
+    const { data: projectDevices } = await supabase
+      .from('network_devices')
+      .select('id')
+      .eq('project_id', projectId)
+
+    if (projectDevices && projectDevices.length > 0) {
+      const { error: portsErr } = await supabase
+        .from('switch_ports')
+        .delete()
+        .in('network_device_id', projectDevices.map(d => d.id))
+
+      if (portsErr) {
+        console.error('Failed to delete switch_ports for project', projectId, portsErr)
+        return { error: 'Could not delete the project’s switch ports.' }
+      }
+    }
+
+    // 1b. Delete associated data from child tables to maintain referential integrity
     await Promise.all([
       supabase.from('camera_tasks').delete().eq('project_id', projectId),
       supabase.from('camera_fiber_assignment_strands').delete().eq('project_id', projectId),
@@ -399,7 +420,6 @@ export async function deleteProject(projectId: string): Promise<{ success?: bool
       supabase.from('fiber_route_segments').delete().eq('project_id', projectId),
       supabase.from('fiber_routes').delete().eq('project_id', projectId),
       supabase.from('fiber_nodes').delete().eq('project_id', projectId),
-      supabase.from('switch_ports').delete().eq('project_id', projectId),
       supabase.from('network_devices').delete().eq('project_id', projectId),
       supabase.from('camera_locations').delete().eq('project_id', projectId),
       supabase.from('cabinets').delete().eq('project_id', projectId),
