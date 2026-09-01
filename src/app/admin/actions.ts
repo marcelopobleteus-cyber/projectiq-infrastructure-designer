@@ -420,7 +420,9 @@ export async function getPlatformOverviewData(): Promise<PlatformOverviewData | 
       totalOrganizations: organizationsList.length,
       totalUsers: profilesList.length,
       totalProjects: projectsList.length,
-      activeProjects: projectsList.filter(p => p.status !== 'archived').length,
+      // 'archived' is not one of the project statuses, so the previous check was always
+      // true and this counted every project. Active means not finished.
+      activeProjects: projectsList.filter(p => p.status !== 'completed' && p.status !== 'closed').length,
       totalDevices: totalDevices || 0,
       totalTasks: totalTasks || 0,
       activityCount24h: recentEventsCount || 0,
