@@ -57,16 +57,30 @@ export async function updateSession(request: NextRequest) {
     isPlatformAdmin = Boolean(prof?.is_platform_admin)
   }
 
-  // The employee mobile login has its own page and must stay reachable
-  // while signed out — it is NOT part of the desktop/admin auth gate below.
-  const isMobileLoginRoute = path === '/mobile/login' || path.startsWith('/mobile/login/')
+  // The employee mobile app has its own entry point (/mobile, which decides
+  // where to send the visitor) and its own login page (/mobile/login) — both
+  // must stay reachable while signed out. Every OTHER /mobile/* route (the
+  // actual app: dashboard, projects, time, etc.) is still gated, but bounces
+  // to /mobile/login instead of the desktop/admin /login.
+  const isMobilePublicRoute =
+    path === '/mobile' || path === '/mobile/login' || path.startsWith('/mobile/login/')
+  const isMobileRoute = path === '/mobile' || path.startsWith('/mobile/')
+  const isProtectedMobileRoute = isMobileRoute && !isMobilePublicRoute
 
-  const tenantAppPrefixes = ['/projects', '/settings', '/dashboard', '/equipment-catalog', '/reports', '/mobile']
-  const isTenantAppRoute = !isMobileLoginRoute && tenantAppPrefixes.some((prefix) => path.startsWith(prefix))
+  const desktopTenantPrefixes = ['/projects', '/settings', '/dashboard', '/equipment-catalog', '/reports']
+  const isDesktopTenantRoute = desktopTenantPrefixes.some((prefix) => path.startsWith(prefix))
+  // Used further below for the admin/tenant separation and suspension checks,
+  // which should apply across the whole mobile app too (not just its gated part).
+  const isTenantAppRoute = isDesktopTenantRoute || isMobileRoute
   const isAdminRoute = path.startsWith('/admin')
-  const isProtectedRoute = isTenantAppRoute || isAdminRoute
 
-  if (isProtectedRoute && !user) {
+  if (isProtectedMobileRoute && !user) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/mobile/login'
+    return NextResponse.redirect(url)
+  }
+
+  if ((isDesktopTenantRoute || isAdminRoute) && !user) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
@@ -80,7 +94,7 @@ export async function updateSession(request: NextRequest) {
 
   // Already signed in and landed on the employee login by mistake (e.g. a
   // bookmarked link) -> send them straight into the mobile app.
-  if (isMobileLoginRoute && user) {
+  if (isMobilePublicRoute && path !== '/mobile' && user) {
     const url = request.nextUrl.clone()
     url.pathname = '/mobile/dashboard'
     return NextResponse.redirect(url)
