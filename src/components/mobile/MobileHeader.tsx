@@ -17,15 +17,20 @@ export default function MobileHeader({
   isDrawerOpen,
 }: MobileHeaderProps) {
   return (
-    <header className="h-14 bg-[var(--surface-1)] border-b border-[var(--border)] px-4 flex items-center justify-between sticky top-0 z-40 shrink-0 font-sans shadow-xs">
+    <header className="h-14 bg-[var(--surface-1)] border-b-2 border-blue-600 px-4 flex items-center justify-between sticky top-0 z-40 shrink-0 font-sans shadow-xs">
       <div className="flex items-center gap-2.5 min-w-0">
-        <Link href="/mobile/projects" className="w-8 h-8 rounded-lg bg-[var(--accent)] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
+        <Link href="/mobile/projects" className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
           NQ
         </Link>
         <div className="min-w-0">
-          <h1 className="text-sm font-extrabold text-[var(--text-primary)] tracking-tight truncate leading-tight">
-            {title}
-          </h1>
+          <div className="flex items-center gap-1.5">
+            <h1 className="text-sm font-extrabold text-[var(--text-primary)] tracking-tight truncate leading-tight">
+              {title}
+            </h1>
+            <span className="shrink-0 text-[8.5px] font-extrabold uppercase tracking-wider text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">
+              Field
+            </span>
+          </div>
           {subtitle && (
             <p className="text-[10px] text-[var(--text-secondary)] font-medium truncate leading-tight">
               {subtitle}

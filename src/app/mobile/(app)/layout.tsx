@@ -1,8 +1,15 @@
 import React from 'react'
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { BYPASS_AUTH } from '@/config/auth'
 import MobileRedirectHandler from '@/components/mobile/MobileRedirectHandler'
+
+// Distinct browser-tab title so the employee field app is never confused
+// with the admin/desktop system, even across tabs.
+export const metadata: Metadata = {
+  title: 'NextQ Field App',
+}
 
 export default async function MobileRootLayout({
   children,

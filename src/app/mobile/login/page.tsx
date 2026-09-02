@@ -27,14 +27,17 @@ export default function MobileLoginPage() {
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-[var(--bg)] p-4 font-sans">
-      <div className="w-full max-w-sm bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-7 shadow-sm">
+      <div className="w-full max-w-sm bg-[var(--surface-1)] border-2 border-blue-600 rounded-2xl p-7 shadow-sm">
         <div className="text-center mb-7">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[var(--accent)] text-white mb-4 font-black text-2xl tracking-wider shadow-xs">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-600 text-white mb-4 font-black text-2xl tracking-wider shadow-xs">
             NQ
           </div>
-          <h1 className="text-xl font-extrabold text-[var(--text-primary)] tracking-tight">Field App</h1>
+          <span className="inline-block text-[9px] font-extrabold uppercase tracking-wider text-blue-700 bg-blue-100 px-2 py-0.5 rounded mb-2">
+            Employee Field App
+          </span>
+          <h1 className="text-xl font-extrabold text-[var(--text-primary)] tracking-tight">Sign in to your shift</h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1.5 font-medium">
-            Sign in with the username and password from your invite
+            Use the username and password from your invite
           </p>
         </div>
 
@@ -56,7 +59,7 @@ export default function MobileLoginPage() {
               required
               autoComplete="username"
               placeholder="you@example.com"
-              className="w-full px-3.5 py-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)] transition-all text-sm font-semibold"
+              className="w-full px-3.5 py-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-blue-600 transition-all text-sm font-semibold"
             />
           </div>
 
@@ -72,7 +75,7 @@ export default function MobileLoginPage() {
                 required
                 autoComplete="current-password"
                 placeholder="Enter your password"
-                className="w-full px-3.5 py-3 pr-10 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)] transition-all text-sm font-semibold"
+                className="w-full px-3.5 py-3 pr-10 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-blue-600 transition-all text-sm font-semibold"
               />
               <button
                 type="button"
@@ -92,7 +95,7 @@ export default function MobileLoginPage() {
           <button
             type="submit"
             disabled={isPending}
-            className="w-full py-3 px-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold rounded-lg transition-all shadow-xs text-sm cursor-pointer disabled:opacity-50"
+            className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-all shadow-xs text-sm cursor-pointer disabled:opacity-50"
           >
             {isPending ? 'Signing In...' : 'Sign In'}
           </button>

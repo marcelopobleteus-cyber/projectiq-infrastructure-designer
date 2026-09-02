@@ -65,7 +65,7 @@ export default function MobileBottomTabs({
           href={tab.href}
           className={`flex-1 min-h-[48px] flex flex-col items-center justify-center gap-1 rounded-xl transition-all ${
             tab.active
-              ? 'text-[var(--accent-text)] font-extrabold'
+              ? 'text-blue-700 font-extrabold'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
@@ -78,7 +78,7 @@ export default function MobileBottomTabs({
         type="button"
         onClick={onToggleDrawer}
         className={`flex-1 min-h-[48px] flex flex-col items-center justify-center gap-1 rounded-xl transition-all cursor-pointer ${
-          isDrawerOpen ? 'text-[var(--accent-text)] font-extrabold' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+          isDrawerOpen ? 'text-blue-700 font-extrabold' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
         }`}
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
