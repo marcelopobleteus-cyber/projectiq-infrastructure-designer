@@ -15,31 +15,44 @@ export interface TimeTrackingEmployee {
   email: string
 }
 
+export interface TimeTrackingCostCode {
+  id: string
+  name: string
+  is_active: boolean
+}
+
 export interface TimeTrackingEntry {
   id: string
-  project_id: string
+  project_id: string | null
   project_name: string
   profile_id: string
   employee_name: string
   employee_email: string
+  cost_code_id: string | null
+  cost_code_name: string
   clock_in: string
   clock_out: string | null
+  paused_minutes: number
   work_description: string | null
 }
 
 export interface TimeTrackingData {
   currentUserRole: 'owner' | 'admin' | 'editor' | 'viewer'
+  organizationId: string
   organizationName: string
   projects: TimeTrackingProject[]
   employees: TimeTrackingEmployee[]
+  costCodes: TimeTrackingCostCode[]
   entries: TimeTrackingEntry[]
 }
 
 const EMPTY: TimeTrackingData = {
   currentUserRole: 'viewer',
+  organizationId: '',
   organizationName: 'Company Workspace',
   projects: [],
   employees: [],
+  costCodes: [],
   entries: [],
 }
 
@@ -80,6 +93,19 @@ export async function getTimeTrackingData(): Promise<TimeTrackingData> {
   const projects: TimeTrackingProject[] = (projectRows || []).map((p) => ({ id: p.id, name: p.name }))
   const projectNameById = new Map(projects.map((p) => [p.id, p.name]))
 
+  const { data: costCodeRows } = await supabase
+    .from('cost_codes')
+    .select('id, name, is_active')
+    .eq('organization_id', orgId)
+    .order('sort_order', { ascending: true })
+
+  const costCodes: TimeTrackingCostCode[] = (costCodeRows || []).map((c) => ({
+    id: c.id,
+    name: c.name,
+    is_active: c.is_active,
+  }))
+  const costCodeNameById = new Map(costCodes.map((c) => [c.id, c.name]))
+
   const { data: memberRows } = await supabase
     .from('organization_members')
     .select('profile_id, profiles(id, full_name, email)')
@@ -99,7 +125,7 @@ export async function getTimeTrackingData(): Promise<TimeTrackingData> {
 
   const { data: entryRows } = await supabase
     .from('time_entries')
-    .select('id, project_id, profile_id, clock_in, clock_out, work_description')
+    .select('id, project_id, profile_id, cost_code_id, clock_in, clock_out, paused_minutes, work_description')
     .eq('organization_id', orgId)
     .gte('clock_in', since.toISOString())
     .order('clock_in', { ascending: false })
@@ -110,22 +136,31 @@ export async function getTimeTrackingData(): Promise<TimeTrackingData> {
     return {
       id: e.id,
       project_id: e.project_id,
-      project_name: projectNameById.get(e.project_id) || 'Proyecto',
+      project_name: e.project_id ? projectNameById.get(e.project_id) || 'Proyecto' : 'Office',
       profile_id: e.profile_id,
       employee_name: emp?.name || 'Ex-miembro',
       employee_email: emp?.email || '',
+      cost_code_id: e.cost_code_id,
+      cost_code_name: e.cost_code_id ? costCodeNameById.get(e.cost_code_id) || 'Sin asignar' : 'Sin asignar',
       clock_in: e.clock_in,
       clock_out: e.clock_out,
+      paused_minutes: e.paused_minutes,
       work_description: e.work_description,
     }
   })
 
-  return { currentUserRole, organizationName, projects, employees, entries }
+  return { currentUserRole, organizationId: orgId, organizationName, projects, employees, costCodes, entries }
 }
 
 export async function updateTimeEntry(
   entryId: string,
-  updates: { clock_in?: string; clock_out?: string | null; work_description?: string | null }
+  updates: {
+    clock_in?: string
+    clock_out?: string | null
+    project_id?: string | null
+    cost_code_id?: string | null
+    work_description?: string | null
+  }
 ) {
   const supabase = await createClient()
   const { error } = await supabase.from('time_entries').update(updates).eq('id', entryId)
@@ -141,6 +176,59 @@ export async function deleteTimeEntry(entryId: string) {
   const { error } = await supabase.from('time_entries').delete().eq('id', entryId)
 
   if (error) return { error: 'No se pudo eliminar el registro. Verifica que tengas permiso de editor.' }
+
+  revalidatePath('/time-tracking')
+  return { error: null }
+}
+
+export async function createCostCode(organizationId: string, name: string) {
+  const supabase = await createClient()
+  const trimmed = name.trim()
+  if (!trimmed) return { error: 'El nombre no puede estar vacío.' }
+
+  const { data: existing } = await supabase
+    .from('cost_codes')
+    .select('sort_order')
+    .eq('organization_id', organizationId)
+    .order('sort_order', { ascending: false })
+    .limit(1)
+
+  const nextSortOrder = (existing?.[0]?.sort_order ?? -1) + 1
+
+  const { error } = await supabase
+    .from('cost_codes')
+    .insert({ organization_id: organizationId, name: trimmed, sort_order: nextSortOrder })
+
+  if (error) {
+    if (error.code === '23505') return { error: 'Ya existe un centro de costo con ese nombre.' }
+    return { error: 'No se pudo crear el centro de costo.' }
+  }
+
+  revalidatePath('/time-tracking')
+  return { error: null }
+}
+
+export async function renameCostCode(costCodeId: string, name: string) {
+  const supabase = await createClient()
+  const trimmed = name.trim()
+  if (!trimmed) return { error: 'El nombre no puede estar vacío.' }
+
+  const { error } = await supabase.from('cost_codes').update({ name: trimmed }).eq('id', costCodeId)
+
+  if (error) {
+    if (error.code === '23505') return { error: 'Ya existe un centro de costo con ese nombre.' }
+    return { error: 'No se pudo renombrar el centro de costo.' }
+  }
+
+  revalidatePath('/time-tracking')
+  return { error: null }
+}
+
+export async function setCostCodeActive(costCodeId: string, isActive: boolean) {
+  const supabase = await createClient()
+  const { error } = await supabase.from('cost_codes').update({ is_active: isActive }).eq('id', costCodeId)
+
+  if (error) return { error: 'No se pudo actualizar el centro de costo.' }
 
   revalidatePath('/time-tracking')
   return { error: null }

@@ -1160,6 +1160,44 @@ export type Database = {
           },
         ]
       }
+      cost_codes: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          organization_id: string
+          sort_order: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          organization_id: string
+          sort_order?: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          organization_id?: string
+          sort_order?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cost_codes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       enclosure_kit_items: {
         Row: {
           created_at: string
@@ -3375,37 +3413,53 @@ export type Database = {
         Row: {
           clock_in: string
           clock_out: string | null
+          cost_code_id: string | null
           created_at: string
           id: string
           organization_id: string
+          paused_at: string | null
+          paused_minutes: number
           profile_id: string
-          project_id: string
+          project_id: string | null
           updated_at: string | null
           work_description: string | null
         }
         Insert: {
           clock_in?: string
           clock_out?: string | null
+          cost_code_id?: string | null
           created_at?: string
           id?: string
           organization_id: string
+          paused_at?: string | null
+          paused_minutes?: number
           profile_id: string
-          project_id: string
+          project_id?: string | null
           updated_at?: string | null
           work_description?: string | null
         }
         Update: {
           clock_in?: string
           clock_out?: string | null
+          cost_code_id?: string | null
           created_at?: string
           id?: string
           organization_id?: string
+          paused_at?: string | null
+          paused_minutes?: number
           profile_id?: string
-          project_id?: string
+          project_id?: string | null
           updated_at?: string | null
           work_description?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "time_entries_cost_code_id_fkey"
+            columns: ["cost_code_id"]
+            isOneToOne: false
+            referencedRelation: "cost_codes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "time_entries_organization_id_fkey"
             columns: ["organization_id"]
