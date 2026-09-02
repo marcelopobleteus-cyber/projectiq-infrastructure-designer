@@ -56,6 +56,16 @@ export default function MainSidebar({ userEmail, userName, isPlatformAdmin, onSi
       active: pathname === '/reports',
     },
     {
+      id: 'time-tracking',
+      label: 'Time Tracking',
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      ),
+      href: '/time-tracking',
+      enabled: true,
+      active: pathname === '/time-tracking',
+    },
+    {
       id: 'settings',
       label: 'Settings',
       icon: (

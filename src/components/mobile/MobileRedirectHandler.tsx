@@ -33,6 +33,8 @@ export default function MobileRedirectHandler() {
         router.replace('/mobile/reports')
       } else if (pathname === '/settings') {
         router.replace('/mobile/settings')
+      } else if (pathname === '/time-tracking') {
+        router.replace('/mobile/time')
       }
     }
 
@@ -51,6 +53,8 @@ export default function MobileRedirectHandler() {
         router.replace('/reports')
       } else if (pathname === '/mobile/settings') {
         router.replace('/settings')
+      } else if (pathname === '/mobile/time') {
+        router.replace('/time-tracking')
       }
     }
   }, [pathname, router])

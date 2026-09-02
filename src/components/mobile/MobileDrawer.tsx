@@ -41,6 +41,8 @@ export default function MobileDrawer({
       targetDesktopPath = '/reports'
     } else if (pathname.includes('/settings')) {
       targetDesktopPath = '/settings'
+    } else if (pathname.includes('/mobile/time')) {
+      targetDesktopPath = '/time-tracking'
     }
 
     onClose()
@@ -50,6 +52,7 @@ export default function MobileDrawer({
   const globalNav = [
     { label: 'Dashboard', href: '/mobile/dashboard', icon: '📊' },
     { label: 'Project List', href: '/mobile/projects', icon: '📁' },
+    { label: 'Fichaje (Timecard)', href: '/mobile/time', icon: '⏱️' },
     { label: 'Executive Reports', href: '/mobile/reports', icon: '📈' },
     { label: 'Settings', href: '/mobile/settings', icon: '⚙️' },
   ]
