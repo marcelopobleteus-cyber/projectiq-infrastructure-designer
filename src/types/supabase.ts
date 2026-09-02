@@ -74,6 +74,7 @@ export type Database = {
       }
       bom_items: {
         Row: {
+          asset_condition: Database["public"]["Enums"]["asset_condition"]
           cabinet_id: string | null
           category: string
           conduit_run_id: string | null
@@ -102,6 +103,7 @@ export type Database = {
           work_scope: Database["public"]["Enums"]["work_scope"]
         }
         Insert: {
+          asset_condition?: Database["public"]["Enums"]["asset_condition"]
           cabinet_id?: string | null
           category: string
           conduit_run_id?: string | null
@@ -130,6 +132,7 @@ export type Database = {
           work_scope?: Database["public"]["Enums"]["work_scope"]
         }
         Update: {
+          asset_condition?: Database["public"]["Enums"]["asset_condition"]
           cabinet_id?: string | null
           category?: string
           conduit_run_id?: string | null
@@ -1160,6 +1163,7 @@ export type Database = {
       enclosure_kit_items: {
         Row: {
           created_at: string
+          default_asset_condition: Database["public"]["Enums"]["asset_condition"]
           description: string
           id: string
           kit_id: string
@@ -1174,6 +1178,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          default_asset_condition?: Database["public"]["Enums"]["asset_condition"]
           description: string
           id?: string
           kit_id: string
@@ -1188,6 +1193,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          default_asset_condition?: Database["public"]["Enums"]["asset_condition"]
           description?: string
           id?: string
           kit_id?: string
@@ -3361,6 +3367,64 @@ export type Database = {
             columns: ["network_device_id"]
             isOneToOne: false
             referencedRelation: "network_devices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      time_entries: {
+        Row: {
+          clock_in: string
+          clock_out: string | null
+          created_at: string
+          id: string
+          organization_id: string
+          profile_id: string
+          project_id: string
+          updated_at: string | null
+          work_description: string | null
+        }
+        Insert: {
+          clock_in?: string
+          clock_out?: string | null
+          created_at?: string
+          id?: string
+          organization_id: string
+          profile_id: string
+          project_id: string
+          updated_at?: string | null
+          work_description?: string | null
+        }
+        Update: {
+          clock_in?: string
+          clock_out?: string | null
+          created_at?: string
+          id?: string
+          organization_id?: string
+          profile_id?: string
+          project_id?: string
+          updated_at?: string | null
+          work_description?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_entries_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entries_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entries_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]

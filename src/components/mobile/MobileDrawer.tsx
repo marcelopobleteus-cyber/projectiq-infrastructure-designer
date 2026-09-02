@@ -50,6 +50,7 @@ export default function MobileDrawer({
   const globalNav = [
     { label: 'Dashboard General', href: '/mobile/dashboard', icon: '📊' },
     { label: 'Lista de Proyectos', href: '/mobile/projects', icon: '📁' },
+    { label: 'Fichaje', href: '/mobile/time', icon: '⏱️' },
     { label: 'Reportes Ejecutivos', href: '/mobile/reports', icon: '📈' },
     { label: 'Configuración', href: '/mobile/settings', icon: '⚙️' },
   ]
@@ -57,6 +58,7 @@ export default function MobileDrawer({
   const projectNav = projectId
     ? [
         { label: 'Overview del Proyecto', href: `/mobile/projects/${projectId}/overview`, icon: '🏠' },
+        { label: 'Fichaje del Proyecto', href: `/mobile/projects/${projectId}/time`, icon: '⏱️' },
         { label: 'Cámaras (CCTV)', href: `/mobile/projects/${projectId}/cameras`, icon: '📸' },
         { label: 'Fibra Óptica (OSP/ISP)', href: `/mobile/projects/${projectId}/fiber`, icon: '🧬' },
         { label: 'Networking & Switches', href: `/mobile/projects/${projectId}/network`, icon: '🔌' },
