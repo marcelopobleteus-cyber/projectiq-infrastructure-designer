@@ -57,8 +57,12 @@ export async function updateSession(request: NextRequest) {
     isPlatformAdmin = Boolean(prof?.is_platform_admin)
   }
 
+  // The employee mobile login has its own page and must stay reachable
+  // while signed out — it is NOT part of the desktop/admin auth gate below.
+  const isMobileLoginRoute = path === '/mobile/login' || path.startsWith('/mobile/login/')
+
   const tenantAppPrefixes = ['/projects', '/settings', '/dashboard', '/equipment-catalog', '/reports', '/mobile']
-  const isTenantAppRoute = tenantAppPrefixes.some((prefix) => path.startsWith(prefix))
+  const isTenantAppRoute = !isMobileLoginRoute && tenantAppPrefixes.some((prefix) => path.startsWith(prefix))
   const isAdminRoute = path.startsWith('/admin')
   const isProtectedRoute = isTenantAppRoute || isAdminRoute
 
@@ -71,6 +75,14 @@ export async function updateSession(request: NextRequest) {
   if ((path === '/login' || path === '/') && user) {
     const url = request.nextUrl.clone()
     url.pathname = isPlatformAdmin ? '/admin' : '/projects'
+    return NextResponse.redirect(url)
+  }
+
+  // Already signed in and landed on the employee login by mistake (e.g. a
+  // bookmarked link) -> send them straight into the mobile app.
+  if (isMobileLoginRoute && user) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/mobile/dashboard'
     return NextResponse.redirect(url)
   }
 
