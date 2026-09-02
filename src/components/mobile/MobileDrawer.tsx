@@ -52,7 +52,7 @@ export default function MobileDrawer({
   const globalNav = [
     { label: 'Dashboard', href: '/mobile/dashboard', icon: '📊' },
     { label: 'Project List', href: '/mobile/projects', icon: '📁' },
-    { label: 'Fichaje (Timecard)', href: '/mobile/time', icon: '⏱️' },
+    { label: 'Time Card', href: '/mobile/time', icon: '⏱️' },
     { label: 'Executive Reports', href: '/mobile/reports', icon: '📈' },
     { label: 'Settings', href: '/mobile/settings', icon: '⚙️' },
   ]

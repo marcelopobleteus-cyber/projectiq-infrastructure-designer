@@ -25,7 +25,7 @@ function formatDuration(minutes: number): string {
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleString('es-CL', {
+  return new Date(iso).toLocaleString('en-US', {
     day: '2-digit',
     month: 'short',
     hour: '2-digit',
@@ -86,7 +86,7 @@ export default function TimeTrackingClient({
   }, [filtered])
 
   function handleExportCsv() {
-    const header = ['Empleado', 'Email', 'Proyecto', 'Centro de Costo', 'Entrada', 'Salida', 'Horas', 'Descripción']
+    const header = ['Employee', 'Email', 'Project', 'Cost Code', 'Clock In', 'Clock Out', 'Hours', 'Description']
     const rows = filtered.map((e) => [
       e.employee_name,
       e.employee_email,
@@ -102,7 +102,7 @@ export default function TimeTrackingClient({
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `fichajes_${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = `time_entries_${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -139,7 +139,7 @@ export default function TimeTrackingClient({
         <div>
           <h1 className="text-lg font-black text-[var(--text-primary)] uppercase tracking-wider">Time Tracking</h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1">
-            Fichajes de terreno · {organizationName}
+            Field time entries · {organizationName}
           </p>
         </div>
         {canEdit && (
@@ -147,7 +147,7 @@ export default function TimeTrackingClient({
             onClick={() => setShowCostCodes(true)}
             className="h-9 px-4 rounded-lg border border-[var(--border)] text-xs font-bold text-[var(--text-primary)] hover:bg-[var(--surface-hover)]"
           >
-            Centros de Costo
+            Cost Codes
           </button>
         )}
       </div>
@@ -157,19 +157,19 @@ export default function TimeTrackingClient({
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-4">
             <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
-              Turnos abiertos ahora
+              Open shifts right now
             </p>
             <p className="text-2xl font-black text-emerald-500 mt-1">{summary.openCount}</p>
           </div>
           <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-4">
             <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
-              Horas en el filtro actual
+              Hours in current filter
             </p>
             <p className="text-2xl font-black text-[var(--text-primary)] mt-1">{summary.totalHours.toFixed(1)}h</p>
           </div>
           <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-4">
             <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
-              Empleados activos hoy
+              Employees active today
             </p>
             <p className="text-2xl font-black text-[var(--text-primary)] mt-1">{summary.activeToday}</p>
           </div>
@@ -178,13 +178,13 @@ export default function TimeTrackingClient({
         {/* Filters */}
         <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-4 flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Proyecto</label>
+            <label className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Project</label>
             <select
               value={projectFilter}
               onChange={(e) => setProjectFilter(e.target.value)}
               className="h-9 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] px-2 text-xs text-[var(--text-primary)]"
             >
-              <option value="all">Todos</option>
+              <option value="all">All</option>
               <option value="office">Office</option>
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
@@ -192,32 +192,32 @@ export default function TimeTrackingClient({
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Empleado</label>
+            <label className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Employee</label>
             <select
               value={employeeFilter}
               onChange={(e) => setEmployeeFilter(e.target.value)}
               className="h-9 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] px-2 text-xs text-[var(--text-primary)]"
             >
-              <option value="all">Todos</option>
+              <option value="all">All</option>
               {employees.map((emp) => (
                 <option key={emp.id} value={emp.id}>{emp.name}</option>
               ))}
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Estado</label>
+            <label className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Status</label>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as any)}
               className="h-9 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] px-2 text-xs text-[var(--text-primary)]"
             >
-              <option value="all">Todos</option>
-              <option value="open">Abiertos</option>
-              <option value="closed">Cerrados</option>
+              <option value="all">All</option>
+              <option value="open">Open</option>
+              <option value="closed">Closed</option>
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Desde</label>
+            <label className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">From</label>
             <input
               type="date"
               value={dateFrom}
@@ -226,7 +226,7 @@ export default function TimeTrackingClient({
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Hasta</label>
+            <label className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">To</label>
             <input
               type="date"
               value={dateTo}
@@ -238,7 +238,7 @@ export default function TimeTrackingClient({
             onClick={handleExportCsv}
             className="ml-auto h-9 px-4 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold uppercase tracking-wide"
           >
-            Exportar CSV
+            Export CSV
           </button>
         </div>
 
@@ -249,21 +249,21 @@ export default function TimeTrackingClient({
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-[var(--border)] text-[var(--text-secondary)] uppercase tracking-wide text-[10px]">
-                <th className="text-left font-bold px-4 py-3">Empleado</th>
-                <th className="text-left font-bold px-4 py-3">Proyecto</th>
-                <th className="text-left font-bold px-4 py-3">Centro de Costo</th>
-                <th className="text-left font-bold px-4 py-3">Entrada</th>
-                <th className="text-left font-bold px-4 py-3">Salida</th>
-                <th className="text-left font-bold px-4 py-3">Horas</th>
-                <th className="text-left font-bold px-4 py-3">Descripción</th>
-                {canEdit && <th className="text-right font-bold px-4 py-3">Acciones</th>}
+                <th className="text-left font-bold px-4 py-3">Employee</th>
+                <th className="text-left font-bold px-4 py-3">Project</th>
+                <th className="text-left font-bold px-4 py-3">Cost Code</th>
+                <th className="text-left font-bold px-4 py-3">Clock In</th>
+                <th className="text-left font-bold px-4 py-3">Clock Out</th>
+                <th className="text-left font-bold px-4 py-3">Hours</th>
+                <th className="text-left font-bold px-4 py-3">Description</th>
+                {canEdit && <th className="text-right font-bold px-4 py-3">Actions</th>}
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={canEdit ? 8 : 7} className="text-center py-10 text-[var(--text-secondary)]">
-                    No hay fichajes que coincidan con el filtro.
+                    No time entries match this filter.
                   </td>
                 </tr>
               ) : (
@@ -277,7 +277,7 @@ export default function TimeTrackingClient({
                       {e.clock_out ? (
                         formatDateTime(e.clock_out)
                       ) : (
-                        <span className="text-emerald-500 font-bold">En curso</span>
+                        <span className="text-emerald-500 font-bold">In progress</span>
                       )}
                     </td>
                     <td className="px-4 py-3 tabular-nums text-[var(--text-primary)] font-semibold whitespace-nowrap">
@@ -292,13 +292,13 @@ export default function TimeTrackingClient({
                           onClick={() => setEditingEntry(e)}
                           className="text-[var(--accent-text)] font-bold hover:underline mr-3"
                         >
-                          Editar
+                          Edit
                         </button>
                         <button
                           onClick={() => setDeletingEntry(e)}
                           className="text-red-400 font-bold hover:underline"
                         >
-                          Eliminar
+                          Delete
                         </button>
                       </td>
                     )}
@@ -326,7 +326,7 @@ export default function TimeTrackingClient({
       {deletingEntry && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-6 max-w-sm w-full space-y-4">
-            <h3 className="text-sm font-bold text-[var(--text-primary)]">¿Eliminar este fichaje?</h3>
+            <h3 className="text-sm font-bold text-[var(--text-primary)]">Delete this time entry?</h3>
             <p className="text-xs text-[var(--text-secondary)]">
               {deletingEntry.employee_name} · {deletingEntry.project_name} · {formatDateTime(deletingEntry.clock_in)}
             </p>
@@ -335,14 +335,14 @@ export default function TimeTrackingClient({
                 onClick={() => setDeletingEntry(null)}
                 className="flex-1 h-10 rounded-xl border border-[var(--border)] text-[var(--text-secondary)] font-semibold text-xs"
               >
-                Cancelar
+                Cancel
               </button>
               <button
                 onClick={confirmDelete}
                 disabled={isPending}
                 className="flex-1 h-10 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs disabled:opacity-50"
               >
-                {isPending ? 'Eliminando…' : 'Eliminar'}
+                {isPending ? 'Deleting…' : 'Delete'}
               </button>
             </div>
           </div>
@@ -386,12 +386,12 @@ function EditModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-6 max-w-md w-full space-y-4">
         <h3 className="text-sm font-bold text-[var(--text-primary)]">
-          Editar fichaje · {entry.employee_name}
+          Edit time entry · {entry.employee_name}
         </h3>
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Proyecto</label>
+              <label className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Project</label>
               <select
                 value={projectId}
                 onChange={(e) => setProjectId(e.target.value)}
@@ -404,21 +404,21 @@ function EditModal({
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Centro de Costo</label>
+              <label className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Cost Code</label>
               <select
                 value={costCodeId}
                 onChange={(e) => setCostCodeId(e.target.value)}
                 className="h-10 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] px-2 text-xs text-[var(--text-primary)]"
               >
-                <option value="">Sin asignar</option>
+                <option value="">Unassigned</option>
                 {costCodes.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}{!c.is_active ? ' (inactivo)' : ''}</option>
+                  <option key={c.id} value={c.id}>{c.name}{!c.is_active ? ' (inactive)' : ''}</option>
                 ))}
               </select>
             </div>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Entrada</label>
+            <label className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Clock In</label>
             <input
               type="datetime-local"
               value={clockIn}
@@ -428,7 +428,7 @@ function EditModal({
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">
-              Salida (vacío = turno abierto)
+              Clock out (empty = shift still open)
             </label>
             <input
               type="datetime-local"
@@ -438,7 +438,7 @@ function EditModal({
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Descripción</label>
+            <label className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Description</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -452,7 +452,7 @@ function EditModal({
             onClick={onCancel}
             className="flex-1 h-10 rounded-xl border border-[var(--border)] text-[var(--text-secondary)] font-semibold text-xs"
           >
-            Cancelar
+            Cancel
           </button>
           <button
             onClick={() =>
@@ -461,7 +461,7 @@ function EditModal({
             disabled={isPending || !clockIn}
             className="flex-1 h-10 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold text-xs disabled:opacity-50"
           >
-            {isPending ? 'Guardando…' : 'Guardar cambios'}
+            {isPending ? 'Saving…' : 'Save changes'}
           </button>
         </div>
       </div>
@@ -514,9 +514,9 @@ function CostCodesModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl p-6 max-w-md w-full space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-[var(--text-primary)]">Centros de Costo</h3>
+          <h3 className="text-sm font-bold text-[var(--text-primary)]">Cost Codes</h3>
           <button onClick={onClose} className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
-            Cerrar
+            Close
           </button>
         </div>
 
@@ -524,7 +524,7 @@ function CostCodesModal({
 
         <div className="space-y-2 max-h-72 overflow-y-auto">
           {costCodes.length === 0 ? (
-            <p className="text-xs text-[var(--text-secondary)] text-center py-4">Todavía no hay centros de costo.</p>
+            <p className="text-xs text-[var(--text-secondary)] text-center py-4">No cost codes yet.</p>
           ) : (
             costCodes.map((c) => (
               <div key={c.id} className="flex items-center gap-2 bg-[var(--surface-2)] rounded-lg px-3 py-2">
@@ -540,13 +540,13 @@ function CostCodesModal({
                       disabled={isPending}
                       className="text-xs font-bold text-[var(--accent-text)]"
                     >
-                      Guardar
+                      Save
                     </button>
                     <button
                       onClick={() => setRenamingId(null)}
                       className="text-xs text-[var(--text-secondary)]"
                     >
-                      Cancelar
+                      Cancel
                     </button>
                   </>
                 ) : (
@@ -561,14 +561,14 @@ function CostCodesModal({
                       }}
                       className="text-xs font-bold text-[var(--accent-text)]"
                     >
-                      Renombrar
+                      Rename
                     </button>
                     <button
                       onClick={() => handleToggleActive(c.id, c.is_active)}
                       disabled={isPending}
                       className="text-xs font-bold text-[var(--text-secondary)]"
                     >
-                      {c.is_active ? 'Desactivar' : 'Activar'}
+                      {c.is_active ? 'Deactivate' : 'Activate'}
                     </button>
                   </>
                 )}
@@ -581,7 +581,7 @@ function CostCodesModal({
           <input
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            placeholder="Nuevo centro de costo"
+            placeholder="New cost code"
             className="flex-1 h-10 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] px-3 text-xs text-[var(--text-primary)]"
           />
           <button
@@ -589,7 +589,7 @@ function CostCodesModal({
             disabled={isPending || !newName.trim()}
             className="h-10 px-4 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold disabled:opacity-50"
           >
-            Agregar
+            Add
           </button>
         </div>
       </div>

@@ -13,7 +13,7 @@ export async function clockIn(projectId: string | null, costCodeId: string | nul
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) return { error: 'Debes iniciar sesión.' }
+  if (!user) return { error: 'You must be signed in.' }
 
   let organizationId: string | null = null
 
@@ -24,7 +24,7 @@ export async function clockIn(projectId: string | null, costCodeId: string | nul
       .eq('id', projectId)
       .maybeSingle()
 
-    if (!project) return { error: 'Proyecto no encontrado.' }
+    if (!project) return { error: 'Project not found.' }
     organizationId = project.organization_id
   } else {
     const { data: membershipRows } = await supabase
@@ -36,7 +36,7 @@ export async function clockIn(projectId: string | null, costCodeId: string | nul
     organizationId = membershipRows?.[0]?.organization_id || null
   }
 
-  if (!organizationId) return { error: 'No se encontró tu organización.' }
+  if (!organizationId) return { error: 'Could not find your organization.' }
 
   const { error } = await supabase.from('time_entries').insert({
     project_id: projectId,
@@ -47,9 +47,9 @@ export async function clockIn(projectId: string | null, costCodeId: string | nul
 
   if (error) {
     if (error.code === '23505') {
-      return { error: 'Ya tienes un fichaje abierto. Marca salida antes de iniciar uno nuevo.' }
+      return { error: 'You already have an open shift. Clock out before starting a new one.' }
     }
-    return { error: 'No se pudo marcar entrada. Intenta de nuevo.' }
+    return { error: 'Could not clock in. Please try again.' }
   }
 
   revalidatePath('/mobile/time')
@@ -62,7 +62,7 @@ export async function pauseEntry(entryId: string) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) return { error: 'Debes iniciar sesión.' }
+  if (!user) return { error: 'You must be signed in.' }
 
   const { error } = await supabase
     .from('time_entries')
@@ -71,7 +71,7 @@ export async function pauseEntry(entryId: string) {
     .eq('profile_id', user.id)
     .is('paused_at', null)
 
-  if (error) return { error: 'No se pudo pausar el turno.' }
+  if (error) return { error: 'Could not pause the shift.' }
 
   revalidatePath('/mobile/time')
   return { error: null }
@@ -83,7 +83,7 @@ export async function resumeEntry(entryId: string) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) return { error: 'Debes iniciar sesión.' }
+  if (!user) return { error: 'You must be signed in.' }
 
   const { data: entry } = await supabase
     .from('time_entries')
@@ -92,7 +92,7 @@ export async function resumeEntry(entryId: string) {
     .eq('profile_id', user.id)
     .maybeSingle()
 
-  if (!entry?.paused_at) return { error: 'Este turno no está pausado.' }
+  if (!entry?.paused_at) return { error: 'This shift is not paused.' }
 
   const pausedMs = Date.now() - new Date(entry.paused_at).getTime()
   const addedMinutes = Math.max(0, Math.round(pausedMs / 60000))
@@ -103,7 +103,7 @@ export async function resumeEntry(entryId: string) {
     .eq('id', entryId)
     .eq('profile_id', user.id)
 
-  if (error) return { error: 'No se pudo reanudar el turno.' }
+  if (error) return { error: 'Could not resume the shift.' }
 
   revalidatePath('/mobile/time')
   return { error: null }
@@ -115,8 +115,8 @@ export async function clockOut(entryId: string, workDescription: string, project
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) return { error: 'Debes iniciar sesión.' }
-  if (!entryId) return { error: 'Fichaje no válido.' }
+  if (!user) return { error: 'You must be signed in.' }
+  if (!entryId) return { error: 'Invalid time entry.' }
 
   // Closing out while paused folds the open pause into paused_minutes first,
   // so the stored total always reflects time actually worked.
@@ -145,7 +145,7 @@ export async function clockOut(entryId: string, workDescription: string, project
     .eq('profile_id', user.id)
 
   if (error) {
-    return { error: 'No se pudo marcar salida. Intenta de nuevo.' }
+    return { error: 'Could not clock out. Please try again.' }
   }
 
   revalidatePath('/mobile/time')

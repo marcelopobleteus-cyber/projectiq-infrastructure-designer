@@ -7,7 +7,7 @@ export default async function MobileTimePage() {
   const data = await getTimeClockData()
 
   return (
-    <MobileAppShell title="Fichaje" subtitle="Registro de Horas">
+    <MobileAppShell title="Time Card" subtitle="Hours Log">
       <TimeClockClient {...data} />
     </MobileAppShell>
   )

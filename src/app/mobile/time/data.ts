@@ -107,7 +107,7 @@ export async function getTimeClockData(): Promise<TimeClockData> {
     ? {
         id: openRow.id,
         project_id: openRow.project_id,
-        project_name: openRow.project_id ? projectNameById.get(openRow.project_id) || 'Proyecto' : 'Office',
+        project_name: openRow.project_id ? projectNameById.get(openRow.project_id) || 'Project' : 'Office',
         clock_in: openRow.clock_in,
         paused_at: openRow.paused_at,
         paused_minutes: openRow.paused_minutes,
@@ -125,7 +125,7 @@ export async function getTimeClockData(): Promise<TimeClockData> {
   const history: TimeEntryHistoryItem[] = (historyRows || []).map((h) => ({
     id: h.id,
     project_id: h.project_id,
-    project_name: h.project_id ? projectNameById.get(h.project_id) || 'Proyecto' : 'Office',
+    project_name: h.project_id ? projectNameById.get(h.project_id) || 'Project' : 'Office',
     clock_in: h.clock_in,
     clock_out: h.clock_out as string,
     work_description: h.work_description,

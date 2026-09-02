@@ -113,7 +113,7 @@ export async function getTimeTrackingData(): Promise<TimeTrackingData> {
 
   const employees: TimeTrackingEmployee[] = (memberRows || []).map((m: any) => ({
     id: m.profile_id,
-    name: m.profiles?.full_name || m.profiles?.email || 'Sin nombre',
+    name: m.profiles?.full_name || m.profiles?.email || 'No name',
     email: m.profiles?.email || '',
   }))
   const employeeById = new Map(employees.map((e) => [e.id, e]))
@@ -136,12 +136,12 @@ export async function getTimeTrackingData(): Promise<TimeTrackingData> {
     return {
       id: e.id,
       project_id: e.project_id,
-      project_name: e.project_id ? projectNameById.get(e.project_id) || 'Proyecto' : 'Office',
+      project_name: e.project_id ? projectNameById.get(e.project_id) || 'Project' : 'Office',
       profile_id: e.profile_id,
-      employee_name: emp?.name || 'Ex-miembro',
+      employee_name: emp?.name || 'Former member',
       employee_email: emp?.email || '',
       cost_code_id: e.cost_code_id,
-      cost_code_name: e.cost_code_id ? costCodeNameById.get(e.cost_code_id) || 'Sin asignar' : 'Sin asignar',
+      cost_code_name: e.cost_code_id ? costCodeNameById.get(e.cost_code_id) || 'Unassigned' : 'Unassigned',
       clock_in: e.clock_in,
       clock_out: e.clock_out,
       paused_minutes: e.paused_minutes,
@@ -165,7 +165,7 @@ export async function updateTimeEntry(
   const supabase = await createClient()
   const { error } = await supabase.from('time_entries').update(updates).eq('id', entryId)
 
-  if (error) return { error: 'No se pudo actualizar el registro. Verifica que tengas permiso de editor.' }
+  if (error) return { error: 'Could not update the entry. Check that you have editor permission.' }
 
   revalidatePath('/time-tracking')
   return { error: null }
@@ -175,7 +175,7 @@ export async function deleteTimeEntry(entryId: string) {
   const supabase = await createClient()
   const { error } = await supabase.from('time_entries').delete().eq('id', entryId)
 
-  if (error) return { error: 'No se pudo eliminar el registro. Verifica que tengas permiso de editor.' }
+  if (error) return { error: 'Could not delete the entry. Check that you have editor permission.' }
 
   revalidatePath('/time-tracking')
   return { error: null }
@@ -184,7 +184,7 @@ export async function deleteTimeEntry(entryId: string) {
 export async function createCostCode(organizationId: string, name: string) {
   const supabase = await createClient()
   const trimmed = name.trim()
-  if (!trimmed) return { error: 'El nombre no puede estar vacío.' }
+  if (!trimmed) return { error: 'The name cannot be empty.' }
 
   const { data: existing } = await supabase
     .from('cost_codes')
@@ -200,8 +200,8 @@ export async function createCostCode(organizationId: string, name: string) {
     .insert({ organization_id: organizationId, name: trimmed, sort_order: nextSortOrder })
 
   if (error) {
-    if (error.code === '23505') return { error: 'Ya existe un centro de costo con ese nombre.' }
-    return { error: 'No se pudo crear el centro de costo.' }
+    if (error.code === '23505') return { error: 'A cost code with that name already exists.' }
+    return { error: 'Could not create the cost code.' }
   }
 
   revalidatePath('/time-tracking')
@@ -211,13 +211,13 @@ export async function createCostCode(organizationId: string, name: string) {
 export async function renameCostCode(costCodeId: string, name: string) {
   const supabase = await createClient()
   const trimmed = name.trim()
-  if (!trimmed) return { error: 'El nombre no puede estar vacío.' }
+  if (!trimmed) return { error: 'The name cannot be empty.' }
 
   const { error } = await supabase.from('cost_codes').update({ name: trimmed }).eq('id', costCodeId)
 
   if (error) {
-    if (error.code === '23505') return { error: 'Ya existe un centro de costo con ese nombre.' }
-    return { error: 'No se pudo renombrar el centro de costo.' }
+    if (error.code === '23505') return { error: 'A cost code with that name already exists.' }
+    return { error: 'Could not rename the cost code.' }
   }
 
   revalidatePath('/time-tracking')
@@ -228,7 +228,7 @@ export async function setCostCodeActive(costCodeId: string, isActive: boolean) {
   const supabase = await createClient()
   const { error } = await supabase.from('cost_codes').update({ is_active: isActive }).eq('id', costCodeId)
 
-  if (error) return { error: 'No se pudo actualizar el centro de costo.' }
+  if (error) return { error: 'Could not update the cost code.' }
 
   revalidatePath('/time-tracking')
   return { error: null }

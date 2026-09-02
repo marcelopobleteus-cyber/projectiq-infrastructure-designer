@@ -15,22 +15,22 @@ function formatDuration(totalMinutes: number): string {
 }
 
 function formatClock(iso: string): string {
-  return new Date(iso).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
+  return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
 }
 
 function formatDay(iso: string): string {
-  return new Date(iso).toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: 'short' })
+  return new Date(iso).toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short' })
 }
 
 function dayKeyFromDate(d: Date): string {
   return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`
 }
 
-const WEEKDAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 function MonthCalendar({ monthDays, weekTotalMinutes }: { monthDays: TimeClockData['monthDays']; weekTotalMinutes: number }) {
   const today = new Date()
-  const monthLabel = today.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' })
+  const monthLabel = today.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
   const minutesByDay = useMemo(() => new Map(monthDays.map((d) => [d.date, d.minutesWorked])), [monthDays])
 
   const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
@@ -50,7 +50,7 @@ function MonthCalendar({ monthDays, weekTotalMinutes }: { monthDays: TimeClockDa
           {monthLabel}
         </span>
         <span className="text-xs font-black text-[var(--text-primary)] tabular-nums">
-          Semana: {formatDuration(weekTotalMinutes)}
+          This week: {formatDuration(weekTotalMinutes)}
         </span>
       </div>
       <div className="grid grid-cols-7 gap-1 mt-3">
@@ -168,7 +168,7 @@ export default function TimeClockClient({ projects, costCodes, openEntry, histor
           <div className="flex items-center gap-2">
             <span className={`w-2.5 h-2.5 rounded-full ${isPaused ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`} />
             <span className={`text-xs font-bold uppercase tracking-wider ${isPaused ? 'text-amber-500' : 'text-emerald-500'}`}>
-              {isPaused ? 'En pausa' : 'Turno en curso'}
+              {isPaused ? 'Paused' : 'Shift in progress'}
             </span>
           </div>
           <div>
@@ -176,7 +176,7 @@ export default function TimeClockClient({ projects, costCodes, openEntry, histor
             <p className="text-3xl font-black text-[var(--text-primary)] tabular-nums mt-1">
               {formatDuration(elapsedMinutes)}
             </p>
-            <p className="text-xs text-[var(--text-secondary)] mt-1">Entrada a las {formatClock(openEntry.clock_in)}</p>
+            <p className="text-xs text-[var(--text-secondary)] mt-1">Clocked in at {formatClock(openEntry.clock_in)}</p>
           </div>
           {!showClockOut ? (
             <div className="grid grid-cols-2 gap-2">
@@ -187,14 +187,14 @@ export default function TimeClockClient({ projects, costCodes, openEntry, histor
                   isPaused ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-amber-500 hover:bg-amber-400 text-white'
                 }`}
               >
-                {isPaused ? 'Reanudar' : 'Pausar'}
+                {isPaused ? 'Resume' : 'Pause'}
               </button>
               <button
                 onClick={() => setShowClockOut(true)}
                 disabled={isPending}
                 className="h-12 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-sm uppercase tracking-wide disabled:opacity-50"
               >
-                Marcar Salida
+                Clock Out
               </button>
             </div>
           ) : (
@@ -202,7 +202,7 @@ export default function TimeClockClient({ projects, costCodes, openEntry, histor
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="¿Qué se hizo en este turno? (opcional)"
+                placeholder="What did you work on this shift? (optional)"
                 rows={3}
                 className="w-full rounded-xl bg-[var(--surface-2)] border border-[var(--border)] p-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none focus:border-[var(--accent)]"
               />
@@ -212,14 +212,14 @@ export default function TimeClockClient({ projects, costCodes, openEntry, histor
                   disabled={isPending}
                   className="flex-1 h-11 rounded-xl border border-[var(--border)] text-[var(--text-secondary)] font-semibold text-sm"
                 >
-                  Cancelar
+                  Cancel
                 </button>
                 <button
                   onClick={handleClockOut}
                   disabled={isPending}
                   className="flex-1 h-11 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-sm disabled:opacity-50"
                 >
-                  {isPending ? 'Guardando…' : 'Confirmar Salida'}
+                  {isPending ? 'Saving…' : 'Confirm Clock Out'}
                 </button>
               </div>
             </div>
@@ -227,9 +227,9 @@ export default function TimeClockClient({ projects, costCodes, openEntry, histor
         </div>
       ) : (
         <div className="bg-[var(--surface-1)] border border-[var(--border)] p-5 rounded-2xl space-y-3">
-          <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">Sin turno activo</p>
+          <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">No active shift</p>
           <div className="space-y-1">
-            <label className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Proyecto</label>
+            <label className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Project</label>
             <select
               value={selectedProjectId}
               onChange={(e) => setSelectedProjectId(e.target.value)}
@@ -244,13 +244,13 @@ export default function TimeClockClient({ projects, costCodes, openEntry, histor
             </select>
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Centro de costo</label>
+            <label className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Cost Code</label>
             <select
               value={selectedCostCodeId}
               onChange={(e) => setSelectedCostCodeId(e.target.value)}
               className="w-full h-12 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] px-3 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
             >
-              <option value="">Sin asignar</option>
+              <option value="">Unassigned</option>
               {costCodes.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -263,7 +263,7 @@ export default function TimeClockClient({ projects, costCodes, openEntry, histor
             disabled={isPending}
             className="w-full h-12 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold text-sm uppercase tracking-wide disabled:opacity-50"
           >
-            {isPending ? 'Marcando…' : 'Marcar Entrada'}
+            {isPending ? 'Clocking in…' : 'Clock In'}
           </button>
         </div>
       )}
@@ -275,11 +275,11 @@ export default function TimeClockClient({ projects, costCodes, openEntry, histor
       {/* History */}
       <div>
         <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-2 px-1">
-          Historial reciente
+          Recent History
         </p>
         {history.length === 0 ? (
           <div className="bg-[var(--surface-1)] border border-[var(--border)] p-5 rounded-2xl text-center text-xs text-[var(--text-secondary)]">
-            Todavía no tienes turnos registrados.
+            No shifts logged yet.
           </div>
         ) : (
           <div className="space-y-2">

@@ -48,7 +48,7 @@ export default function MobileBottomTabs({
     },
     {
       id: 'time',
-      label: 'Fichaje',
+      label: 'Time Card',
       href: `/mobile/time`,
       active: pathname.startsWith('/mobile/time'),
       icon: (
