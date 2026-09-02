@@ -74,57 +74,118 @@ export type Database = {
       }
       bom_items: {
         Row: {
+          cabinet_id: string | null
           category: string
+          conduit_run_id: string | null
+          conduit_structure_id: string | null
           created_at: string
           description: string
+          fiber_enclosure_id: string | null
           fiber_node_id: string | null
           fiber_route_id: string | null
           id: string
           manufacturer: string | null
+          material_received: boolean
+          material_received_at: string | null
+          module: Database["public"]["Enums"]["bom_module"]
           part_number: string | null
           project_id: string
           quantity: number
           source: Database["public"]["Enums"]["bom_source_type"]
           status: string | null
+          subcategory: string | null
+          supplied_by: string | null
+          supply_responsibility: Database["public"]["Enums"]["supply_responsibility"]
           unit: string
           unit_cost: number
           updated_at: string | null
+          work_scope: Database["public"]["Enums"]["work_scope"]
         }
         Insert: {
+          cabinet_id?: string | null
           category: string
+          conduit_run_id?: string | null
+          conduit_structure_id?: string | null
           created_at?: string
           description: string
+          fiber_enclosure_id?: string | null
           fiber_node_id?: string | null
           fiber_route_id?: string | null
           id?: string
           manufacturer?: string | null
+          material_received?: boolean
+          material_received_at?: string | null
+          module?: Database["public"]["Enums"]["bom_module"]
           part_number?: string | null
           project_id: string
           quantity?: number
           source?: Database["public"]["Enums"]["bom_source_type"]
           status?: string | null
+          subcategory?: string | null
+          supplied_by?: string | null
+          supply_responsibility?: Database["public"]["Enums"]["supply_responsibility"]
           unit?: string
           unit_cost?: number
           updated_at?: string | null
+          work_scope?: Database["public"]["Enums"]["work_scope"]
         }
         Update: {
+          cabinet_id?: string | null
           category?: string
+          conduit_run_id?: string | null
+          conduit_structure_id?: string | null
           created_at?: string
           description?: string
+          fiber_enclosure_id?: string | null
           fiber_node_id?: string | null
           fiber_route_id?: string | null
           id?: string
           manufacturer?: string | null
+          material_received?: boolean
+          material_received_at?: string | null
+          module?: Database["public"]["Enums"]["bom_module"]
           part_number?: string | null
           project_id?: string
           quantity?: number
           source?: Database["public"]["Enums"]["bom_source_type"]
           status?: string | null
+          subcategory?: string | null
+          supplied_by?: string | null
+          supply_responsibility?: Database["public"]["Enums"]["supply_responsibility"]
           unit?: string
           unit_cost?: number
           updated_at?: string | null
+          work_scope?: Database["public"]["Enums"]["work_scope"]
         }
         Relationships: [
+          {
+            foreignKeyName: "bom_items_cabinet_id_fkey"
+            columns: ["cabinet_id"]
+            isOneToOne: false
+            referencedRelation: "cabinets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bom_items_conduit_run_id_fkey"
+            columns: ["conduit_run_id"]
+            isOneToOne: false
+            referencedRelation: "conduit_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bom_items_conduit_structure_id_fkey"
+            columns: ["conduit_structure_id"]
+            isOneToOne: false
+            referencedRelation: "conduit_structures"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bom_items_fiber_enclosure_id_fkey"
+            columns: ["fiber_enclosure_id"]
+            isOneToOne: false
+            referencedRelation: "fiber_enclosures"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "bom_items_fiber_node_id_fkey"
             columns: ["fiber_node_id"]
@@ -148,47 +209,138 @@ export type Database = {
           },
         ]
       }
-      cabinets: {
+      bom_items_removed: {
         Row: {
-          cabinet_tag: string
-          cabinet_type: string
-          created_at: string
           id: string
-          latitude: number
-          longitude: number
-          notes: string | null
-          organization_id: string
+          original_id: string
+          payload: Json
           project_id: string
-          status: string
-          updated_at: string | null
+          removed_at: string
+          removed_reason: string
+          restored_at: string | null
         }
         Insert: {
-          cabinet_tag: string
-          cabinet_type: string
-          created_at?: string
           id?: string
-          latitude: number
-          longitude: number
-          notes?: string | null
-          organization_id: string
+          original_id: string
+          payload: Json
           project_id: string
-          status?: string
-          updated_at?: string | null
+          removed_at?: string
+          removed_reason: string
+          restored_at?: string | null
         }
         Update: {
-          cabinet_tag?: string
-          cabinet_type?: string
-          created_at?: string
           id?: string
-          latitude?: number
-          longitude?: number
-          notes?: string | null
-          organization_id?: string
+          original_id?: string
+          payload?: Json
           project_id?: string
-          status?: string
-          updated_at?: string | null
+          removed_at?: string
+          removed_reason?: string
+          restored_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "bom_items_removed_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cabinets: {
+        Row: {
+          asset_condition: Database["public"]["Enums"]["asset_condition"]
+          cabinet_role: string
+          cabinet_tag: string
+          cabinet_type: string
+          condition_source: string | null
+          created_at: string
+          id: string
+          kit_id: string | null
+          latitude: number
+          longitude: number
+          material_received: boolean
+          material_received_at: string | null
+          mount_type: string | null
+          mounted_on_node_id: string | null
+          notes: string | null
+          organization_id: string
+          owner_of_record: string | null
+          project_id: string
+          status: string
+          supplied_by: string | null
+          supply_responsibility: Database["public"]["Enums"]["supply_responsibility"]
+          updated_at: string | null
+          uplink_target: string | null
+          work_scope: Database["public"]["Enums"]["work_scope"]
+        }
+        Insert: {
+          asset_condition?: Database["public"]["Enums"]["asset_condition"]
+          cabinet_role?: string
+          cabinet_tag: string
+          cabinet_type: string
+          condition_source?: string | null
+          created_at?: string
+          id?: string
+          kit_id?: string | null
+          latitude: number
+          longitude: number
+          material_received?: boolean
+          material_received_at?: string | null
+          mount_type?: string | null
+          mounted_on_node_id?: string | null
+          notes?: string | null
+          organization_id: string
+          owner_of_record?: string | null
+          project_id: string
+          status?: string
+          supplied_by?: string | null
+          supply_responsibility?: Database["public"]["Enums"]["supply_responsibility"]
+          updated_at?: string | null
+          uplink_target?: string | null
+          work_scope?: Database["public"]["Enums"]["work_scope"]
+        }
+        Update: {
+          asset_condition?: Database["public"]["Enums"]["asset_condition"]
+          cabinet_role?: string
+          cabinet_tag?: string
+          cabinet_type?: string
+          condition_source?: string | null
+          created_at?: string
+          id?: string
+          kit_id?: string | null
+          latitude?: number
+          longitude?: number
+          material_received?: boolean
+          material_received_at?: string | null
+          mount_type?: string | null
+          mounted_on_node_id?: string | null
+          notes?: string | null
+          organization_id?: string
+          owner_of_record?: string | null
+          project_id?: string
+          status?: string
+          supplied_by?: string | null
+          supply_responsibility?: Database["public"]["Enums"]["supply_responsibility"]
+          updated_at?: string | null
+          uplink_target?: string | null
+          work_scope?: Database["public"]["Enums"]["work_scope"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cabinets_kit_id_fkey"
+            columns: ["kit_id"]
+            isOneToOne: false
+            referencedRelation: "enclosure_kits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cabinets_mounted_on_node_id_fkey"
+            columns: ["mounted_on_node_id"]
+            isOneToOne: false
+            referencedRelation: "fiber_nodes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cabinets_organization_id_fkey"
             columns: ["organization_id"]
@@ -444,54 +596,96 @@ export type Database = {
       camera_locations: {
         Row: {
           address_reference: string | null
+          asset_condition: Database["public"]["Enums"]["asset_condition"]
           assigned_network_device_id: string | null
+          backbone_cable_id: string | null
+          backbone_strand_a: number | null
+          backbone_strand_b: number | null
           camera_id_tag: string
           camera_model_id: string
           communication_type: Database["public"]["Enums"]["comm_type"]
+          condition_source: string | null
           created_at: string
+          drop_cable_ft: number | null
           id: string
           latitude: number
           longitude: number
+          material_received: boolean
+          material_received_at: string | null
+          mount_hardware: string | null
           notes: string | null
+          owner_of_record: string | null
           power_type: Database["public"]["Enums"]["power_type"]
           project_id: string
+          served_by_cabinet_id: string | null
           status: Database["public"]["Enums"]["camera_status"]
           structure_reference: string | null
+          supplied_by: string | null
+          supply_responsibility: Database["public"]["Enums"]["supply_responsibility"]
           updated_at: string
+          work_scope: Database["public"]["Enums"]["work_scope"]
         }
         Insert: {
           address_reference?: string | null
+          asset_condition?: Database["public"]["Enums"]["asset_condition"]
           assigned_network_device_id?: string | null
+          backbone_cable_id?: string | null
+          backbone_strand_a?: number | null
+          backbone_strand_b?: number | null
           camera_id_tag: string
           camera_model_id: string
           communication_type?: Database["public"]["Enums"]["comm_type"]
+          condition_source?: string | null
           created_at?: string
+          drop_cable_ft?: number | null
           id?: string
           latitude: number
           longitude: number
+          material_received?: boolean
+          material_received_at?: string | null
+          mount_hardware?: string | null
           notes?: string | null
+          owner_of_record?: string | null
           power_type?: Database["public"]["Enums"]["power_type"]
           project_id: string
+          served_by_cabinet_id?: string | null
           status?: Database["public"]["Enums"]["camera_status"]
           structure_reference?: string | null
+          supplied_by?: string | null
+          supply_responsibility?: Database["public"]["Enums"]["supply_responsibility"]
           updated_at?: string
+          work_scope?: Database["public"]["Enums"]["work_scope"]
         }
         Update: {
           address_reference?: string | null
+          asset_condition?: Database["public"]["Enums"]["asset_condition"]
           assigned_network_device_id?: string | null
+          backbone_cable_id?: string | null
+          backbone_strand_a?: number | null
+          backbone_strand_b?: number | null
           camera_id_tag?: string
           camera_model_id?: string
           communication_type?: Database["public"]["Enums"]["comm_type"]
+          condition_source?: string | null
           created_at?: string
+          drop_cable_ft?: number | null
           id?: string
           latitude?: number
           longitude?: number
+          material_received?: boolean
+          material_received_at?: string | null
+          mount_hardware?: string | null
           notes?: string | null
+          owner_of_record?: string | null
           power_type?: Database["public"]["Enums"]["power_type"]
           project_id?: string
+          served_by_cabinet_id?: string | null
           status?: Database["public"]["Enums"]["camera_status"]
           structure_reference?: string | null
+          supplied_by?: string | null
+          supply_responsibility?: Database["public"]["Enums"]["supply_responsibility"]
           updated_at?: string
+          work_scope?: Database["public"]["Enums"]["work_scope"]
         }
         Relationships: [
           {
@@ -499,6 +693,13 @@ export type Database = {
             columns: ["assigned_network_device_id"]
             isOneToOne: false
             referencedRelation: "network_devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camera_locations_backbone_cable_id_fkey"
+            columns: ["backbone_cable_id"]
+            isOneToOne: false
+            referencedRelation: "fiber_cables"
             referencedColumns: ["id"]
           },
           {
@@ -513,6 +714,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camera_locations_served_by_cabinet_id_fkey"
+            columns: ["served_by_cabinet_id"]
+            isOneToOne: false
+            referencedRelation: "cabinets"
             referencedColumns: ["id"]
           },
         ]
@@ -739,6 +947,324 @@ export type Database = {
             columns: ["project_task_id"]
             isOneToOne: false
             referencedRelation: "field_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conduit_runs: {
+        Row: {
+          asset_condition: Database["public"]["Enums"]["asset_condition"]
+          condition_source: string | null
+          created_at: string
+          depth_inches: number | null
+          diameter_inches: number
+          id: string
+          install_method: string
+          length_feet: number
+          material: string
+          material_received: boolean
+          material_received_at: string | null
+          notes: string | null
+          organization_id: string
+          owner_of_record: string | null
+          project_id: string
+          route_id: string | null
+          run_tag: string
+          status: string
+          supplied_by: string | null
+          supply_responsibility: Database["public"]["Enums"]["supply_responsibility"]
+          surface_type: string
+          updated_at: string | null
+          ways: number
+          work_scope: Database["public"]["Enums"]["work_scope"]
+        }
+        Insert: {
+          asset_condition?: Database["public"]["Enums"]["asset_condition"]
+          condition_source?: string | null
+          created_at?: string
+          depth_inches?: number | null
+          diameter_inches?: number
+          id?: string
+          install_method?: string
+          length_feet?: number
+          material?: string
+          material_received?: boolean
+          material_received_at?: string | null
+          notes?: string | null
+          organization_id: string
+          owner_of_record?: string | null
+          project_id: string
+          route_id?: string | null
+          run_tag: string
+          status?: string
+          supplied_by?: string | null
+          supply_responsibility?: Database["public"]["Enums"]["supply_responsibility"]
+          surface_type?: string
+          updated_at?: string | null
+          ways?: number
+          work_scope?: Database["public"]["Enums"]["work_scope"]
+        }
+        Update: {
+          asset_condition?: Database["public"]["Enums"]["asset_condition"]
+          condition_source?: string | null
+          created_at?: string
+          depth_inches?: number | null
+          diameter_inches?: number
+          id?: string
+          install_method?: string
+          length_feet?: number
+          material?: string
+          material_received?: boolean
+          material_received_at?: string | null
+          notes?: string | null
+          organization_id?: string
+          owner_of_record?: string | null
+          project_id?: string
+          route_id?: string | null
+          run_tag?: string
+          status?: string
+          supplied_by?: string | null
+          supply_responsibility?: Database["public"]["Enums"]["supply_responsibility"]
+          surface_type?: string
+          updated_at?: string | null
+          ways?: number
+          work_scope?: Database["public"]["Enums"]["work_scope"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conduit_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conduit_runs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conduit_runs_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "fiber_routes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conduit_structures: {
+        Row: {
+          asset_condition: Database["public"]["Enums"]["asset_condition"]
+          condition_source: string | null
+          cover_rating: string | null
+          created_at: string
+          depth_ft: number | null
+          id: string
+          latitude: number | null
+          longitude: number | null
+          material: string | null
+          material_received: boolean
+          material_received_at: string | null
+          node_id: string | null
+          notes: string | null
+          organization_id: string
+          owner_of_record: string | null
+          project_id: string
+          size_description: string | null
+          status: string
+          structure_tag: string
+          structure_type: string
+          supplied_by: string | null
+          supply_responsibility: Database["public"]["Enums"]["supply_responsibility"]
+          updated_at: string | null
+          work_scope: Database["public"]["Enums"]["work_scope"]
+        }
+        Insert: {
+          asset_condition?: Database["public"]["Enums"]["asset_condition"]
+          condition_source?: string | null
+          cover_rating?: string | null
+          created_at?: string
+          depth_ft?: number | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          material?: string | null
+          material_received?: boolean
+          material_received_at?: string | null
+          node_id?: string | null
+          notes?: string | null
+          organization_id: string
+          owner_of_record?: string | null
+          project_id: string
+          size_description?: string | null
+          status?: string
+          structure_tag: string
+          structure_type?: string
+          supplied_by?: string | null
+          supply_responsibility?: Database["public"]["Enums"]["supply_responsibility"]
+          updated_at?: string | null
+          work_scope?: Database["public"]["Enums"]["work_scope"]
+        }
+        Update: {
+          asset_condition?: Database["public"]["Enums"]["asset_condition"]
+          condition_source?: string | null
+          cover_rating?: string | null
+          created_at?: string
+          depth_ft?: number | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          material?: string | null
+          material_received?: boolean
+          material_received_at?: string | null
+          node_id?: string | null
+          notes?: string | null
+          organization_id?: string
+          owner_of_record?: string | null
+          project_id?: string
+          size_description?: string | null
+          status?: string
+          structure_tag?: string
+          structure_type?: string
+          supplied_by?: string | null
+          supply_responsibility?: Database["public"]["Enums"]["supply_responsibility"]
+          updated_at?: string | null
+          work_scope?: Database["public"]["Enums"]["work_scope"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conduit_structures_node_id_fkey"
+            columns: ["node_id"]
+            isOneToOne: false
+            referencedRelation: "fiber_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conduit_structures_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conduit_structures_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      enclosure_kit_items: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          kit_id: string
+          manufacturer: string | null
+          part_number: string
+          quantity: number
+          role: string
+          sort_order: number
+          supply_responsibility: Database["public"]["Enums"]["supply_responsibility"]
+          unit: string
+          unit_cost: number
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          kit_id: string
+          manufacturer?: string | null
+          part_number: string
+          quantity?: number
+          role?: string
+          sort_order?: number
+          supply_responsibility?: Database["public"]["Enums"]["supply_responsibility"]
+          unit?: string
+          unit_cost?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          kit_id?: string
+          manufacturer?: string | null
+          part_number?: string
+          quantity?: number
+          role?: string
+          sort_order?: number
+          supply_responsibility?: Database["public"]["Enums"]["supply_responsibility"]
+          unit?: string
+          unit_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enclosure_kit_items_kit_id_fkey"
+            columns: ["kit_id"]
+            isOneToOne: false
+            referencedRelation: "enclosure_kits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      enclosure_kits: {
+        Row: {
+          camera_capacity: number
+          code: string
+          created_at: string
+          description: string | null
+          id: string
+          is_default: boolean
+          name: string
+          organization_id: string | null
+          pigtail_count: number
+          poe_budget_watts: number
+          sfp_uplink_count: number
+          strands_spliced: number
+          switch_port_count: number
+          updated_at: string | null
+        }
+        Insert: {
+          camera_capacity?: number
+          code: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_default?: boolean
+          name: string
+          organization_id?: string | null
+          pigtail_count?: number
+          poe_budget_watts?: number
+          sfp_uplink_count?: number
+          strands_spliced?: number
+          switch_port_count?: number
+          updated_at?: string | null
+        }
+        Update: {
+          camera_capacity?: number
+          code?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_default?: boolean
+          name?: string
+          organization_id?: string | null
+          pigtail_count?: number
+          poe_budget_watts?: number
+          sfp_uplink_count?: number
+          strands_spliced?: number
+          switch_port_count?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enclosure_kits_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -1040,10 +1566,13 @@ export type Database = {
           has_slack_loop: boolean
           id: string
           node_id: string
+          notes: string | null
           organization_id: string
           project_id: string
           sequence_order: number
           slack_length_ft: number
+          strand_from: number | null
+          strand_to: number | null
           updated_at: string | null
         }
         Insert: {
@@ -1052,10 +1581,13 @@ export type Database = {
           has_slack_loop?: boolean
           id?: string
           node_id: string
+          notes?: string | null
           organization_id: string
           project_id: string
           sequence_order: number
           slack_length_ft?: number
+          strand_from?: number | null
+          strand_to?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -1064,10 +1596,13 @@ export type Database = {
           has_slack_loop?: boolean
           id?: string
           node_id?: string
+          notes?: string | null
           organization_id?: string
           project_id?: string
           sequence_order?: number
           slack_length_ft?: number
+          strand_from?: number | null
+          strand_to?: number | null
           updated_at?: string | null
         }
         Relationships: [
@@ -1103,8 +1638,10 @@ export type Database = {
       }
       fiber_cables: {
         Row: {
+          asset_condition: Database["public"]["Enums"]["asset_condition"]
           cable_tag: string
           cable_type: string
+          condition_source: string | null
           created_at: string
           fiber_count: number
           from_node_id: string | null
@@ -1112,20 +1649,28 @@ export type Database = {
           install_status: string
           length_ft: number
           manufacturer: string | null
+          material_received: boolean
+          material_received_at: string | null
           model: string | null
           notes: string | null
           organization_id: string
+          owner_of_record: string | null
           project_id: string
           route_id: string | null
           status: string | null
           strand_count: number | null
+          supplied_by: string | null
+          supply_responsibility: Database["public"]["Enums"]["supply_responsibility"]
           test_status: string
           to_node_id: string | null
           updated_at: string | null
+          work_scope: Database["public"]["Enums"]["work_scope"]
         }
         Insert: {
+          asset_condition?: Database["public"]["Enums"]["asset_condition"]
           cable_tag: string
           cable_type: string
+          condition_source?: string | null
           created_at?: string
           fiber_count: number
           from_node_id?: string | null
@@ -1133,20 +1678,28 @@ export type Database = {
           install_status?: string
           length_ft?: number
           manufacturer?: string | null
+          material_received?: boolean
+          material_received_at?: string | null
           model?: string | null
           notes?: string | null
           organization_id: string
+          owner_of_record?: string | null
           project_id: string
           route_id?: string | null
           status?: string | null
           strand_count?: number | null
+          supplied_by?: string | null
+          supply_responsibility?: Database["public"]["Enums"]["supply_responsibility"]
           test_status?: string
           to_node_id?: string | null
           updated_at?: string | null
+          work_scope?: Database["public"]["Enums"]["work_scope"]
         }
         Update: {
+          asset_condition?: Database["public"]["Enums"]["asset_condition"]
           cable_tag?: string
           cable_type?: string
+          condition_source?: string | null
           created_at?: string
           fiber_count?: number
           from_node_id?: string | null
@@ -1154,16 +1707,22 @@ export type Database = {
           install_status?: string
           length_ft?: number
           manufacturer?: string | null
+          material_received?: boolean
+          material_received_at?: string | null
           model?: string | null
           notes?: string | null
           organization_id?: string
+          owner_of_record?: string | null
           project_id?: string
           route_id?: string | null
           status?: string | null
           strand_count?: number | null
+          supplied_by?: string | null
+          supply_responsibility?: Database["public"]["Enums"]["supply_responsibility"]
           test_status?: string
           to_node_id?: string | null
           updated_at?: string | null
+          work_scope?: Database["public"]["Enums"]["work_scope"]
         }
         Relationships: [
           {
@@ -1348,6 +1907,7 @@ export type Database = {
       }
       fiber_enclosures: {
         Row: {
+          asset_condition: Database["public"]["Enums"]["asset_condition"]
           cabinet_id: string | null
           capacity: number
           created_at: string
@@ -1357,14 +1917,22 @@ export type Database = {
           installed_status: string
           latitude: number | null
           longitude: number | null
+          material_received: boolean
+          material_received_at: string | null
           node_id: string
           notes: string | null
           organization_id: string
+          part_number: string | null
           project_id: string
+          role: string
           splice_count: number
+          supplied_by: string | null
+          supply_responsibility: Database["public"]["Enums"]["supply_responsibility"]
           updated_at: string | null
+          work_scope: Database["public"]["Enums"]["work_scope"]
         }
         Insert: {
+          asset_condition?: Database["public"]["Enums"]["asset_condition"]
           cabinet_id?: string | null
           capacity?: number
           created_at?: string
@@ -1374,14 +1942,22 @@ export type Database = {
           installed_status?: string
           latitude?: number | null
           longitude?: number | null
+          material_received?: boolean
+          material_received_at?: string | null
           node_id: string
           notes?: string | null
           organization_id: string
+          part_number?: string | null
           project_id: string
+          role?: string
           splice_count?: number
+          supplied_by?: string | null
+          supply_responsibility?: Database["public"]["Enums"]["supply_responsibility"]
           updated_at?: string | null
+          work_scope?: Database["public"]["Enums"]["work_scope"]
         }
         Update: {
+          asset_condition?: Database["public"]["Enums"]["asset_condition"]
           cabinet_id?: string | null
           capacity?: number
           created_at?: string
@@ -1391,12 +1967,19 @@ export type Database = {
           installed_status?: string
           latitude?: number | null
           longitude?: number | null
+          material_received?: boolean
+          material_received_at?: string | null
           node_id?: string
           notes?: string | null
           organization_id?: string
+          part_number?: string | null
           project_id?: string
+          role?: string
           splice_count?: number
+          supplied_by?: string | null
+          supply_responsibility?: Database["public"]["Enums"]["supply_responsibility"]
           updated_at?: string | null
+          work_scope?: Database["public"]["Enums"]["work_scope"]
         }
         Relationships: [
           {
@@ -1468,6 +2051,8 @@ export type Database = {
       fiber_nodes: {
         Row: {
           address: string | null
+          asset_condition: Database["public"]["Enums"]["asset_condition"]
+          condition_source: string | null
           created_at: string
           elevation_ft: number
           id: string
@@ -1477,15 +2062,19 @@ export type Database = {
           node_type: string
           notes: string | null
           organization_id: string
+          owner_of_record: string | null
           project_id: string
           size_description: string
           slack_loop_ft: number
           status: string
           structure_depth_ft: number
           updated_at: string | null
+          work_scope: Database["public"]["Enums"]["work_scope"]
         }
         Insert: {
           address?: string | null
+          asset_condition?: Database["public"]["Enums"]["asset_condition"]
+          condition_source?: string | null
           created_at?: string
           elevation_ft?: number
           id?: string
@@ -1495,15 +2084,19 @@ export type Database = {
           node_type: string
           notes?: string | null
           organization_id: string
+          owner_of_record?: string | null
           project_id: string
           size_description?: string
           slack_loop_ft?: number
           status?: string
           structure_depth_ft?: number
           updated_at?: string | null
+          work_scope?: Database["public"]["Enums"]["work_scope"]
         }
         Update: {
           address?: string | null
+          asset_condition?: Database["public"]["Enums"]["asset_condition"]
+          condition_source?: string | null
           created_at?: string
           elevation_ft?: number
           id?: string
@@ -1513,12 +2106,14 @@ export type Database = {
           node_type?: string
           notes?: string | null
           organization_id?: string
+          owner_of_record?: string | null
           project_id?: string
           size_description?: string
           slack_loop_ft?: number
           status?: string
           structure_depth_ft?: number
           updated_at?: string | null
+          work_scope?: Database["public"]["Enums"]["work_scope"]
         }
         Relationships: [
           {
@@ -1780,6 +2375,8 @@ export type Database = {
       }
       fiber_routes: {
         Row: {
+          asset_condition: Database["public"]["Enums"]["asset_condition"]
+          condition_source: string | null
           conduit_diameter_inches: number
           created_at: string
           fill_percentage: number
@@ -1788,14 +2385,18 @@ export type Database = {
           installed_length_feet: number
           measured_length_feet: number
           organization_id: string
+          owner_of_record: string | null
           project_id: string
           route_id_tag: string
           route_purpose: string
           slack_percentage: number
           spare_capacity: number
           updated_at: string | null
+          work_scope: Database["public"]["Enums"]["work_scope"]
         }
         Insert: {
+          asset_condition?: Database["public"]["Enums"]["asset_condition"]
+          condition_source?: string | null
           conduit_diameter_inches?: number
           created_at?: string
           fill_percentage?: number
@@ -1804,14 +2405,18 @@ export type Database = {
           installed_length_feet?: number
           measured_length_feet?: number
           organization_id: string
+          owner_of_record?: string | null
           project_id: string
           route_id_tag: string
           route_purpose?: string
           slack_percentage?: number
           spare_capacity?: number
           updated_at?: string | null
+          work_scope?: Database["public"]["Enums"]["work_scope"]
         }
         Update: {
+          asset_condition?: Database["public"]["Enums"]["asset_condition"]
+          condition_source?: string | null
           conduit_diameter_inches?: number
           created_at?: string
           fill_percentage?: number
@@ -1820,12 +2425,14 @@ export type Database = {
           installed_length_feet?: number
           measured_length_feet?: number
           organization_id?: string
+          owner_of_record?: string | null
           project_id?: string
           route_id_tag?: string
           route_purpose?: string
           slack_percentage?: number
           spare_capacity?: number
           updated_at?: string | null
+          work_scope?: Database["public"]["Enums"]["work_scope"]
         }
         Relationships: [
           {
@@ -2121,6 +2728,62 @@ export type Database = {
           },
         ]
       }
+      labor_rates: {
+        Row: {
+          applies_to_scope: Database["public"]["Enums"]["work_scope"]
+          code: string
+          created_at: string
+          description: string
+          id: string
+          is_default: boolean
+          module: Database["public"]["Enums"]["bom_module"]
+          notes: string | null
+          organization_id: string | null
+          rate: number
+          structure_type: string | null
+          unit: string
+          updated_at: string | null
+        }
+        Insert: {
+          applies_to_scope: Database["public"]["Enums"]["work_scope"]
+          code: string
+          created_at?: string
+          description: string
+          id?: string
+          is_default?: boolean
+          module?: Database["public"]["Enums"]["bom_module"]
+          notes?: string | null
+          organization_id?: string | null
+          rate?: number
+          structure_type?: string | null
+          unit?: string
+          updated_at?: string | null
+        }
+        Update: {
+          applies_to_scope?: Database["public"]["Enums"]["work_scope"]
+          code?: string
+          created_at?: string
+          description?: string
+          id?: string
+          is_default?: boolean
+          module?: Database["public"]["Enums"]["bom_module"]
+          notes?: string | null
+          organization_id?: string | null
+          rate?: number
+          structure_type?: string | null
+          unit?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "labor_rates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       modules: {
         Row: {
           created_at: string
@@ -2153,7 +2816,9 @@ export type Database = {
       }
       network_devices: {
         Row: {
+          asset_condition: Database["public"]["Enums"]["asset_condition"]
           cabinet_id: string | null
+          condition_source: string | null
           created_at: string
           device_type: Database["public"]["Enums"]["device_type"]
           id: string
@@ -2162,17 +2827,25 @@ export type Database = {
           location_reference: string | null
           longitude: number | null
           manufacturer: string | null
+          material_received: boolean
+          material_received_at: string | null
           model_number: string | null
           name: string
+          owner_of_record: string | null
           poe_budget_watts: number
           project_id: string
           rack_unit: string | null
           status: string
+          supplied_by: string | null
+          supply_responsibility: Database["public"]["Enums"]["supply_responsibility"]
           total_ports: number | null
           updated_at: string | null
+          work_scope: Database["public"]["Enums"]["work_scope"]
         }
         Insert: {
+          asset_condition?: Database["public"]["Enums"]["asset_condition"]
           cabinet_id?: string | null
+          condition_source?: string | null
           created_at?: string
           device_type?: Database["public"]["Enums"]["device_type"]
           id?: string
@@ -2181,17 +2854,25 @@ export type Database = {
           location_reference?: string | null
           longitude?: number | null
           manufacturer?: string | null
+          material_received?: boolean
+          material_received_at?: string | null
           model_number?: string | null
           name: string
+          owner_of_record?: string | null
           poe_budget_watts?: number
           project_id: string
           rack_unit?: string | null
           status?: string
+          supplied_by?: string | null
+          supply_responsibility?: Database["public"]["Enums"]["supply_responsibility"]
           total_ports?: number | null
           updated_at?: string | null
+          work_scope?: Database["public"]["Enums"]["work_scope"]
         }
         Update: {
+          asset_condition?: Database["public"]["Enums"]["asset_condition"]
           cabinet_id?: string | null
+          condition_source?: string | null
           created_at?: string
           device_type?: Database["public"]["Enums"]["device_type"]
           id?: string
@@ -2200,14 +2881,20 @@ export type Database = {
           location_reference?: string | null
           longitude?: number | null
           manufacturer?: string | null
+          material_received?: boolean
+          material_received_at?: string | null
           model_number?: string | null
           name?: string
+          owner_of_record?: string | null
           poe_budget_watts?: number
           project_id?: string
           rack_unit?: string | null
           status?: string
+          supplied_by?: string | null
+          supply_responsibility?: Database["public"]["Enums"]["supply_responsibility"]
           total_ports?: number | null
           updated_at?: string | null
+          work_scope?: Database["public"]["Enums"]["work_scope"]
         }
         Relationships: [
           {
@@ -2680,7 +3367,26 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      project_cost_summary: {
+        Row: {
+          billable_total: number | null
+          labor: number | null
+          material_contractor: number | null
+          material_owner_furnished: number | null
+          ofci_lines: number | null
+          ofci_pending_delivery: number | null
+          project_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bom_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       assign_camera_to_switch_port: {
@@ -2718,6 +3424,19 @@ export type Database = {
       }
     }
     Enums: {
+      asset_condition: "existing" | "new" | "unknown"
+      bom_module:
+        | "cctv"
+        | "conduit"
+        | "fiber"
+        | "enclosure"
+        | "network"
+        | "power"
+        | "lighting"
+        | "wireless"
+        | "traffic"
+        | "tower"
+        | "general"
       bom_source_type: "catalog" | "custom"
       camera_status:
         | "planned"
@@ -2776,8 +3495,16 @@ export type Database = {
         | "power_monitoring"
         | "spare"
       splice_status: "planned" | "installed" | "tested" | "abandoned"
+      supply_responsibility: "contractor" | "owner" | "other_contractor"
       task_status: "pending" | "in_progress" | "completed" | "blocked"
       user_role: "owner" | "admin" | "member" | "editor" | "viewer"
+      work_scope:
+        | "reference"
+        | "reuse"
+        | "modify"
+        | "install"
+        | "replace"
+        | "remove"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2793,12 +3520,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2822,11 +3549,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2847,11 +3574,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2872,11 +3599,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2889,11 +3616,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2905,6 +3632,20 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      asset_condition: ["existing", "new", "unknown"],
+      bom_module: [
+        "cctv",
+        "conduit",
+        "fiber",
+        "enclosure",
+        "network",
+        "power",
+        "lighting",
+        "wireless",
+        "traffic",
+        "tower",
+        "general",
+      ],
       bom_source_type: ["catalog", "custom"],
       camera_status: ["planned", "in_progress", "complete", "issue", "unknown"],
       comm_type: ["copper", "fiber", "wireless"],
@@ -2964,8 +3705,17 @@ export const Constants = {
         "spare",
       ],
       splice_status: ["planned", "installed", "tested", "abandoned"],
+      supply_responsibility: ["contractor", "owner", "other_contractor"],
       task_status: ["pending", "in_progress", "completed", "blocked"],
       user_role: ["owner", "admin", "member", "editor", "viewer"],
+      work_scope: [
+        "reference",
+        "reuse",
+        "modify",
+        "install",
+        "replace",
+        "remove",
+      ],
     },
   },
 } as const

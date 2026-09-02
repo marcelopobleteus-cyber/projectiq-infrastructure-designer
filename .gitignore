@@ -45,3 +45,4 @@ next-env.d.ts
 # local agent configs
 .agents/
 mcp_config.json
+supabase/.temp/

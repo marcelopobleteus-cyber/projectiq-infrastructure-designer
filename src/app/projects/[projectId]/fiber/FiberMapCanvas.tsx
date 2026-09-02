@@ -20,8 +20,29 @@ import {
   clearStrandAssignmentsForCamera,
   assignStrandToCamera,
   assignCameraFiberTechnicianMode,
-  completeCameraFiberSplices
+  completeCameraFiberSplices,
+  setAssetCondition
 } from '../../actions-fiber'
+import type { AssetCondition } from '@/lib/assetCondition'
+
+/**
+ * Linea segmentada para infraestructura existente, siguiendo la convencion
+ * de los planos de construccion (solido = propuesto, segmentado = existente).
+ * Google Maps no tiene dashArray: se hace con un simbolo repetido.
+ */
+const DASHED_LINE_ICONS = (color: string): google.maps.IconSequence[] => [
+  {
+    icon: {
+      path: 'M 0,-1 0,1',
+      strokeOpacity: 0.9,
+      strokeColor: color,
+      strokeWeight: 2.5,
+      scale: 3,
+    },
+    offset: '0',
+    repeat: '14px',
+  },
+]
 
 const haversineDistanceMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const R = 6371000 // Earth radius in meters
@@ -162,6 +183,11 @@ export default function FiberMapCanvas({
   const [installationType, setInstallationType] = useState<'underground' | 'aerial' | 'direct_buried'>('underground')
   const [selectedCatalogCableId, setSelectedCatalogCableId] = useState('')
   const [routeFiberCount, setRouteFiberCount] = useState(12)
+
+  // Existente vs nuevo. Se elige ANTES de dibujar y se mantiene hasta que se
+  // cambie, porque en terreno se recorre por tramos: varios existentes
+  // seguidos, luego varios nuevos.
+  const [drawCondition, setDrawCondition] = useState<AssetCondition>('new')
 
   const [nodeColor, setNodeColor] = useState('')
   const [routeColor, setRouteColor] = useState('')
@@ -537,15 +563,38 @@ export default function FiberMapCanvas({
 
       const strokeCol = getRouteColor(route)
 
+      // Convencion de plano OSP: linea solida = ducto nuevo,
+      // linea segmentada = ducto existente que se reutiliza.
+      // Lo existente se dibuja mas tenue: esta en el mapa como contexto
+      // del recorrido, pero no es alcance que se cobre como material.
+      const isExisting = (route as any).asset_condition === 'existing'
+      const isUnverified = (route as any).asset_condition === 'unknown'
+
       // Draw Polyline path
       const poly = new google.maps.Polyline({
         path: points,
         geodesic: true,
         strokeColor: strokeCol,
-        strokeOpacity: 0.8,
+        strokeOpacity: isExisting ? 0 : 0.8,
         strokeWeight: 2.5,
+        ...(isExisting ? { icons: DASHED_LINE_ICONS(strokeCol) } : {}),
         map: map
       })
+
+      // Lo no verificado lleva un halo ambar: no se sabe si es existente o
+      // nuevo, y esa duda vale dinero. Debe verse, no esconderse.
+      if (isUnverified) {
+        const halo = new google.maps.Polyline({
+          path: points,
+          geodesic: true,
+          strokeColor: '#f59e0b',
+          strokeOpacity: 0.35,
+          strokeWeight: 7,
+          zIndex: -1,
+          map: map,
+        })
+        polylinesRef.current.push(halo)
+      }
 
       // Highlight selected route
       if (selectedRoute && selectedRoute.id === route.id) {
@@ -1102,12 +1151,18 @@ export default function FiberMapCanvas({
       elevationFt: 0.0,
       sizeDescription: defaultSize,
       slackLoopFt: defaultSlack,
+      assetCondition: drawCondition,
     })
 
     if (res.error) {
       showNotification('error', res.error)
     } else {
-      showNotification('success', `Created OSP Node ${tag}`)
+      showNotification(
+        'success',
+        drawCondition === 'existing'
+          ? `Marked existing ${tag} — reused, no material added to BOM`
+          : `Created OSP Node ${tag}`
+      )
       setToolMode('select')
       await loadDesignData()
     }
@@ -1158,17 +1213,56 @@ export default function FiberMapCanvas({
       installationType: installationType,
       segments,
       cableCatalogId: selectedCatalogCableId || undefined,
-      fiberCount: routeFiberCount
+      fiberCount: routeFiberCount,
+      conduitCondition: drawCondition,
     })
 
     if (res.error) {
       showNotification('error', res.error)
     } else {
-      showNotification('success', `Installed Conduit & Fiber route ${tag}`)
+      showNotification(
+        'success',
+        drawCondition === 'existing'
+          ? `Route ${tag} through existing conduit — fiber billed, conduit not`
+          : `Installed Conduit & Fiber route ${tag}`
+      )
       setTempRoutePoints([])
       setToolMode('select')
       await loadDesignData()
     }
+  }
+
+  // Reclasificar existente/nuevo sobre un elemento ya dibujado
+  const handleSetRouteCondition = async (id: string, cond: AssetCondition) => {
+    const res = await setAssetCondition({ projectId, target: 'route', id, assetCondition: cond })
+    if (res.error) {
+      showNotification('error', res.error)
+      return
+    }
+    if (res.removedBomLines) {
+      showNotification('success', `Marked as existing — ${res.removedBomLines} conduit BOM lines removed`)
+    } else if (res.warning) {
+      showNotification('success', res.warning)
+    } else {
+      showNotification('success', 'Condition updated')
+    }
+    await loadDesignData()
+  }
+
+  const handleSetNodeCondition = async (id: string, cond: AssetCondition) => {
+    const res = await setAssetCondition({ projectId, target: 'node', id, assetCondition: cond })
+    if (res.error) {
+      showNotification('error', res.error)
+      return
+    }
+    if (res.removedBomLines) {
+      showNotification('success', `Marked as existing — ${res.removedBomLines} BOM lines removed`)
+    } else if (res.warning) {
+      showNotification('success', res.warning)
+    } else {
+      showNotification('success', 'Condition updated')
+    }
+    await loadDesignData()
   }
 
   // Delete node handler
@@ -1676,7 +1770,40 @@ export default function FiberMapCanvas({
               Select
             </button>
             <div className="w-px h-4 bg-slate-800" />
-            
+
+            {/*
+              Existente vs nuevo. Va aqui, en la barra y no en un panel de
+              propiedades, porque se decide ANTES de cada trazo: el recorrido
+              alterna tramos existentes y nuevos. Elegir mal aqui es lo que
+              mete material fantasma en el BOM.
+            */}
+            <div className="flex items-center gap-0.5 bg-[var(--surface-2)] border border-[var(--border)] p-0.5 rounded-lg">
+              <button
+                onClick={() => setDrawCondition('new')}
+                title="Lo que se dibuje se instala en este proyecto: genera material en el BOM"
+                className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide transition-all ${
+                  drawCondition === 'new'
+                    ? 'bg-[var(--accent)] text-white shadow-inner'
+                    : 'bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                New
+              </button>
+              <button
+                onClick={() => setDrawCondition('existing')}
+                title="Ya existe en terreno: se reutiliza, NO genera material en el BOM"
+                className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide transition-all ${
+                  drawCondition === 'existing'
+                    ? 'bg-[var(--text-secondary)] text-[var(--surface-1)] shadow-inner'
+                    : 'bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                Existing
+              </button>
+            </div>
+
+            <div className="w-px h-4 bg-slate-800" />
+
             <div className="flex items-center gap-1 bg-[var(--surface-2)] border border-[var(--border)] p-0.5 rounded-lg">
               <select
                 id="toolbar-node-type-select"
@@ -2177,6 +2304,33 @@ export default function FiberMapCanvas({
                             <option value="direct_buried">Direct Buried</option>
                           </select>
                         </div>
+                      </div>
+
+                      {/* Procedencia del ducto: define si se cobra material */}
+                      <div>
+                        <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Conduit Condition</label>
+                        <div className="flex gap-2">
+                          {(['new', 'existing'] as const).map(cond => (
+                            <button
+                              key={cond}
+                              onClick={() => handleSetRouteCondition(selectedRoute.id, cond)}
+                              className={`flex-1 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wide border transition-all ${
+                                (selectedRoute as any).asset_condition === cond
+                                  ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                                  : 'bg-[var(--surface-2)] text-[var(--text-secondary)] border-[var(--border)] hover:text-[var(--text-primary)]'
+                              }`}
+                            >
+                              {cond === 'new' ? 'New' : 'Existing'}
+                            </button>
+                          ))}
+                        </div>
+                        <p className="text-[10px] text-[var(--text-tertiary)] mt-1.5 leading-snug">
+                          {(selectedRoute as any).asset_condition === 'existing'
+                            ? 'Ducto existente reutilizado. No se cobra conduit; la fibra si.'
+                            : (selectedRoute as any).asset_condition === 'unknown'
+                            ? 'Sin verificar. Confirma si el ducto ya existia antes de cotizar.'
+                            : 'Ducto nuevo. Genera HDPE, innerduct y mule tape en el BOM.'}
+                        </p>
                       </div>
 
                       <div>

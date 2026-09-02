@@ -34,12 +34,9 @@ export interface OrganizationTeamData {
 }
 
 export async function getOrganizationTeamData(): Promise<OrganizationTeamData> {
-  console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: START`)
   const supabase = await createClient()
   
-  console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: fetching user`)
   const { data: { user } } = await supabase.auth.getUser()
-  console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: auth.getUser() complete, user: ${user?.id || 'none'}`)
 
   if (!user && !BYPASS_AUTH) {
     return {
@@ -56,11 +53,14 @@ export async function getOrganizationTeamData(): Promise<OrganizationTeamData> {
   let currentUserRole: 'owner' | 'admin' | 'editor' | 'viewer' = 'owner'
 
   if (user) {
-    console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: fetching membership`)
+    // Ordered so a user who belongs to more than one organization always resolves to the
+    // same one. Without an order, `limit(1)` returned whichever row Postgres handed back
+    // first, so the settings page could silently show a different organization per load.
     const { data: membershipRows } = await supabase
       .from('organization_members')
       .select('organization_id, role')
       .eq('profile_id', user.id)
+      .order('created_at', { ascending: true })
       .limit(1)
 
     const membership = membershipRows?.[0]
@@ -71,14 +71,16 @@ export async function getOrganizationTeamData(): Promise<OrganizationTeamData> {
     }
   }
 
+  // Note: the two fallbacks below pick "any project" and then "any organization" when the
+  // caller has no membership. RLS is what keeps that from crossing tenants, so they are
+  // left in place, but a user with no membership should really see an empty state rather
+  // than someone else's workspace.
   if (!orgId) {
-    console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: no orgId from membership, checking projects`)
     const { data: firstProj } = await supabase.from('projects').select('organization_id').limit(1)
     orgId = firstProj?.[0]?.organization_id || ''
   }
 
   if (!orgId) {
-    console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: no orgId from projects, checking organizations`)
     const { data: firstOrg } = await supabase.from('organizations').select('id').limit(1)
     orgId = firstOrg?.[0]?.id || ''
   }
@@ -86,31 +88,26 @@ export async function getOrganizationTeamData(): Promise<OrganizationTeamData> {
   // Fetch Organization Name
   let organizationName = 'Company Workspace'
   if (orgId) {
-    console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: fetching orgName`)
     const { data: orgRow } = await supabase.from('organizations').select('name').eq('id', orgId).limit(1)
     if (orgRow?.[0]?.name) organizationName = orgRow[0].name
   }
 
   // 2. Fetch all members in organization
-  console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: fetching memberRows for orgId: ${orgId}`)
   const { data: memberRows } = await supabase
     .from('organization_members')
     .select('id, profile_id, role, created_at, profiles(id, full_name, email)')
     .eq('organization_id', orgId)
   
-  console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: memberRows fetched, count: ${memberRows?.length || 0}`)
 
   // Fetch real emails from auth.users via admin client if available
   let adminClient: any = null
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (serviceRoleKey) {
-    console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: creating admin client`)
     adminClient = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey)
   }
 
   const members: TeamMemberItem[] = []
   for (const m of memberRows || []) {
-    console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: processing member ${m.profile_id}`)
     const profile = (m.profiles as any) || {}
     const fullName = profile.full_name || 'Team Member'
     
@@ -123,7 +120,6 @@ export async function getOrganizationTeamData(): Promise<OrganizationTeamData> {
     
     if (!email && adminClient) {
       try {
-        console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: calling admin getUserById for ${m.profile_id}`)
         // Hard timeout of 3 seconds to prevent indefinite hanging in Vercel
         const timeoutPromise = new Promise((_, reject) => 
           setTimeout(() => reject(new Error('Admin API Timeout')), 3000)
@@ -131,12 +127,10 @@ export async function getOrganizationTeamData(): Promise<OrganizationTeamData> {
         const fetchPromise = adminClient.auth.admin.getUserById(m.profile_id)
         
         const { data: adminUser } = await Promise.race([fetchPromise, timeoutPromise]) as any
-        console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: admin getUserById resolved`)
         if (adminUser?.user?.email) {
           email = adminUser.user.email
         }
       } catch (e) {
-        console.warn(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: adminClient fetch failed or timed out:`, e)
         // ignore
       }
     }
@@ -157,7 +151,6 @@ export async function getOrganizationTeamData(): Promise<OrganizationTeamData> {
   }
 
   // 3. Fetch pending invites in organization
-  console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: fetching pending invites`)
   const { data: inviteRows } = await supabase
     .from('organization_invites')
     .select('id, email, role, created_at, status')
@@ -165,7 +158,6 @@ export async function getOrganizationTeamData(): Promise<OrganizationTeamData> {
     .eq('status', 'pending')
     .order('created_at', { ascending: false })
 
-  console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: invites fetched, count: ${inviteRows?.length || 0}`)
   
   const invites: PendingInviteItem[] = (inviteRows || []).map(i => ({
     id: i.id,
@@ -176,7 +168,6 @@ export async function getOrganizationTeamData(): Promise<OrganizationTeamData> {
     status: 'pending',
   }))
 
-  console.log(`[TRACE][${new Date().toISOString()}] getOrganizationTeamData: END`)
   return {
     currentUserRole,
     organizationId: orgId,
@@ -189,7 +180,7 @@ export async function getOrganizationTeamData(): Promise<OrganizationTeamData> {
 export async function inviteTeamMember(
   email: string,
   role: 'admin' | 'editor' | 'viewer'
-): Promise<{ success?: boolean; error?: string }> {
+): Promise<{ success?: boolean; error?: string; warning?: string }> {
   const validRoles = ['admin', 'editor', 'viewer']
   if (!validRoles.includes(role)) {
     return { error: 'Invalid role selected.' }
@@ -239,14 +230,21 @@ export async function inviteTeamMember(
     return { error: `Failed to create invite: ${inviteErr.message}` }
   }
 
-  // Attempt to send Supabase auth invite email with redirect to /reset-password
-  try {
-    await sendInviteEmail(email.trim().toLowerCase())
-  } catch (e) {
-    console.warn('Supabase auth inviteUserByEmail notice:', e)
-  }
+  // sendInviteEmail returns { sent, error } — it does not throw, so the old try/catch
+  // never saw a failed send. The invite row exists either way, but the person is told
+  // whether the email actually left.
+  const invite = await sendInviteEmail(email.trim().toLowerCase())
 
   revalidatePath('/settings')
+
+  if (!invite.sent) {
+    console.error('Invite email not sent to', email, '-', invite.error)
+    return {
+      success: true,
+      warning: `Invitation saved, but the email could not be sent: ${invite.error || 'unknown error'}`,
+    }
+  }
+
   return { success: true }
 }
 
@@ -411,6 +409,215 @@ export async function revokeInvite(inviteId: string): Promise<{ success?: boolea
     .from('organization_invites')
     .update({ status: 'revoked' })
     .eq('id', inviteId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/settings')
+  return { success: true }
+}
+
+/**
+ * Rename the caller's organization.
+ *
+ * The General tab used to render the workspace name in an input with no save button — you
+ * could type in it and nothing happened. RLS already allows owners and admins to update
+ * `organizations`, so the check here mirrors that rather than inventing a new rule.
+ */
+export async function updateWorkspaceName(
+  name: string
+): Promise<{ success?: boolean; error?: string }> {
+  const trimmed = name.trim()
+
+  if (!trimmed) {
+    return { error: 'The workspace name cannot be empty.' }
+  }
+
+  if (trimmed.length > 120) {
+    return { error: 'The workspace name is too long (120 characters max).' }
+  }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user && !BYPASS_AUTH) return { error: 'Not authenticated' }
+
+  let orgId = ''
+  let callerRole = 'owner'
+
+  if (user) {
+    const { data: membershipRows } = await supabase
+      .from('organization_members')
+      .select('organization_id, role')
+      .eq('profile_id', user.id)
+      .order('created_at', { ascending: true })
+      .limit(1)
+
+    const membership = membershipRows?.[0]
+    if (!membership && !BYPASS_AUTH) return { error: 'Access denied' }
+    if (membership) {
+      orgId = membership.organization_id
+      callerRole = membership.role
+    }
+  }
+
+  if (callerRole !== 'owner' && callerRole !== 'admin' && !BYPASS_AUTH) {
+    return { error: 'Only owners and admins can rename the workspace.' }
+  }
+
+  const { error } = await supabase
+    .from('organizations')
+    .update({ name: trimmed })
+    .eq('id', orgId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/settings')
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+// ─── Tarifas de mano de obra ─────────────────────────────────────────────────
+//
+// El sistema trae tarifas base (organization_id null) que son un punto de
+// partida, NO precios de mercado verificados. Cada organizacion sobrescribe
+// las que le sirven; las suyas ganan siempre sobre la base.
+
+export interface LaborRateItem {
+  id: string
+  code: string
+  description: string
+  module: string
+  appliesToScope: string
+  structureType: string | null
+  unit: string
+  rate: number
+  notes: string | null
+  /** true = tarifa base del sistema, todavia sin ajustar por la organizacion */
+  isSystemDefault: boolean
+  /** id de la fila base cuando esta ya fue sobrescrita, para poder mostrar el origen */
+  overridesCode: string | null
+}
+
+/** Resuelve la organizacion del usuario y su rol. */
+async function resolveCallerOrg(): Promise<
+  { orgId: string; role: string } | { error: string }
+> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user && !BYPASS_AUTH) return { error: 'Not authenticated' }
+  if (!user) return { orgId: '', role: 'owner' }
+
+  const { data: rows } = await supabase
+    .from('organization_members')
+    .select('organization_id, role')
+    .eq('profile_id', user.id)
+    .order('created_at', { ascending: true })
+    .limit(1)
+
+  const membership = rows?.[0]
+  if (!membership) return { error: 'Access denied' }
+  return { orgId: membership.organization_id, role: membership.role }
+}
+
+export async function getLaborRates(): Promise<{
+  rates: LaborRateItem[]
+  canEdit: boolean
+  error?: string
+}> {
+  const caller = await resolveCallerOrg()
+  if ('error' in caller) return { rates: [], canEdit: false, error: caller.error }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('labor_rates')
+    .select('*')
+    .or(`organization_id.is.null,organization_id.eq.${caller.orgId}`)
+    .order('module', { ascending: true })
+    .order('code', { ascending: true })
+
+  if (error) return { rates: [], canEdit: false, error: error.message }
+
+  // La tarifa propia de la organizacion reemplaza a la base del mismo codigo.
+  const byCode = new Map<string, any>()
+  for (const row of data ?? []) {
+    const current = byCode.get(row.code)
+    if (!current || (!current.organization_id && row.organization_id)) {
+      byCode.set(row.code, row)
+    }
+  }
+
+  const rates: LaborRateItem[] = [...byCode.values()].map(r => ({
+    id: r.id,
+    code: r.code,
+    description: r.description,
+    module: r.module,
+    appliesToScope: r.applies_to_scope,
+    structureType: r.structure_type,
+    unit: r.unit,
+    rate: Number(r.rate),
+    notes: r.notes,
+    isSystemDefault: r.organization_id === null,
+    overridesCode: r.organization_id ? r.code : null,
+  }))
+
+  return {
+    rates,
+    canEdit: caller.role === 'owner' || caller.role === 'admin',
+  }
+}
+
+/**
+ * Fija la tarifa de la organizacion para un codigo. Nunca modifica la fila
+ * base del sistema: crea o actualiza la propia de la organizacion, de modo
+ * que siempre se pueda ver cual era el punto de partida.
+ */
+export async function setLaborRate(params: {
+  code: string
+  rate: number
+}): Promise<{ success?: boolean; error?: string }> {
+  if (!Number.isFinite(params.rate) || params.rate < 0) {
+    return { error: 'The rate must be a positive number.' }
+  }
+  if (params.rate > 1_000_000) {
+    return { error: 'That rate looks wrong (over $1,000,000). Please check it.' }
+  }
+
+  const caller = await resolveCallerOrg()
+  if ('error' in caller) return { error: caller.error }
+  if (caller.role !== 'owner' && caller.role !== 'admin' && !BYPASS_AUTH) {
+    return { error: 'Only owners and admins can change labor rates.' }
+  }
+
+  const supabase = await createClient()
+
+  // Fila base como plantilla: se copia su descripcion, modulo y alcance.
+  const { data: base } = await supabase
+    .from('labor_rates')
+    .select('*')
+    .eq('code', params.code)
+    .is('organization_id', null)
+    .maybeSingle()
+
+  if (!base) return { error: `Unknown rate code: ${params.code}` }
+
+  const { error } = await supabase
+    .from('labor_rates')
+    .upsert(
+      {
+        organization_id: caller.orgId,
+        code: base.code,
+        description: base.description,
+        module: base.module,
+        applies_to_scope: base.applies_to_scope,
+        structure_type: base.structure_type,
+        unit: base.unit,
+        rate: params.rate,
+        is_default: false,
+        notes: 'Ajustada por la organizacion',
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'organization_id,code' }
+    )
 
   if (error) return { error: error.message }
 

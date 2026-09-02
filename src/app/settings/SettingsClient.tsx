@@ -1,20 +1,24 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   getOrganizationTeamData,
   inviteTeamMember,
   updateMemberRole,
   removeMember,
   revokeInvite,
+  updateWorkspaceName,
+  getLaborRates,
+  setLaborRate,
   OrganizationTeamData,
   TeamMemberItem,
   PendingInviteItem,
+  LaborRateItem,
 } from './actions'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 
 export default function SettingsClient({ initialTeamData }: { initialTeamData: OrganizationTeamData }) {
-  const [activeTab, setActiveTab] = useState<'general' | 'profile' | 'company' | 'branding' | 'team' | 'preferences' | 'integrations' | 'security'>('general')
+  const [activeTab, setActiveTab] = useState<'general' | 'profile' | 'company' | 'branding' | 'team' | 'rates' | 'preferences' | 'integrations' | 'security'>('general')
 
   // Notification Toast state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null)
@@ -26,6 +30,10 @@ export default function SettingsClient({ initialTeamData }: { initialTeamData: O
   const [loadingTeam, setLoadingTeam] = useState(false)
   const [teamLoadError, setTeamLoadError] = useState(false)
 
+  // General tab — editable workspace name
+  const [workspaceName, setWorkspaceName] = useState(initialTeamData.organizationName || '')
+  const [isSavingName, setIsSavingName] = useState(false)
+
   // Invite modal state
   const [isInviteOpen, setIsInviteOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
@@ -33,6 +41,16 @@ export default function SettingsClient({ initialTeamData }: { initialTeamData: O
   const [isInviting, setIsInviting] = useState(false)
 
   // Member deletion state
+  // Tarifas de mano de obra. Los borradores se guardan aparte de la lista
+  // cargada para poder mostrar Save/Discard reales y no perder el valor
+  // original mientras se edita.
+  const [laborRates, setLaborRates] = useState<LaborRateItem[]>([])
+  const [rateDrafts, setRateDrafts] = useState<Record<string, string>>({})
+  const [loadingRates, setLoadingRates] = useState(false)
+  const [ratesError, setRatesError] = useState<string | null>(null)
+  const [canEditRates, setCanEditRates] = useState(false)
+  const [savingRate, setSavingRate] = useState<string | null>(null)
+
   const [memberToRemove, setMemberToRemove] = useState<TeamMemberItem | null>(null)
   const [isRemoving, setIsRemoving] = useState(false)
 
@@ -68,11 +86,33 @@ export default function SettingsClient({ initialTeamData }: { initialTeamData: O
     if (res.error) {
       showToast(res.error, 'error')
     } else {
-      showToast(`Invitation sent to ${inviteEmail}!`)
+      // The invite row can be saved while the email fails to leave. Say which happened.
+      if (res.warning) {
+        showToast(res.warning, 'error')
+      } else {
+        showToast(`Invitation sent to ${inviteEmail}!`)
+      }
       setIsInviteOpen(false)
       setInviteEmail('')
       loadTeamData()
     }
+  }
+
+  const handleSaveWorkspaceName = async () => {
+    const next = workspaceName.trim()
+    if (!next || next === teamData?.organizationName) return
+
+    setIsSavingName(true)
+    const res = await updateWorkspaceName(next)
+    setIsSavingName(false)
+
+    if (res.error) {
+      showToast(res.error, 'error')
+      return
+    }
+
+    showToast('Workspace name updated.')
+    setTeamData(prev => (prev ? { ...prev, organizationName: next } : prev))
   }
 
   const handleRoleChange = async (memberId: string, newRole: any) => {
@@ -111,19 +151,94 @@ export default function SettingsClient({ initialTeamData }: { initialTeamData: O
     }
   }
 
+  // Carga diferida: las tarifas solo se piden cuando se abre su pestana.
+  useEffect(() => {
+    if (activeTab !== 'rates' || laborRates.length > 0 || loadingRates) return
+    let cancelled = false
+    setLoadingRates(true)
+    setRatesError(null)
+    getLaborRates()
+      .then(res => {
+        if (cancelled) return
+        if (res.error) setRatesError(res.error)
+        else {
+          setLaborRates(res.rates)
+          setCanEditRates(res.canEdit)
+        }
+      })
+      .catch(() => { if (!cancelled) setRatesError('Could not load labor rates.') })
+      .finally(() => { if (!cancelled) setLoadingRates(false) })
+    return () => { cancelled = true }
+  }, [activeTab, laborRates.length, loadingRates])
+
+  // Solo cuenta como cambio si el numero es valido y distinto del guardado.
+  const dirtyRateCodes = laborRates
+    .filter(r => {
+      const draft = rateDrafts[r.code]
+      if (draft === undefined) return false
+      const n = Number(draft)
+      return draft.trim() !== '' && Number.isFinite(n) && n >= 0 && n !== r.rate
+    })
+    .map(r => r.code)
+
+  const handleSaveRates = async () => {
+    if (dirtyRateCodes.length === 0) return
+    setSavingRate(dirtyRateCodes[0])
+
+    const failed: string[] = []
+    for (const code of dirtyRateCodes) {
+      const res = await setLaborRate({ code, rate: Number(rateDrafts[code]) })
+      if (res.error) failed.push(`${code}: ${res.error}`)
+    }
+
+    // Se recarga desde el servidor en vez de asumir el resultado, para que
+    // la columna Source refleje que ahora es tarifa propia y no la base.
+    const refreshed = await getLaborRates()
+    if (!refreshed.error) {
+      setLaborRates(refreshed.rates)
+      setCanEditRates(refreshed.canEdit)
+    }
+
+    setSavingRate(null)
+
+    if (failed.length > 0) {
+      showToast(failed[0], 'error')
+      // Se conservan los borradores que fallaron para no perder lo escrito.
+      setRateDrafts(prev => {
+        const kept: Record<string, string> = {}
+        for (const line of failed) {
+          const code = line.split(':')[0]
+          if (prev[code] !== undefined) kept[code] = prev[code]
+        }
+        return kept
+      })
+    } else {
+      setRateDrafts({})
+      showToast(`Updated ${dirtyRateCodes.length} rate${dirtyRateCodes.length > 1 ? 's' : ''}.`)
+    }
+  }
+
   const isOrgAdmin = teamData?.currentUserRole === 'owner' || teamData?.currentUserRole === 'admin'
   const isOwner = teamData?.currentUserRole === 'owner'
 
-  const tabs = [
-    { id: 'general', label: 'General' },
-    { id: 'profile', label: 'Profile' },
-    { id: 'company', label: 'Company / Organization' },
-    { id: 'branding', label: 'Branding' },
-    { id: 'team', label: 'Users & Permissions' },
-    { id: 'preferences', label: 'Preferences' },
-    { id: 'integrations', label: 'Integrations' },
-    { id: 'security', label: 'Data & Security' },
+  // Every section planned for this page, with whether it actually renders anything.
+  // Only `general` and `team` have a matching block in the content area below; the other
+  // six were listed in the sidebar but showed an empty panel with no explanation when
+  // clicked. They stay here so the roadmap is not lost — flip `built` to true once a
+  // section has a real implementation and it reappears in the navigation.
+  const allTabs = [
+    { id: 'general', label: 'General', built: true },
+    { id: 'team', label: 'Users & Permissions', built: true },
+    { id: 'rates', label: 'Labor Rates', built: true },
+    { id: 'profile', label: 'Profile', built: false },
+    { id: 'company', label: 'Company / Organization', built: false },
+    { id: 'branding', label: 'Branding', built: false },
+    { id: 'preferences', label: 'Preferences', built: false },
+    { id: 'integrations', label: 'Integrations', built: false },
+    { id: 'security', label: 'Data & Security', built: false },
   ] as const
+
+  const tabs = allTabs.filter(t => t.built)
 
   return (
     <div className="flex-1 flex bg-[var(--bg)] text-[var(--text-primary)] font-sans h-full overflow-hidden relative">
@@ -158,7 +273,7 @@ export default function SettingsClient({ initialTeamData }: { initialTeamData: O
                 }`}
               >
                 <span>{tab.label}</span>
-                {(tab.id === 'company' || tab.id === 'branding' || tab.id === 'team') && !isOrgAdmin && (
+                {!isOrgAdmin && (
                   <span className="text-[9px] text-[var(--text-tertiary)] uppercase font-mono">Read-Only</span>
                 )}
               </button>
@@ -177,16 +292,166 @@ export default function SettingsClient({ initialTeamData }: { initialTeamData: O
               <h2 className="text-xl font-extrabold text-[var(--text-primary)]">General Workspace Settings</h2>
               <p className="text-xs text-[var(--text-secondary)] mt-1">Configure global application defaults and operational metadata.</p>
             </div>
+            {/* The workspace name used to sit in an input with no save button, and the
+                field below it showed a hardcoded "Production (US-East)" that came from
+                nowhere. Now the name saves, and the invented field is gone. */}
             <div className="bg-[var(--surface-1)] border border-[var(--border)] p-6 rounded-xl space-y-4 shadow-xs">
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider">Workspace Title</label>
-                <input type="text" defaultValue={teamData?.organizationName || 'NextQ Infrastructure Designer'} className="bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3.5 py-2 text-xs text-[var(--text-primary)] font-semibold" />
+                <label htmlFor="workspace-name" className="text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider">
+                  Workspace Name
+                </label>
+                <input
+                  id="workspace-name"
+                  type="text"
+                  value={workspaceName}
+                  onChange={(e) => setWorkspaceName(e.target.value)}
+                  disabled={!isOrgAdmin || isSavingName}
+                  className="bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3.5 py-2 text-xs text-[var(--text-primary)] font-semibold focus:outline-none focus:border-[var(--accent)] disabled:opacity-60"
+                />
+                <p className="text-[11px] text-[var(--text-tertiary)]">
+                  {isOrgAdmin
+                    ? 'This is the name your team sees across the application.'
+                    : 'Only owners and admins can change the workspace name.'}
+                </p>
               </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold uppercase text-[var(--text-tertiary)] tracking-wider">Environment</label>
-                <input type="text" readOnly defaultValue="Production (US-East)" className="bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3.5 py-2 text-xs text-[var(--text-tertiary)] font-mono" />
-              </div>
+
+              {isOrgAdmin && (
+                <div className="flex items-center gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleSaveWorkspaceName}
+                    disabled={isSavingName || !workspaceName.trim() || workspaceName.trim() === teamData?.organizationName}
+                    className="px-3.5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-lg transition cursor-pointer shadow-xs"
+                  >
+                    {isSavingName ? 'Saving…' : 'Save Changes'}
+                  </button>
+                  {workspaceName.trim() !== teamData?.organizationName && (
+                    <button
+                      type="button"
+                      onClick={() => setWorkspaceName(teamData?.organizationName || '')}
+                      disabled={isSavingName}
+                      className="px-3.5 py-2 bg-[var(--surface-2)] hover:bg-[var(--surface-hover)] border border-[var(--border)] text-[var(--text-primary)] text-xs font-bold rounded-lg transition cursor-pointer"
+                    >
+                      Discard
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
+          </div>
+        )}
+
+        {/* Labor Rates Tab */}
+        {activeTab === 'rates' && (
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-xl font-extrabold text-[var(--text-primary)]">Labor Rates</h2>
+              <p className="text-xs text-[var(--text-secondary)] mt-1">
+                What the crew charges for work on infrastructure that already exists. Reusing a manhole
+                buys no material, but it still costs labor.
+              </p>
+            </div>
+
+            {/* Las tarifas base las sembro el sistema como punto de partida.
+                Advertirlo es obligatorio: no son precios de mercado verificados
+                y cotizar con ellas sin revisar produce numeros equivocados. */}
+            <div className="bg-[var(--surface-1)] border-l-2 border-l-[var(--accent)] border border-[var(--border)] p-4 rounded-xl">
+              <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+                <span className="font-bold text-[var(--text-primary)]">Los valores marcados &ldquo;System default&rdquo; no son precios verificados.</span>{' '}
+                Son un punto de partida para que el calculo funcione. Ajustalos con tus costos reales
+                antes de cotizar a un cliente.
+              </p>
+            </div>
+
+            {loadingRates ? (
+              <p className="text-xs text-[var(--text-tertiary)]">Loading rates…</p>
+            ) : ratesError ? (
+              <div className="bg-red-50 border border-red-200 p-4 rounded-xl">
+                <p className="text-xs text-[var(--danger)] font-semibold">{ratesError}</p>
+              </div>
+            ) : (
+              <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-xl overflow-hidden shadow-xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
+                        <th className="text-left px-4 py-2.5 font-bold uppercase text-[10px] tracking-wider text-[var(--text-tertiary)]">Code</th>
+                        <th className="text-left px-4 py-2.5 font-bold uppercase text-[10px] tracking-wider text-[var(--text-tertiary)]">Work</th>
+                        <th className="text-left px-4 py-2.5 font-bold uppercase text-[10px] tracking-wider text-[var(--text-tertiary)]">Applies to</th>
+                        <th className="text-right px-4 py-2.5 font-bold uppercase text-[10px] tracking-wider text-[var(--text-tertiary)]">Rate</th>
+                        <th className="text-left px-4 py-2.5 font-bold uppercase text-[10px] tracking-wider text-[var(--text-tertiary)]">Source</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {laborRates.map(r => (
+                        <tr key={r.code} className="border-b border-[var(--border)] last:border-0">
+                          <td className="px-4 py-3 font-mono text-[11px] text-[var(--text-secondary)]">{r.code}</td>
+                          <td className="px-4 py-3 text-[var(--text-primary)]">{r.description}</td>
+                          <td className="px-4 py-3 text-[var(--text-secondary)]">
+                            <span className="capitalize">{r.appliesToScope}</span>
+                            {r.structureType && <span className="text-[var(--text-tertiary)]"> · {r.structureType.replace('_', ' ')}</span>}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <span className="text-[var(--text-tertiary)]">$</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={rateDrafts[r.code] ?? String(r.rate)}
+                                onChange={e => setRateDrafts(prev => ({ ...prev, [r.code]: e.target.value }))}
+                                disabled={!canEditRates || savingRate !== null}
+                                className="w-24 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-right text-[var(--text-primary)] font-semibold font-mono focus:outline-none focus:border-[var(--accent)] disabled:opacity-60"
+                              />
+                              <span className="text-[10px] text-[var(--text-tertiary)] font-mono w-6">/{r.unit}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            {r.isSystemDefault ? (
+                              <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--accent-text)]">System default</span>
+                            ) : (
+                              <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-tertiary)]">Your rate</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {canEditRates && dirtyRateCodes.length > 0 && (
+                  <div className="flex items-center gap-3 px-4 py-3 border-t border-[var(--border)] bg-[var(--surface-2)]">
+                    <button
+                      type="button"
+                      onClick={handleSaveRates}
+                      disabled={savingRate !== null}
+                      className="px-3.5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white text-xs font-bold rounded-lg transition cursor-pointer shadow-xs"
+                    >
+                      {savingRate ? 'Saving…' : `Save ${dirtyRateCodes.length} rate${dirtyRateCodes.length > 1 ? 's' : ''}`}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRateDrafts({})}
+                      disabled={savingRate !== null}
+                      className="px-3.5 py-2 bg-[var(--surface-1)] hover:bg-[var(--surface-hover)] border border-[var(--border)] text-[var(--text-primary)] text-xs font-bold rounded-lg transition cursor-pointer"
+                    >
+                      Discard
+                    </button>
+                  </div>
+                )}
+
+                {!canEditRates && (
+                  <div className="px-4 py-3 border-t border-[var(--border)] bg-[var(--surface-2)]">
+                    <p className="text-[11px] text-[var(--text-tertiary)]">Only owners and admins can change labor rates.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <p className="text-[11px] text-[var(--text-tertiary)] leading-relaxed">
+              Cambiar una tarifa afecta las lineas de mano de obra que se generen de aqui en adelante.
+              Las que ya estan en un BOM conservan el precio con que se crearon.
+            </p>
           </div>
         )}
 

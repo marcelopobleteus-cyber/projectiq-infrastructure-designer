@@ -1,6 +1,8 @@
 'use client'
 
 import React, { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { recalculateProjectLabor, LaborRecalcResult } from '../../actions-labor'
 
 interface BOMItem {
   id: string
@@ -14,6 +16,10 @@ interface BOMItem {
   totalCost: number
   status: string
   isDatabase?: boolean
+  /** Quien compra el material. 'owner' = OFCI, lo provee el cliente. */
+  supplyResponsibility?: 'contractor' | 'owner' | 'other_contractor'
+  suppliedBy?: string | null
+  materialReceived?: boolean
 }
 
 interface BOMClientViewProps {
@@ -24,6 +30,46 @@ interface BOMClientViewProps {
 export default function BOMClientView({ projectId, items }: BOMClientViewProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('All')
   const [searchQuery, setSearchQuery] = useState<string>('')
+
+  const router = useRouter()
+
+  // Recalculo de mano de obra: siempre se previsualiza antes de escribir.
+  const [laborPreview, setLaborPreview] = useState<LaborRecalcResult | null>(null)
+  const [laborBusy, setLaborBusy] = useState(false)
+
+  const handlePreviewLabor = async () => {
+    setLaborBusy(true)
+    try {
+      const res = await recalculateProjectLabor({ projectId, apply: false })
+      setLaborPreview(res)
+    } catch {
+      setLaborPreview({
+        changes: [], currentLaborTotal: 0, newLaborTotal: 0, missingRates: [],
+        applied: false, error: 'Could not calculate the labor update.',
+      })
+    } finally {
+      setLaborBusy(false)
+    }
+  }
+
+  const handleApplyLabor = async () => {
+    setLaborBusy(true)
+    try {
+      const res = await recalculateProjectLabor({ projectId, apply: true })
+      if (res.error) {
+        setLaborPreview(res)
+      } else {
+        setLaborPreview(null)
+        // El BOM se arma en el servidor: hay que recargarlo para ver el cambio.
+        router.refresh()
+      }
+    } catch {
+      setLaborPreview(prev => prev && { ...prev, error: 'Could not apply the labor update.' })
+    } finally {
+      setLaborBusy(false)
+    }
+  }
+
 
   const categories = ['All', 'Camera', 'Network', 'Fiber', 'Power', 'Mounting', 'Labor', 'Miscellaneous']
 
@@ -36,11 +82,23 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
     return matchesCategory && matchesSearch
   })
 
-  const totalBOMCost = items.reduce((acc, item) => acc + item.totalCost, 0)
-  const fiberOSPSubtotal = items
+  // Lo que provee el cliente (OFCI) NO entra en lo que cobramos, pero SI
+  // aparece en el BOM: el as-built tiene que estar completo para poder
+  // entregar como quedo conectado.
+  const isOwnerFurnished = (i: BOMItem) =>
+    i.supplyResponsibility != null && i.supplyResponsibility !== 'contractor'
+
+  const ownerFurnishedItems = items.filter(isOwnerFurnished)
+  const contractorItems = items.filter(i => !isOwnerFurnished(i))
+
+  const ownerFurnishedValue = ownerFurnishedItems.reduce((acc, i) => acc + i.totalCost, 0)
+  const ofciPending = ownerFurnishedItems.filter(i => !i.materialReceived).length
+
+  const totalBOMCost = contractorItems.reduce((acc, item) => acc + item.totalCost, 0)
+  const fiberOSPSubtotal = contractorItems
     .filter(item => item.category.toLowerCase() === 'fiber')
     .reduce((acc, item) => acc + item.totalCost, 0)
-  const cameraDeviceSubtotal = items
+  const cameraDeviceSubtotal = contractorItems
     .filter(item => ['camera', 'network'].includes(item.category.toLowerCase()))
     .reduce((acc, item) => acc + item.totalCost, 0)
   const laborSubtotal = items
@@ -74,7 +132,7 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
   }
 
   const handleExportCSV = () => {
-    const headers = ['Description', 'Manufacturer', 'Part Number', 'Category', 'Quantity', 'Unit', 'Unit Cost', 'Total Cost', 'Status']
+    const headers = ['Description', 'Manufacturer', 'Part Number', 'Category', 'Quantity', 'Unit', 'Unit Cost', 'Total Cost', 'Status', 'Supplied By', 'Received']
     const rows = filteredItems.map(item => [
       `"${item.description.replace(/"/g, '""')}"`,
       `"${item.manufacturer.replace(/"/g, '""')}"`,
@@ -84,7 +142,9 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
       `"${item.unit}"`,
       item.unitCost.toFixed(2),
       item.totalCost.toFixed(2),
-      `"${item.status}"`
+      `"${item.status}"`,
+      `"${isOwnerFurnished(item) ? (item.suppliedBy || 'Cliente (OFCI)') : 'NGT (CFCI)'}"`,
+      `"${isOwnerFurnished(item) ? (item.materialReceived ? 'Sí' : 'Pendiente') : 'n/a'}"`
     ])
 
     const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\n')
@@ -104,9 +164,13 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
       {/* Metrics Banner (Stat Cards Spec: upper label, mono big number, surface-1 background) */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-[var(--surface-1)] border border-[var(--border)] p-4 rounded-xl flex flex-col justify-between shadow-xs">
-          <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider block">Total Estimated Cost</span>
+          <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider block">Facturable a cliente</span>
           <span className="text-2xl font-black text-[var(--text-primary)] font-mono tracking-tight mt-1">{formatCurrency(totalBOMCost)}</span>
-          <p className="text-[10px] text-[var(--text-secondary)] mt-2">Combined hardware & outside plant</p>
+          <p className="text-[10px] text-[var(--text-secondary)] mt-2">
+            {ownerFurnishedItems.length > 0
+              ? `Excluye ${formatCurrency(ownerFurnishedValue)} provisto por el cliente`
+              : 'Material y mano de obra que compramos e instalamos'}
+          </p>
         </div>
 
         <div className="bg-[var(--surface-1)] border border-[var(--border)] p-4 rounded-xl flex flex-col justify-between shadow-xs relative overflow-hidden">
@@ -181,6 +245,17 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
               className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)]"
             />
           </div>
+          {/* Las lineas de mano de obra conservan el precio con que se crearon.
+              Este boton es la accion explicita para ponerlas al dia tras
+              cambiar una tarifa — siempre previsualizando antes de aplicar. */}
+          <button
+            onClick={handlePreviewLabor}
+            disabled={laborBusy}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--surface-1)] hover:bg-[var(--surface-hover)] disabled:opacity-50 border border-[var(--border)] text-[var(--text-primary)] rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer shadow-xs"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 12a9 9 0 0 1 9-9 9 9 0 0 1 6.7 3M21 12a9 9 0 0 1-9 9 9 9 0 0 1-6.7-3"/><polyline points="21 3 21 8 16 8"/><polyline points="3 21 3 16 8 16"/></svg>
+            {laborBusy ? 'CHECKING…' : 'RECALC LABOR'}
+          </button>
           <button
             onClick={handleExportCSV}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--surface-1)] hover:bg-[var(--surface-hover)] border border-[var(--border)] text-[var(--text-primary)] rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer shadow-xs"
@@ -190,6 +265,137 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
           </button>
         </div>
       </div>
+
+      {/* Material del cliente pendiente de llegar. Sin esto la cuadrilla
+          llega a terreno y no puede instalar — es el aviso que evita el viaje
+          perdido, y por eso va arriba y no escondido en la tabla. */}
+      {ofciPending > 0 && (
+        <div className="bg-[var(--surface-1)] border border-[var(--border)] border-l-2 border-l-[var(--warn)] rounded-xl px-4 py-3 flex items-center gap-3">
+          <span className="text-xs font-bold text-[var(--text-primary)]">
+            {ofciPending} {ofciPending === 1 ? 'ítem provisto por el cliente sigue' : 'ítems provistos por el cliente siguen'} sin recibirse en obra
+          </span>
+          <span className="text-[11px] text-[var(--text-secondary)]">
+            Valor de referencia: {formatCurrency(ownerFurnishedValue)} · no se factura
+          </span>
+        </div>
+      )}
+
+      {/* Previsualizacion del recalculo de mano de obra */}
+      {laborPreview && (
+        <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-xl shadow-xs overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--surface-2)]">
+            <div>
+              <h3 className="text-xs font-extrabold uppercase tracking-wider text-[var(--text-primary)]">Labor Recalculation</h3>
+              <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                Nada se ha guardado todavía. Revisa el cambio antes de aplicarlo.
+              </p>
+            </div>
+            <button
+              onClick={() => setLaborPreview(null)}
+              className="text-[11px] font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
+
+          {laborPreview.error ? (
+            <div className="px-4 py-4">
+              <p className="text-xs text-[var(--danger)] font-semibold">{laborPreview.error}</p>
+            </div>
+          ) : laborPreview.changes.length === 0 ? (
+            <div className="px-4 py-5">
+              <p className="text-xs text-[var(--text-secondary)]">
+                La mano de obra ya está al día con las tarifas vigentes. No hay nada que cambiar.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto max-h-72 overflow-y-auto">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-[var(--surface-2)]">
+                    <tr className="border-b border-[var(--border)]">
+                      <th className="text-left px-4 py-2 font-bold uppercase text-[10px] tracking-wider text-[var(--text-tertiary)]">Change</th>
+                      <th className="text-left px-4 py-2 font-bold uppercase text-[10px] tracking-wider text-[var(--text-tertiary)]">Element</th>
+                      <th className="text-left px-4 py-2 font-bold uppercase text-[10px] tracking-wider text-[var(--text-tertiary)]">Work</th>
+                      <th className="text-right px-4 py-2 font-bold uppercase text-[10px] tracking-wider text-[var(--text-tertiary)]">Rate</th>
+                      <th className="text-right px-4 py-2 font-bold uppercase text-[10px] tracking-wider text-[var(--text-tertiary)]">Line total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {laborPreview.changes.map((c, i) => (
+                      <tr key={`${c.code}-${c.elementTag}-${i}`} className="border-b border-[var(--border)] last:border-0">
+                        <td className="px-4 py-2.5">
+                          <span className={`text-[10px] font-bold uppercase tracking-wide ${
+                            c.action === 'add' ? 'text-[var(--success)]'
+                            : c.action === 'remove' ? 'text-[var(--danger)]'
+                            : 'text-[var(--accent-text)]'
+                          }`}>
+                            {c.action}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 font-mono text-[11px] text-[var(--text-secondary)]">{c.elementTag}</td>
+                        <td className="px-4 py-2.5 text-[var(--text-primary)]">{c.description}</td>
+                        <td className="px-4 py-2.5 text-right font-mono text-[11px]">
+                          {c.oldRate !== null && c.newRate !== null && c.oldRate !== c.newRate ? (
+                            <>
+                              <span className="text-[var(--text-tertiary)] line-through">{formatCurrency(c.oldRate)}</span>
+                              <span className="text-[var(--text-primary)] font-bold"> → {formatCurrency(c.newRate)}</span>
+                            </>
+                          ) : (
+                            <span className="text-[var(--text-primary)]">{formatCurrency(c.newRate ?? c.oldRate ?? 0)}</span>
+                          )}
+                          <span className="text-[var(--text-tertiary)]">/{c.unit}</span>
+                        </td>
+                        <td className="px-4 py-2.5 text-right font-mono text-[11px] font-bold text-[var(--text-primary)]">
+                          {formatCurrency(c.newTotal)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {laborPreview.missingRates.length > 0 && (
+                <div className="px-4 py-3 border-t border-[var(--border)]">
+                  <p className="text-[11px] text-[var(--warn)] font-semibold">
+                    Sin tarifa definida, quedan sin cobrar: {laborPreview.missingRates.join(', ')}
+                  </p>
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3 border-t border-[var(--border)] bg-[var(--surface-2)]">
+                <div className="text-[11px] font-mono text-[var(--text-secondary)] flex-1">
+                  Labor total:{' '}
+                  <span className="text-[var(--text-tertiary)] line-through">{formatCurrency(laborPreview.currentLaborTotal)}</span>
+                  <span className="text-[var(--text-primary)] font-bold"> → {formatCurrency(laborPreview.newLaborTotal)}</span>
+                  <span className={`ml-2 font-bold ${
+                    laborPreview.newLaborTotal >= laborPreview.currentLaborTotal ? 'text-[var(--success)]' : 'text-[var(--danger)]'
+                  }`}>
+                    ({laborPreview.newLaborTotal >= laborPreview.currentLaborTotal ? '+' : ''}
+                    {formatCurrency(laborPreview.newLaborTotal - laborPreview.currentLaborTotal)})
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleApplyLabor}
+                    disabled={laborBusy}
+                    className="px-3.5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white text-xs font-bold rounded-lg transition cursor-pointer shadow-xs"
+                  >
+                    {laborBusy ? 'Applying…' : `Apply ${laborPreview.changes.length} change${laborPreview.changes.length > 1 ? 's' : ''}`}
+                  </button>
+                  <button
+                    onClick={() => setLaborPreview(null)}
+                    disabled={laborBusy}
+                    className="px-3.5 py-2 bg-[var(--surface-1)] hover:bg-[var(--surface-hover)] border border-[var(--border)] text-[var(--text-primary)] text-xs font-bold rounded-lg transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Main Table Component */}
       {filteredItems.length === 0 ? (
@@ -220,6 +426,16 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
                   <tr key={idx} className="hover:bg-[var(--surface-hover)] transition-colors">
                     <td className="py-3 px-6 font-bold text-[var(--text-primary)]">
                       {item.description}
+                      {/* OFCI: la línea existe para el as-built, pero no se cobra.
+                          Se marca en la fila para que nadie la sume al cotizar. */}
+                      {isOwnerFurnished(item) && (
+                        <span className="inline-flex items-center gap-1.5 ml-2 px-2 py-0.5 rounded text-[9.5px] font-bold uppercase bg-[var(--surface-2)] text-[var(--text-secondary)] border border-[var(--border-strong)] align-middle">
+                          OFCI · {item.suppliedBy || 'Cliente'}
+                          {!item.materialReceived && (
+                            <span className="text-[var(--warn)]">· pendiente</span>
+                          )}
+                        </span>
+                      )}
                       {item.unit === 'ft' && (
                         <span className="block text-[9.5px] text-[var(--text-tertiary)] font-mono mt-0.5 uppercase tracking-wide">
                           OSP Length in Feet (Calculated via Installed Cable Pathway)
@@ -241,7 +457,7 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
                       {item.quantity.toLocaleString(undefined, { minimumFractionDigits: item.unit === 'ft' ? 2 : 0, maximumFractionDigits: item.unit === 'ft' ? 2 : 0 })}
                       <span className="text-[10px] text-[var(--text-tertiary)] ml-1 lowercase font-normal">{item.unit}</span>
                     </td>
-                    <td className="py-3 px-4 text-right font-mono text-[var(--text-secondary)]">
+                    <td className={`py-3 px-4 text-right font-mono ${isOwnerFurnished(item) ? 'text-[var(--text-tertiary)]' : 'text-[var(--text-secondary)]'}`}>
                       {item.unitCost > 0 ? formatCurrency(item.unitCost) : <span className="italic text-[var(--text-tertiary)]">N/A</span>}
                     </td>
                     <td className="py-3 px-4 text-right font-mono text-[var(--text-primary)] font-extrabold">

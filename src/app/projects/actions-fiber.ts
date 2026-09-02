@@ -4,6 +4,9 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
 import { BYPASS_AUTH } from '@/config/auth'
 import { DEMO_FIBER_DATA } from '@/lib/demoData'
+import type { Database } from '@/types/supabase'
+import { scopeBuysMaterial } from '@/lib/assetCondition'
+import type { AssetCondition, WorkScope } from '@/lib/assetCondition'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -19,6 +22,7 @@ export type FiberNodeType =
   | 'Custom'
 
 export type FiberNodeStatus = 'Planned' | 'Existing' | 'Installed' | 'Blocked' | 'Needs Survey' | 'Removed'
+
 export type FiberCableType = 'Backbone' | 'Drop' | 'Existing' | 'Spare' | 'Temporary' | 'Custom'
 export type FiberInstallStatus = 'Planned' | 'Pulled' | 'Installed' | 'Blocked' | 'Damaged' | 'Removed'
 export type FiberTestStatus = 'Not Tested' | 'Passed' | 'Failed' | 'Needs Retest'
@@ -174,8 +178,16 @@ export async function createFiberNode(params: {
   sizeDescription?: string
   slackLoopFt?: number
   notes?: string
+  /** El elemento fisico ya estaba en terreno, o se instala en este proyecto. */
+  assetCondition?: AssetCondition
+  /** Que trabajo se hace sobre el. Solo install/replace generan material. */
+  workScope?: WorkScope
+  ownerOfRecord?: string
 }) {
   const supabase = await createClient()
+
+  const assetCondition = params.assetCondition ?? 'new'
+  const workScope = params.workScope ?? (assetCondition === 'existing' ? 'reuse' : 'install')
 
   const defaultSlack =
     params.nodeType === 'Handhole' || params.nodeType === 'Cabinet' ? 20.0
@@ -199,6 +211,9 @@ export async function createFiberNode(params: {
       size_description: params.sizeDescription ?? '24x36x36',
       slack_loop_ft: params.slackLoopFt ?? defaultSlack,
       notes: params.notes,
+      asset_condition: assetCondition,
+      work_scope: workScope,
+      owner_of_record: params.ownerOfRecord,
     })
     .select()
     .single()
@@ -218,6 +233,8 @@ export async function createFiberNode(params: {
         longitude: params.longitude,
         status: params.status ?? 'Planned',
         notes: params.notes,
+        asset_condition: assetCondition,
+        work_scope: workScope,
       })
     if (cabErr) {
       console.error('Failed to auto-create cabinet for node:', cabErr.message)
@@ -233,7 +250,36 @@ export async function createFiberNode(params: {
     'Building': { partNumber: 'BLDG-ENTRY-KIT', defaultDesc: 'Building Entrance Transition Kit', fallbackCost: 250.00 },
   }
 
-  const nodeConfig = nodeTypeMap[params.nodeType]
+  // Espejo en la capa conduit para las estructuras civiles.
+  const CONDUIT_STRUCTURE_TYPES: Record<string, string> = {
+    'Handhole': 'handhole', 'Manhole': 'manhole', 'Pull Box': 'pull_box', 'Vault': 'vault',
+  }
+  const structureType = CONDUIT_STRUCTURE_TYPES[params.nodeType]
+  if (structureType) {
+    const { error: structErr } = await supabase.from('conduit_structures').insert({
+      project_id: params.projectId,
+      organization_id: '00000000-0000-0000-0000-000000000000', // trigger overrides
+      node_id: newNode.id,
+      structure_tag: params.nodeTag,
+      structure_type: structureType,
+      latitude: params.latitude,
+      longitude: params.longitude,
+      size_description: params.sizeDescription,
+      depth_ft: params.structureDepthFt,
+      status: params.status ?? 'Planned',
+      asset_condition: assetCondition,
+      work_scope: workScope,
+      owner_of_record: params.ownerOfRecord,
+    })
+    if (structErr) console.error('Failed to mirror conduit structure:', structErr.message)
+  }
+
+  // Auto BOM por tipo de nodo.
+  // Solo se compra material para lo que se instala. Una estructura existente
+  // que se reutiliza no genera linea de material — ese fue el origen de los 36
+  // manholes fantasma en el BOM del Beltline (migracion 029).
+  const generatesMaterial = workScope === 'install' || workScope === 'replace'
+  const nodeConfig = generatesMaterial ? nodeTypeMap[params.nodeType] : undefined
   if (nodeConfig) {
     const { data: catItem } = await supabase
       .from('fiber_hardware_catalog')
@@ -248,6 +294,9 @@ export async function createFiberNode(params: {
     await supabase.from('bom_items').insert({
       project_id: params.projectId,
       category: 'Fiber',
+      module: params.nodeType === 'Cabinet' ? 'enclosure' : 'conduit',
+      subcategory: params.nodeType === 'Cabinet' ? 'cabinet' : 'structure',
+      work_scope: workScope,
       part_number: nodeConfig.partNumber,
       description,
       quantity: 1.0,
@@ -371,8 +420,24 @@ export async function createFiberRoute(params: {
   }[]
   cableCatalogId?: string
   fiberCount?: number
+  /**
+   * Condicion del DUCTO por el que corre esta ruta, no de la fibra.
+   * Un main haul existente reutilizado para tirar fibra nueva es
+   * ('existing','reuse'): no se compra conduit, pero si se compra el cable.
+   */
+  conduitCondition?: AssetCondition
+  conduitWorkScope?: WorkScope
+  installMethod?: string
+  surfaceType?: string
+  ownerOfRecord?: string
 }) {
   const supabase = await createClient()
+
+  const conduitCondition = params.conduitCondition ?? 'new'
+  const conduitWorkScope =
+    params.conduitWorkScope ?? (conduitCondition === 'existing' ? 'reuse' : 'install')
+  // Solo el ducto NUEVO se compra. La fibra que pasa por dentro es nueva igual.
+  const buysConduit = conduitWorkScope === 'install' || conduitWorkScope === 'replace'
 
   const slackPct = params.slackPercentage ?? 10.0
   let measuredLength = 0
@@ -418,11 +483,31 @@ export async function createFiberRoute(params: {
       spare_capacity: 100.0,
       installation_type: params.installationType,
       route_purpose: params.routePurpose ?? 'camera_backbone',
+      asset_condition: conduitCondition,
+      work_scope: conduitWorkScope,
+      owner_of_record: params.ownerOfRecord,
     })
     .select()
     .single()
 
   if (routeErr) return { error: `Failed to create route: ${routeErr.message}` }
+
+  // Espejo en la capa conduit: la obra civil como elemento propio, con su
+  // condicion. Comparte la geometria de la ruta, no la duplica.
+  const { error: runErr } = await supabase.from('conduit_runs').insert({
+    project_id: params.projectId,
+    organization_id: '00000000-0000-0000-0000-000000000000', // trigger overrides
+    route_id: newRoute.id,
+    run_tag: params.routeIdTag,
+    install_method: params.installMethod ?? (params.installationType === 'underground' ? 'bore' : 'aerial'),
+    surface_type: params.surfaceType ?? 'unknown',
+    diameter_inches: params.conduitDiameterInches ?? 2.0,
+    length_feet: Number(installedLength.toFixed(2)),
+    asset_condition: conduitCondition,
+    work_scope: conduitWorkScope,
+    owner_of_record: params.ownerOfRecord,
+  })
+  if (runErr) console.error('Failed to mirror conduit run:', runErr.message)
 
   // Insert segments
   const finalSegments = segmentInserts.map(s => ({
@@ -501,10 +586,18 @@ export async function createFiberRoute(params: {
   const innerduct = hwMap.get('INNER-1.25')
   const muleTape = hwMap.get('MULE-WP1250')
 
-  const bomItems = [
+  // Material de obra civil: SOLO si el ducto es nuevo. Si se reutiliza un
+  // ducto existente no se compra HDPE, innerduct ni mule tape — se paga la
+  // mano de obra del tendido, que es otra linea.
+  type BomInsert = Database['public']['Tables']['bom_items']['Insert']
+
+  const bomItems: BomInsert[] = !buysConduit ? [] : [
     {
       project_id: params.projectId,
       category: 'Fiber',
+      module: 'conduit' as const,
+      subcategory: 'duct',
+      work_scope: conduitWorkScope,
       part_number: 'HDPE-COND',
       description: hdpe?.description ?? `HDPE Conduit (${params.conduitDiameterInches ?? 2.0}-in)`,
       quantity: Number(installedLength.toFixed(2)),
@@ -518,6 +611,9 @@ export async function createFiberRoute(params: {
     {
       project_id: params.projectId,
       category: 'Fiber',
+      module: 'conduit' as const,
+      subcategory: 'duct',
+      work_scope: conduitWorkScope,
       part_number: 'INNER-1.25',
       description: innerduct?.description ?? '1.25-in Corrugated Innerduct',
       quantity: Number(installedLength.toFixed(2)),
@@ -531,6 +627,9 @@ export async function createFiberRoute(params: {
     {
       project_id: params.projectId,
       category: 'Fiber',
+      module: 'conduit' as const,
+      subcategory: 'duct',
+      work_scope: conduitWorkScope,
       part_number: 'MULE-WP1250',
       description: muleTape?.description ?? 'Mule Tape 1250 lbs Pull Tape',
       quantity: Number(installedLength.toFixed(2)),
@@ -543,10 +642,14 @@ export async function createFiberRoute(params: {
     },
   ]
 
+  // El cable SIEMPRE se compra: la fibra es nueva aunque el ducto sea existente.
   if (params.cableCatalogId) {
     bomItems.push({
       project_id: params.projectId,
       category: 'Fiber',
+      module: 'fiber' as const,
+      subcategory: 'cable',
+      work_scope: 'install' as const,
       part_number: cablePart,
       description: cableName,
       quantity: Number(installedLength.toFixed(2)),
@@ -679,6 +782,216 @@ export async function deleteFiberRoute(params: { id: string; projectId: string }
   return { success: true }
 }
 
+// ─── 8.0 Reclasificar existente/nuevo ────────────────────────────────────────
+
+/**
+ * Agrega la linea de mano de obra que corresponde a reutilizar o modificar un
+ * elemento existente. Busca primero una tarifa propia de la organizacion y cae
+ * a la tarifa base del sistema. Si no hay tarifa aplicable no inventa un
+ * precio: no agrega nada y el llamador lo reporta.
+ */
+async function addReuseLaborLine(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  args: {
+    projectId: string
+    target: 'node' | 'route'
+    id: string
+    workScope: WorkScope
+    linkCol: 'fiber_node_id' | 'fiber_route_id'
+  }
+): Promise<number> {
+  // Que estructura o tramo es, para elegir la tarifa
+  let structureType: string | null = null
+  let quantity = 1
+  let unitWanted = 'ea'
+
+  if (args.target === 'node') {
+    const { data: node } = await supabase
+      .from('fiber_nodes')
+      .select('node_type')
+      .eq('id', args.id)
+      .maybeSingle()
+    const MAP: Record<string, string> = {
+      'Manhole': 'manhole', 'Handhole': 'handhole', 'Pull Box': 'pull_box', 'Pole': 'pole',
+    }
+    structureType = MAP[node?.node_type ?? ''] ?? null
+  } else {
+    const { data: route } = await supabase
+      .from('fiber_routes')
+      .select('installed_length_feet')
+      .eq('id', args.id)
+      .maybeSingle()
+    quantity = Number(route?.installed_length_feet ?? 0)
+    unitWanted = 'ft'
+    if (quantity <= 0) return 0
+  }
+
+  const { data: rates } = await supabase
+    .from('labor_rates')
+    .select('*')
+    .eq('applies_to_scope', args.workScope)
+    .eq('unit', unitWanted)
+
+  if (!rates?.length) return 0
+
+  // Tarifa propia de la organizacion antes que la base del sistema
+  const applicable = rates
+    .filter(r => (structureType ? r.structure_type === structureType : r.structure_type === null))
+    .sort((a, b) => (a.organization_id ? -1 : 1) - (b.organization_id ? -1 : 1))[0]
+
+  if (!applicable) return 0
+
+  // No duplicar si ya se agrego antes
+  const { data: existing } = await supabase
+    .from('bom_items')
+    .select('id')
+    .eq(args.linkCol, args.id)
+    .eq('part_number', applicable.code)
+    .maybeSingle()
+
+  if (existing) return 0
+
+  const { error } = await supabase.from('bom_items').insert({
+    project_id: args.projectId,
+    category: 'Labor',
+    module: applicable.module,
+    subcategory: 'labor',
+    work_scope: args.workScope,
+    part_number: applicable.code,
+    description: applicable.description,
+    quantity,
+    unit: applicable.unit,
+    unit_cost: Number(applicable.rate),
+    source: 'catalog',
+    manufacturer: 'Labor',
+    status: 'Planned',
+    [args.linkCol]: args.id,
+  } as any)
+
+  return error ? 0 : 1
+}
+
+/**
+ * Cambia la procedencia de un elemento ya dibujado y ajusta el BOM en
+ * consecuencia. Marcar algo como existente borra su material; volver a
+ * marcarlo como nuevo NO lo recrea automaticamente — se avisa, porque
+ * recrear lineas de costo sin que el usuario lo pida es peor que faltar.
+ */
+export async function setAssetCondition(params: {
+  projectId: string
+  target: 'node' | 'route'
+  id: string
+  assetCondition: AssetCondition
+  workScope?: WorkScope
+  ownerOfRecord?: string
+}) {
+  const supabase = await createClient()
+
+  const workScope =
+    params.workScope ?? (params.assetCondition === 'existing' ? 'reuse' : 'install')
+  const buysMaterial = scopeBuysMaterial(workScope)
+
+  const table = params.target === 'node' ? 'fiber_nodes' : 'fiber_routes'
+  const { error: updErr } = await supabase
+    .from(table)
+    .update({
+      asset_condition: params.assetCondition,
+      work_scope: workScope,
+      owner_of_record: params.ownerOfRecord,
+      condition_source: 'marcado en el mapa',
+    })
+    .eq('id', params.id)
+
+  if (updErr) return { error: `Failed to update condition: ${updErr.message}` }
+
+  // Espejo en la capa conduit
+  if (params.target === 'node') {
+    await supabase
+      .from('conduit_structures')
+      .update({ asset_condition: params.assetCondition, work_scope: workScope })
+      .eq('node_id', params.id)
+  } else {
+    await supabase
+      .from('conduit_runs')
+      .update({ asset_condition: params.assetCondition, work_scope: workScope })
+      .eq('route_id', params.id)
+  }
+
+  // Ajuste del BOM. Solo se tocan las lineas de OBRA CIVIL: el cable de fibra
+  // se compra igual aunque el ducto sea existente.
+  const linkCol = params.target === 'node' ? 'fiber_node_id' : 'fiber_route_id'
+  let removed = 0
+
+  let laborAdded = 0
+
+  if (!buysMaterial) {
+    const { data: doomed } = await supabase
+      .from('bom_items')
+      .select('id')
+      .eq(linkCol, params.id)
+      .eq('module', 'conduit')
+
+    if (doomed?.length) {
+      // Respaldo antes de borrar: son cifras de una cotizacion real y el
+      // usuario debe poder revertir si se equivoco de elemento.
+      const { data: fullRows } = await supabase
+        .from('bom_items')
+        .select('*')
+        .in('id', doomed.map(d => d.id))
+
+      if (fullRows?.length) {
+        await supabase.from('bom_items_removed').insert(
+          fullRows.map(row => ({
+            original_id: row.id,
+            project_id: params.projectId,
+            payload: row as any,
+            removed_reason: `Reclasificado como ${params.assetCondition}/${workScope} desde el mapa`,
+          }))
+        )
+      }
+
+      const { error: delErr } = await supabase
+        .from('bom_items')
+        .delete()
+        .in('id', doomed.map(d => d.id))
+      if (delErr) return { error: `Condition saved, but BOM cleanup failed: ${delErr.message}` }
+      removed = doomed.length
+    }
+
+    // Reutilizar no cuesta material, pero si cuesta trabajo: abrir, achicar,
+    // limpiar, racking, rodding. Dejarlo en cero seria tan incorrecto como
+    // cobrar el material completo.
+    laborAdded = await addReuseLaborLine(supabase, {
+      projectId: params.projectId,
+      target: params.target,
+      id: params.id,
+      workScope,
+      linkCol,
+    })
+  } else {
+    await supabase
+      .from('bom_items')
+      .update({ work_scope: workScope })
+      .eq(linkCol, params.id)
+      .eq('module', 'conduit')
+  }
+
+  revalidatePath(`/projects/${params.projectId}/fiber`)
+  revalidatePath(`/projects/${params.projectId}/bom`)
+
+  return {
+    success: true,
+    removedBomLines: removed,
+    laborLinesAdded: laborAdded,
+    warning:
+      buysMaterial && params.assetCondition === 'new'
+        ? 'Marcado como nuevo. Si antes era existente, revisa el BOM: las lineas de material no se recrean solas.'
+        : !buysMaterial && removed > 0 && laborAdded === 0
+        ? 'Material retirado, pero no hay tarifa de mano de obra para este alcance: el trabajo de reuso quedo sin cobrar.'
+        : undefined,
+  }
+}
+
 // ─── 8.1 Update fiber route ──────────────────────────────────────────────────
 
 export async function updateFiberRoute(params: {
@@ -775,8 +1088,45 @@ export async function updateFiberRoute(params: {
 
   if (error) return { error: `Failed to update route: ${error.message}` }
 
+  // Resincronizar el BOM con la geometria nueva.
+  // Sin esto la cantidad de material queda congelada en el trazo original:
+  // en el Beltline la ruta R-002 mide 214 ft y su BOM decia 3,706 ft porque
+  // la ruta se redibujo despues de crearla y nadie actualizo las lineas.
+  let resynced = 0
+
+  // Solo si la geometria efectivamente cambio. Si el usuario solo renombro la
+  // ruta, installedLength queda undefined y el BOM no se toca.
+  if (installedLength !== undefined) {
+    const newLength = installedLength
+
+    // Se reajusta lo que se mide en pies sobre este trazo: conduit, innerduct,
+    // mule tape y el cable. Las lineas en 'pcs' (estructuras, cierres) no
+    // dependen del largo y quedan intactas.
+    const { data: linearLines } = await supabase
+      .from('bom_items')
+      .select('id, quantity')
+      .eq('fiber_route_id', params.id)
+      .eq('unit', 'ft')
+
+    for (const line of linearLines ?? []) {
+      if (Math.abs(Number(line.quantity) - newLength) < 0.01) continue
+      const { error: qErr } = await supabase
+        .from('bom_items')
+        .update({ quantity: newLength, updated_at: new Date().toISOString() })
+        .eq('id', line.id)
+      if (!qErr) resynced++
+    }
+
+    // El run de conduit comparte la geometria: tambien se reajusta.
+    await supabase
+      .from('conduit_runs')
+      .update({ length_feet: newLength, updated_at: new Date().toISOString() })
+      .eq('route_id', params.id)
+  }
+
   revalidatePath(`/projects/${params.projectId}/fiber`)
-  return { success: true }
+  revalidatePath(`/projects/${params.projectId}/bom`)
+  return { success: true, resyncedBomLines: resynced }
 }
 
 // ─── 12. Create splice record ────────────────────────────────────────────────

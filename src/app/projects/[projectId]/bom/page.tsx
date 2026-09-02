@@ -120,6 +120,11 @@ export default async function ProjectBOMPage({ params }: PageProps) {
       manufacturer: item.manufacturer || 'Generic',
       partNumber: item.part_number || 'N/A',
       category: item.category,
+      module: item.module || null,
+      subcategory: item.subcategory || null,
+      supplyResponsibility: item.supply_responsibility || 'contractor',
+      suppliedBy: item.supplied_by || null,
+      materialReceived: item.material_received ?? false,
       quantity: qty,
       unit: item.unit,
       unitCost: cost,
@@ -128,7 +133,21 @@ export default async function ProjectBOMPage({ params }: PageProps) {
       isDatabase: true
     })
 
-    if (item.category.toLowerCase() === 'fiber') {
+    // Roll-up de mano de obra OSP.
+    // Usa la clasificacion real (module/subcategory, migracion
+    // bom_module_categorization). El bloque heuristico por texto queda solo
+    // como fallback para filas antiguas que todavia no tengan module.
+    if (item.module) {
+      if (item.module === 'conduit' && item.subcategory === 'duct' && item.unit === 'ft') {
+        totalConduitFeet += qty
+      } else if (item.module === 'conduit' && item.subcategory === 'structure') {
+        totalNodePcs += qty
+      } else if (item.module === 'fiber' && item.subcategory === 'cable' && item.unit === 'ft') {
+        totalCableFeet += qty
+      } else if (item.module === 'fiber' && item.subcategory === 'splice') {
+        totalEnclosurePcs += qty
+      }
+    } else if (item.category.toLowerCase() === 'fiber') {
       const descLower = (item.description || '').toLowerCase()
       const partLower = (item.part_number || '').toLowerCase()
 
