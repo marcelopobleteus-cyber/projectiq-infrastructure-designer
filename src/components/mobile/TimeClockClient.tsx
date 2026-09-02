@@ -2,8 +2,8 @@
 
 import React, { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { clockIn, clockOut, pauseEntry, resumeEntry } from '@/app/mobile/time/actions'
-import type { TimeClockData } from '@/app/mobile/time/data'
+import { clockIn, clockOut, pauseEntry, resumeEntry } from '@/app/mobile/(app)/time/actions'
+import type { TimeClockData } from '@/app/mobile/(app)/time/data'
 
 const OFFICE_VALUE = 'office'
 

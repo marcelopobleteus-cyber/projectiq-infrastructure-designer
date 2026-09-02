@@ -15,7 +15,7 @@ export default async function MobileRootLayout({
   } = await supabase.auth.getUser()
 
   if (!user && !BYPASS_AUTH) {
-    redirect('/login?next=/mobile/dashboard')
+    redirect('/mobile/login')
   }
 
   return (
