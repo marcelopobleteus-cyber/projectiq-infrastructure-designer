@@ -19,7 +19,7 @@ export default function ConfirmModal({
   title,
   message,
   confirmText = 'Confirm',
-  cancelText = 'Cancelar',
+  cancelText = 'Cancel',
   variant = 'danger',
   isLoading = false,
   onConfirm,

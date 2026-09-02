@@ -393,7 +393,7 @@ export default function ProjectGridClient({ initialProjects }: ProjectGridClient
                               ) : (
                                 <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                               )}
-                              Borrar proyecto
+                              Delete project
                             </button>
                           </div>
                         )}
@@ -425,7 +425,7 @@ export default function ProjectGridClient({ initialProjects }: ProjectGridClient
                   href={`/projects/${project.id}/overview`}
                   className="px-3 py-1.5 bg-[var(--surface-2)] hover:bg-[var(--accent)] hover:text-white text-[var(--text-primary)] border border-[var(--border)] rounded-lg text-xs font-bold transition flex items-center gap-1"
                 >
-                  Abrir Proyecto
+                  Open Project
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7"/></svg>
                 </Link>
               </div>
@@ -469,7 +469,7 @@ export default function ProjectGridClient({ initialProjects }: ProjectGridClient
                     href={`/projects/${project.id}/overview`}
                     className="px-3 py-1.5 bg-[var(--surface-2)] hover:bg-[var(--accent)] hover:text-white text-[var(--text-primary)] border border-[var(--border)] rounded-lg text-xs font-bold transition flex items-center gap-1"
                   >
-                    Abrir Proyecto
+                    Open Project
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7"/></svg>
                   </Link>
 
@@ -525,7 +525,7 @@ export default function ProjectGridClient({ initialProjects }: ProjectGridClient
                               ) : (
                                 <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                               )}
-                              Borrar proyecto
+                              Delete project
                             </button>
                           </div>
                         )}
@@ -544,8 +544,8 @@ export default function ProjectGridClient({ initialProjects }: ProjectGridClient
         isOpen={Boolean(deleteTarget)}
         title={`Delete project "${deleteTarget?.name}"?`}
         message={`This will PERMANENTLY delete from the Supabase database every camera, fiber node, switch, BOM line and work order in this project. This cannot be undone.`}
-        confirmText="Eliminar Proyecto"
-        cancelText="Cancelar"
+        confirmText="Delete Project"
+        cancelText="Cancel"
         variant="danger"
         isLoading={Boolean(deletingId)}
         onConfirm={confirmDeleteProject}

@@ -10,8 +10,8 @@ import { createClient } from '@/utils/supabase/client'
 const DISCIPLINE_OPTIONS = [
   { id: 'cctv', title: 'CCTV & Video Surveillance', subtitle: '4K PTZ cameras, LPR, VLANs, NVRs and FOV coverage', icon: '📹', color: 'border-[var(--accent)]/50 bg-[var(--accent)]/10 text-[var(--accent-text)]', ready: true },
   { id: 'fiber', title: 'Fiber Optic (OSP / ISP)', subtitle: 'SMF 24F/48F routes, manholes, splices and FDUs', icon: '🌐', color: 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400', ready: true },
-  { id: 'networking', title: 'Networking & Switches', subtitle: 'Switches Industriales PoE, Racks, Patch Cords & Ports', icon: '🖧', color: 'border-purple-500/50 bg-purple-500/10 text-purple-400', ready: true },
-  { id: 'wireless', title: 'Enlaces Wireless & PTP', subtitle: 'Antenas Punto a Punto, PtMP, LoS y Cobertura Wi-Fi', icon: '📡', color: 'border-cyan-500/50 bg-cyan-500/10 text-cyan-400', ready: true },
+  { id: 'networking', title: 'Networking & Switches', subtitle: 'Industrial PoE switches, racks, patch cords & ports', icon: '🖧', color: 'border-purple-500/50 bg-purple-500/10 text-purple-400', ready: true },
+  { id: 'wireless', title: 'Wireless Links & PTP', subtitle: 'Point-to-point antennas, PtMP, line of sight and Wi-Fi coverage', icon: '📡', color: 'border-cyan-500/50 bg-cyan-500/10 text-cyan-400', ready: true },
   { id: 'power', title: 'Power & Substations', subtitle: 'AC services, transformers, UPS and wattage load', icon: '⚡', color: 'border-red-500/50 bg-red-500/10 text-red-400', ready: true },
   { id: 'conduit', title: 'Conduit & Duct Bank', subtitle: 'Duct bank, PVC/HDPE pipe and handholes', icon: '🏗️', color: 'border-amber-500/50 bg-amber-500/10 text-amber-400', ready: false },
   { id: 'lighting', title: 'Public & Private Lighting', subtitle: 'Smart lighting, poles, LED luminaires and photocells', icon: '💡', color: 'border-yellow-500/50 bg-yellow-500/10 text-yellow-400', ready: false },
@@ -118,7 +118,7 @@ export default function CreateProjectPage() {
           <div>
             <div className="flex items-center justify-between mb-3">
               <label className="block text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider">
-                Disciplinas del Proyecto
+                Project Disciplines
                 <span className="ml-2 text-[var(--text-tertiary)] normal-case font-normal">pick one or more, according to your plan</span>
               </label>
               <div className="flex items-center gap-3 text-[11px] font-semibold">

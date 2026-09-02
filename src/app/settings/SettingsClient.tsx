@@ -663,7 +663,7 @@ export default function SettingsClient({ initialTeamData }: { initialTeamData: O
         title={`Remove ${memberToRemove?.fullName}?`}
         message={`This will revoke ${memberToRemove?.email}'s access to this organization's projects and resources.`}
         confirmText="Remover Miembro"
-        cancelText="Cancelar"
+        cancelText="Cancel"
         variant="danger"
         isLoading={isRemoving}
         onConfirm={handleConfirmRemoveMember}

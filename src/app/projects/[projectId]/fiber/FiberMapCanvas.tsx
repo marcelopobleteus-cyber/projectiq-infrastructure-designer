@@ -892,7 +892,7 @@ export default function FiberMapCanvas({
             <div><strong>Enclosures:</strong> ${nodeEnclosures.length}</div>
             <div><strong>Served Cameras:</strong> ${servedCamTags || 'None'}</div>
             <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #e2e8f0; display: flex;">
-              <button onclick="window.selectNodeForEditing('${node.id}')" style="display: inline-block; padding: 4px 8px; background-color: #4f46e5; color: white; border-radius: 6px; border: none; font-weight: bold; font-size: 9px; text-align: center; flex: 1; cursor: pointer;">Editar Nodo</button>
+              <button onclick="window.selectNodeForEditing('${node.id}')" style="display: inline-block; padding: 4px 8px; background-color: #4f46e5; color: white; border-radius: 6px; border: none; font-weight: bold; font-size: 9px; text-align: center; flex: 1; cursor: pointer;">Edit Node</button>
             </div>
           </div>
         `

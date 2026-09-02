@@ -406,8 +406,8 @@ export default function OverviewEditPanel({ project }: OverviewEditPanelProps) {
         isOpen={showConfirmDelete}
         title={`Delete project "${project.name}"?`}
         message={`This will PERMANENTLY delete from the Supabase database every camera, fiber node, switch, BOM line and work order in this project. This cannot be undone.`}
-        confirmText="Eliminar Proyecto"
-        cancelText="Cancelar"
+        confirmText="Delete Project"
+        cancelText="Cancel"
         variant="danger"
         isLoading={saving}
         onConfirm={confirmDeleteProject}

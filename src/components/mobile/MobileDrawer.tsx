@@ -15,7 +15,7 @@ export default function MobileDrawer({
   isOpen,
   onClose,
   projectId,
-  projectName = 'Proyecto',
+  projectName = 'Project',
 }: MobileDrawerProps) {
   const pathname = usePathname()
   const router = useRouter()
@@ -48,15 +48,15 @@ export default function MobileDrawer({
   }
 
   const globalNav = [
-    { label: 'Dashboard General', href: '/mobile/dashboard', icon: '📊' },
-    { label: 'Lista de Proyectos', href: '/mobile/projects', icon: '📁' },
-    { label: 'Reportes Ejecutivos', href: '/mobile/reports', icon: '📈' },
+    { label: 'Dashboard', href: '/mobile/dashboard', icon: '📊' },
+    { label: 'Project List', href: '/mobile/projects', icon: '📁' },
+    { label: 'Executive Reports', href: '/mobile/reports', icon: '📈' },
     { label: 'Settings', href: '/mobile/settings', icon: '⚙️' },
   ]
 
   const projectNav = projectId
     ? [
-        { label: 'Overview del Proyecto', href: `/mobile/projects/${projectId}/overview`, icon: '🏠' },
+        { label: 'Project Overview', href: `/mobile/projects/${projectId}/overview`, icon: '🏠' },
         { label: 'Cameras (CCTV)', href: `/mobile/projects/${projectId}/cameras`, icon: '📸' },
         { label: 'Fiber Optic (OSP/ISP)', href: `/mobile/projects/${projectId}/fiber`, icon: '🧬' },
         { label: 'Networking & Switches', href: `/mobile/projects/${projectId}/network`, icon: '🔌' },

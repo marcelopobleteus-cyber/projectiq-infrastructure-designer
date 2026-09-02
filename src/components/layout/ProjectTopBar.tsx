@@ -161,7 +161,7 @@ export default function ProjectTopBar({
           {isMenuOpen && (
             <div className="absolute right-0 mt-1.5 w-56 bg-[var(--surface-1)] border border-[var(--border-strong)] rounded-xl shadow-xl p-1.5 z-50 space-y-0.5 animate-in zoom-in-95 duration-100 font-sans">
               <div className="px-2.5 py-1 text-[9.5px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider border-b border-[var(--border)] mb-1">
-                Acciones del Proyecto
+                Project Actions
               </div>
 
               <Link
@@ -170,7 +170,7 @@ export default function ProjectTopBar({
                 className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/></svg>
-                Dashboard del Proyecto
+                Project Dashboard
               </Link>
 
               <Link
@@ -188,7 +188,7 @@ export default function ProjectTopBar({
                 className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-                Exportar Reportes PDF
+                Export PDF Reports
               </Link>
 
               <div className="border-t border-[var(--border)] pt-1 mt-1">
@@ -199,7 +199,7 @@ export default function ProjectTopBar({
                   className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-bold text-[var(--danger)] hover:bg-red-50 transition-colors cursor-pointer"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                  {isDeleting ? 'Eliminando...' : 'Eliminar Proyecto'}
+                  {isDeleting ? 'Deleting...' : 'Delete Project'}
                 </button>
               </div>
             </div>
@@ -212,8 +212,8 @@ export default function ProjectTopBar({
         isOpen={showConfirmDelete}
         title={`Delete project "${projectName}"?`}
         message={`This will PERMANENTLY delete from the Supabase database every camera, fiber node, switch, BOM line and work order in this project. This cannot be undone.`}
-        confirmText="Eliminar Proyecto"
-        cancelText="Cancelar"
+        confirmText="Delete Project"
+        cancelText="Cancel"
         variant="danger"
         isLoading={isDeleting}
         onConfirm={confirmDelete}
@@ -223,10 +223,10 @@ export default function ProjectTopBar({
       {/* Demo Notice Modal */}
       <ConfirmModal
         isOpen={demoNotice}
-        title="Proyecto Protegido"
+        title="Protected Project"
         message="The demo project cannot be deleted because it serves as a template for new users."
-        confirmText="Entendido"
-        cancelText="Cerrar"
+        confirmText="Understood"
+        cancelText="Close"
         variant="info"
         onConfirm={() => setDemoNotice(false)}
         onCancel={() => setDemoNotice(false)}
@@ -235,10 +235,10 @@ export default function ProjectTopBar({
       {/* Error Notice Modal */}
       <ConfirmModal
         isOpen={Boolean(errorMsg)}
-        title="Error al Eliminar"
+        title="Error Deleting"
         message={errorMsg || ''}
-        confirmText="Entendido"
-        cancelText="Cerrar"
+        confirmText="Understood"
+        cancelText="Close"
         variant="danger"
         onConfirm={() => setErrorMsg(null)}
         onCancel={() => setErrorMsg(null)}

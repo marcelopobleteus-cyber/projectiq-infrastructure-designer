@@ -203,7 +203,7 @@ export default function PortfolioSection({ projectId, portfolio }: PortfolioSect
             onClick={() => { setShowLinker(false); setError(null) }}
             className="text-xs font-bold text-[var(--text-secondary)] dark:text-[var(--text-tertiary)]"
           >
-            Cancelar
+            Cancel
           </button>
           {portfolio.linkableParents.length === 0 && (
             <span className="text-[10.5px] text-[var(--text-secondary)] dark:text-[var(--text-tertiary)] basis-full">
