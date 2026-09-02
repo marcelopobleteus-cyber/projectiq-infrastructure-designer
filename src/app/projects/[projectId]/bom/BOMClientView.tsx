@@ -143,8 +143,8 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
       item.unitCost.toFixed(2),
       item.totalCost.toFixed(2),
       `"${item.status}"`,
-      `"${isOwnerFurnished(item) ? (item.suppliedBy || 'Cliente (OFCI)') : 'NGT (CFCI)'}"`,
-      `"${isOwnerFurnished(item) ? (item.materialReceived ? 'Sí' : 'Pendiente') : 'n/a'}"`
+      `"${isOwnerFurnished(item) ? (item.suppliedBy || 'Client (OFCI)') : 'Contractor (CFCI)'}"`,
+      `"${isOwnerFurnished(item) ? (item.materialReceived ? 'Yes' : 'Pending') : 'n/a'}"`
     ])
 
     const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\n')
@@ -164,12 +164,12 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
       {/* Metrics Banner (Stat Cards Spec: upper label, mono big number, surface-1 background) */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-[var(--surface-1)] border border-[var(--border)] p-4 rounded-xl flex flex-col justify-between shadow-xs">
-          <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider block">Facturable a cliente</span>
+          <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider block">Billable to Client</span>
           <span className="text-2xl font-black text-[var(--text-primary)] font-mono tracking-tight mt-1">{formatCurrency(totalBOMCost)}</span>
           <p className="text-[10px] text-[var(--text-secondary)] mt-2">
             {ownerFurnishedItems.length > 0
-              ? `Excluye ${formatCurrency(ownerFurnishedValue)} provisto por el cliente`
-              : 'Material y mano de obra que compramos e instalamos'}
+              ? `Excludes ${formatCurrency(ownerFurnishedValue)} furnished by the client`
+              : 'Material and labor we buy and install'}
           </p>
         </div>
 
@@ -272,10 +272,10 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
       {ofciPending > 0 && (
         <div className="bg-[var(--surface-1)] border border-[var(--border)] border-l-2 border-l-[var(--warn)] rounded-xl px-4 py-3 flex items-center gap-3">
           <span className="text-xs font-bold text-[var(--text-primary)]">
-            {ofciPending} {ofciPending === 1 ? 'ítem provisto por el cliente sigue' : 'ítems provistos por el cliente siguen'} sin recibirse en obra
+            {ofciPending} client-furnished {ofciPending === 1 ? 'item has' : 'items have'} not been received on site
           </span>
           <span className="text-[11px] text-[var(--text-secondary)]">
-            Valor de referencia: {formatCurrency(ownerFurnishedValue)} · no se factura
+            Reference value: {formatCurrency(ownerFurnishedValue)} · not billed
           </span>
         </div>
       )}
@@ -287,7 +287,7 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
             <div>
               <h3 className="text-xs font-extrabold uppercase tracking-wider text-[var(--text-primary)]">Labor Recalculation</h3>
               <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-                Nada se ha guardado todavía. Revisa el cambio antes de aplicarlo.
+                Nothing saved yet. Review the change before applying it.
               </p>
             </div>
             <button
@@ -305,7 +305,7 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
           ) : laborPreview.changes.length === 0 ? (
             <div className="px-4 py-5">
               <p className="text-xs text-[var(--text-secondary)]">
-                La mano de obra ya está al día con las tarifas vigentes. No hay nada que cambiar.
+                Labor is already up to date with the current rates. Nothing to change.
               </p>
             </div>
           ) : (
@@ -358,7 +358,7 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
               {laborPreview.missingRates.length > 0 && (
                 <div className="px-4 py-3 border-t border-[var(--border)]">
                   <p className="text-[11px] text-[var(--warn)] font-semibold">
-                    Sin tarifa definida, quedan sin cobrar: {laborPreview.missingRates.join(', ')}
+                    No rate defined, so these go uncharged: {laborPreview.missingRates.join(', ')}
                   </p>
                 </div>
               )}
@@ -426,13 +426,13 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
                   <tr key={idx} className="hover:bg-[var(--surface-hover)] transition-colors">
                     <td className="py-3 px-6 font-bold text-[var(--text-primary)]">
                       {item.description}
-                      {/* OFCI: la línea existe para el as-built, pero no se cobra.
+                      {/* OFCI: the line exists for the as-built, but is not billed.
                           Se marca en la fila para que nadie la sume al cotizar. */}
                       {isOwnerFurnished(item) && (
                         <span className="inline-flex items-center gap-1.5 ml-2 px-2 py-0.5 rounded text-[9.5px] font-bold uppercase bg-[var(--surface-2)] text-[var(--text-secondary)] border border-[var(--border-strong)] align-middle">
-                          OFCI · {item.suppliedBy || 'Cliente'}
+                          OFCI · {item.suppliedBy || 'Client'}
                           {!item.materialReceived && (
-                            <span className="text-[var(--warn)]">· pendiente</span>
+                            <span className="text-[var(--warn)]">· pending</span>
                           )}
                         </span>
                       )}

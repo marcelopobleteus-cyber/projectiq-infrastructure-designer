@@ -613,7 +613,7 @@ export async function setLaborRate(params: {
         unit: base.unit,
         rate: params.rate,
         is_default: false,
-        notes: 'Ajustada por la organizacion',
+        notes: 'Adjusted by the organization',
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'organization_id,code' }

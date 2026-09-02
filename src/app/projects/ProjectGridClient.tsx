@@ -542,8 +542,8 @@ export default function ProjectGridClient({ initialProjects }: ProjectGridClient
       {/* Styled App Modal Confirmation for Project Deletion */}
       <ConfirmModal
         isOpen={Boolean(deleteTarget)}
-        title={`¿Eliminar proyecto "${deleteTarget?.name}"?`}
-        message={`Esta acción borrará PERMANENTEMENTE de la base de datos Supabase todas las cámaras, nodos de fibra, switches, cómputos métricos (BOM) y órdenes de trabajo asociadas.\n\nEsta acción NO se puede deshacer.`}
+        title={`Delete project "${deleteTarget?.name}"?`}
+        message={`This will PERMANENTLY delete from the Supabase database every camera, fiber node, switch, BOM line and work order in this project. This cannot be undone.`}
         confirmText="Eliminar Proyecto"
         cancelText="Cancelar"
         variant="danger"

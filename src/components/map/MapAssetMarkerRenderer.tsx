@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useRef } from 'react'
+import * as maplibregl from 'maplibre-gl'
 import { Database } from '@/types/supabase'
 
 type CameraLocation = Database['public']['Tables']['camera_locations']['Row']
@@ -10,7 +11,7 @@ type FiberCable = Database['public']['Tables']['fiber_cables']['Row']
 type CameraFiberAssignment = Database['public']['Tables']['camera_fiber_assignments']['Row']
 
 interface MapAssetMarkerRendererProps {
-  map: google.maps.Map | null
+  map: maplibregl.Map | null
   cameras: CameraLocation[]
   selectedCamera: CameraLocation | null
   setSelectedCamera: (cam: CameraLocation | null) => void
@@ -40,6 +41,21 @@ interface MapAssetMarkerRendererProps {
   mapRectRef: React.MutableRefObject<DOMRect | null>
 }
 
+const buildMarkerElement = (svg: string, size: [number, number], cursor = 'pointer'): HTMLDivElement => {
+  const el = document.createElement('div')
+  el.style.width = `${size[0]}px`
+  el.style.height = `${size[1]}px`
+  el.style.cursor = cursor
+  el.innerHTML = svg
+  const svgEl = el.firstElementChild as SVGElement | null
+  if (svgEl) {
+    svgEl.style.width = '100%'
+    svgEl.style.height = '100%'
+    svgEl.style.display = 'block'
+  }
+  return el
+}
+
 export default function MapAssetMarkerRenderer({
   map,
   cameras,
@@ -64,14 +80,15 @@ export default function MapAssetMarkerRenderer({
   mapRef,
   mapRectRef
 }: MapAssetMarkerRendererProps) {
-  const cameraMarkersRef = useRef<{ [id: string]: google.maps.Marker }>({})
-  const deviceMarkersRef = useRef<{ [id: string]: google.maps.Marker }>({})
-  const fiberNodeMarkersRef = useRef<{ [id: string]: google.maps.Marker }>({})
+  const cameraMarkersRef = useRef<{ [id: string]: maplibregl.Marker }>({})
+  const deviceMarkersRef = useRef<{ [id: string]: maplibregl.Marker }>({})
+  const fiberNodeMarkersRef = useRef<{ [id: string]: maplibregl.Marker }>({})
 
   const cameraMarkerStateRef = useRef<{ [id: string]: { isSelected: boolean; status: string; tag: string } }>({})
   const deviceMarkerStateRef = useRef<{ [id: string]: { isSelected: boolean; deviceType: string; name: string } }>({})
-  
+
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const nodePopupRef = useRef<maplibregl.Popup | null>(null)
 
   // Color helpers
   const getCameraStatusColor = (status: Database['public']['Enums']['camera_status']): string => {
@@ -101,6 +118,9 @@ export default function MapAssetMarkerRenderer({
     return '#64748b'
   }
 
+  // Camera icon: circle anchor (23,23) inside a 46x60 box — offset the element center down by 7px.
+  const CAMERA_ICON_OFFSET: [number, number] = [0, 7]
+
   // 1. Sync Cameras
   useEffect(() => {
     if (!map) return
@@ -114,7 +134,7 @@ export default function MapAssetMarkerRenderer({
       const ringAttr = isSelected ? `stroke="white" stroke-width="3"` : ''
       const shortTag = tag.length > 9 ? tag.substring(0, 9) : tag
 
-      const svg = [
+      return [
         `<svg xmlns="http://www.w3.org/2000/svg" width="46" height="60" viewBox="0 0 46 60">`,
         `<defs><filter id="ds" x="-40%" y="-40%" width="180%" height="180%">`,
         `<feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#000" flood-opacity="0.5"/></filter></defs>`,
@@ -129,19 +149,14 @@ export default function MapAssetMarkerRenderer({
         `font-size="8" font-weight="bold" fill="white" letter-spacing="0.4">${shortTag}</text>`,
         `</svg>`,
       ].join('')
-
-      return {
-        url: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
-        scaledSize: new google.maps.Size(46, 60),
-        anchor: new google.maps.Point(23, 23),
-      }
     }
 
     Object.keys(cameraMarkersRef.current).forEach(id => {
       const cam = cameras.find(c => c.id === id)
       if (!cam || !showCameras) {
-        cameraMarkersRef.current[id].setMap(null)
+        cameraMarkersRef.current[id].remove()
         delete cameraMarkersRef.current[id]
+        delete cameraMarkerStateRef.current[id]
       }
     })
 
@@ -149,7 +164,6 @@ export default function MapAssetMarkerRenderer({
 
     cameras.forEach(cam => {
       const isSelected = selectedCamera?.id === cam.id
-      const position = { lat: cam.latitude, lng: cam.longitude }
 
       const prevState = cameraMarkerStateRef.current[cam.id]
       const needsIconUpdate = !prevState ||
@@ -159,44 +173,48 @@ export default function MapAssetMarkerRenderer({
 
       if (cameraMarkersRef.current[cam.id]) {
         const marker = cameraMarkersRef.current[cam.id]
-        marker.setPosition(position)
+        marker.setLngLat([cam.longitude, cam.latitude])
         if (needsIconUpdate) {
-          const icon = createCameraMarkerIcon(cam.status, cam.camera_id_tag, isSelected)
-          marker.setIcon(icon)
-          marker.setTitle(`${cam.camera_id_tag} (${cam.status})`)
+          const svg = createCameraMarkerIcon(cam.status, cam.camera_id_tag, isSelected)
+          const el = marker.getElement()
+          el.innerHTML = svg
+          el.title = `${cam.camera_id_tag} (${cam.status})`
           cameraMarkerStateRef.current[cam.id] = { isSelected, status: cam.status, tag: cam.camera_id_tag }
         }
       } else {
-        const icon = createCameraMarkerIcon(cam.status, cam.camera_id_tag, isSelected)
-        const marker = new google.maps.Marker({
-          position,
-          map,
+        const svg = createCameraMarkerIcon(cam.status, cam.camera_id_tag, isSelected)
+        const el = buildMarkerElement(svg, [46, 60])
+        el.title = `${cam.camera_id_tag} (${cam.status})`
+        const marker = new maplibregl.Marker({
+          element: el,
           draggable: true,
-          icon,
-          title: `${cam.camera_id_tag} (${cam.status})`,
+          anchor: 'center',
+          offset: CAMERA_ICON_OFFSET
         })
+          .setLngLat([cam.longitude, cam.latitude])
+          .addTo(map)
 
         cameraMarkerStateRef.current[cam.id] = { isSelected, status: cam.status, tag: cam.camera_id_tag }
 
-        marker.addListener('click', () => {
+        el.addEventListener('click', (e: MouseEvent) => {
+          e.stopPropagation()
           setSelectedCamera(cam)
         })
 
-        marker.addListener('mouseover', (e: google.maps.MapMouseEvent) => {
-          const domEvent = (e as unknown as { domEvent: MouseEvent }).domEvent
+        el.addEventListener('mouseenter', (e: MouseEvent) => {
           let rect = mapRectRef.current
           if (!rect && mapRef.current) {
             rect = mapRef.current.getBoundingClientRect()
             mapRectRef.current = rect
           }
           if (rect) {
-            setHoverPosition({ x: domEvent.clientX - rect.left, y: domEvent.clientY - rect.top })
+            setHoverPosition({ x: e.clientX - rect.left, y: e.clientY - rect.top })
           }
           setHoveredCamera(cam)
           if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
         })
 
-        marker.addListener('mouseout', () => {
+        el.addEventListener('mouseleave', () => {
           hoverTimerRef.current = setTimeout(() => {
             if (!isHoveringCardRef.current) {
               setHoveredCamera(null)
@@ -205,19 +223,15 @@ export default function MapAssetMarkerRenderer({
           }, 350)
         })
 
-        marker.addListener('dragend', async () => {
-          const newPos = marker.getPosition()
-          if (!newPos) return
-
-          const newLat = newPos.lat()
-          const newLng = newPos.lng()
-
-          await onCameraDragEnd(cam.id, newLat, newLng)
+        marker.on('dragend', async () => {
+          const newPos = marker.getLngLat()
+          await onCameraDragEnd(cam.id, newPos.lat, newPos.lng)
         })
 
         cameraMarkersRef.current[cam.id] = marker
       }
     })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cameras, map, selectedCamera, showCameras, onCameraDragEnd, isHoveringCardRef, mapRectRef, mapRef, setHoverPosition, setHoveredCamera, setSelectedCamera])
 
   // 2. Sync Devices
@@ -226,23 +240,26 @@ export default function MapAssetMarkerRenderer({
 
     const getNetworkMarkerIcon = (type: Database['public']['Enums']['device_type'], isSelected = false) => {
       const color = getNetworkDeviceColor(type)
-      return {
-        path: 'M2 5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5zm3 2h14v2H5V7zm0 4h14v2H5v-2zm0 4h14v2H5v-2z',
-        fillColor: color,
-        fillOpacity: 1,
-        strokeColor: isSelected ? '#ffffff' : '#0f172a',
-        strokeWeight: isSelected ? 3 : 1.5,
-        scale: isSelected ? 1.3 : 1.1,
-        anchor: new google.maps.Point(12, 12),
-      }
+      const scale = isSelected ? 1.3 : 1.1
+      const size = Math.round(24 * scale)
+      const strokeColor = isSelected ? '#ffffff' : '#0f172a'
+      const strokeWidth = isSelected ? 1.5 : 0.9
+      const svg = [
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24">`,
+        `<path d="M2 5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5zm3 2h14v2H5V7zm0 4h14v2H5v-2zm0 4h14v2H5v-2z" `,
+        `fill="${color}" stroke="${strokeColor}" stroke-width="${strokeWidth}"/>`,
+        `</svg>`
+      ].join('')
+      return { svg, size: [size, size] as [number, number] }
     }
 
     Object.keys(deviceMarkersRef.current).forEach(id => {
       const dev = networkDevices.find(d => d.id === id)
       const hasCoords = dev && dev.latitude !== null && dev.longitude !== null
       if (!dev || !hasCoords || !showDevices) {
-        deviceMarkersRef.current[id].setMap(null)
+        deviceMarkersRef.current[id].remove()
         delete deviceMarkersRef.current[id]
+        delete deviceMarkerStateRef.current[id]
       }
     })
 
@@ -250,9 +267,8 @@ export default function MapAssetMarkerRenderer({
 
     networkDevices.forEach(dev => {
       if (dev.latitude === null || dev.longitude === null) return
-      
+
       const isSelected = selectedDevice?.id === dev.id
-      const position = { lat: dev.latitude, lng: dev.longitude }
 
       const prevState = deviceMarkerStateRef.current[dev.id]
       const needsIconUpdate = !prevState ||
@@ -262,37 +278,38 @@ export default function MapAssetMarkerRenderer({
 
       if (deviceMarkersRef.current[dev.id]) {
         const marker = deviceMarkersRef.current[dev.id]
-        marker.setPosition(position)
+        marker.setLngLat([dev.longitude, dev.latitude])
         if (needsIconUpdate) {
           const icon = getNetworkMarkerIcon(dev.device_type, isSelected)
-          marker.setIcon(icon)
-          marker.setTitle(`${dev.name} (${dev.device_type})`)
+          const el = marker.getElement()
+          el.innerHTML = icon.svg
+          el.style.width = `${icon.size[0]}px`
+          el.style.height = `${icon.size[1]}px`
+          el.title = `${dev.name} (${dev.device_type})`
           deviceMarkerStateRef.current[dev.id] = { isSelected, deviceType: dev.device_type, name: dev.name }
         }
       } else {
         const icon = getNetworkMarkerIcon(dev.device_type, isSelected)
-        const marker = new google.maps.Marker({
-          position,
-          map,
+        const el = buildMarkerElement(icon.svg, icon.size)
+        el.title = `${dev.name} (${dev.device_type})`
+        const marker = new maplibregl.Marker({
+          element: el,
           draggable: true,
-          icon,
-          title: `${dev.name} (${dev.device_type})`,
+          anchor: 'center'
         })
+          .setLngLat([dev.longitude, dev.latitude])
+          .addTo(map)
 
         deviceMarkerStateRef.current[dev.id] = { isSelected, deviceType: dev.device_type, name: dev.name }
 
-        marker.addListener('click', () => {
+        el.addEventListener('click', (e: MouseEvent) => {
+          e.stopPropagation()
           setSelectedDevice(dev)
         })
 
-        marker.addListener('dragend', async () => {
-          const newPos = marker.getPosition()
-          if (!newPos) return
-
-          const newLat = newPos.lat()
-          const newLng = newPos.lng()
-
-          await onDeviceDragEnd(dev.id, newLat, newLng)
+        marker.on('dragend', async () => {
+          const newPos = marker.getLngLat()
+          await onDeviceDragEnd(dev.id, newPos.lat, newPos.lng)
         })
 
         deviceMarkersRef.current[dev.id] = marker
@@ -305,24 +322,17 @@ export default function MapAssetMarkerRenderer({
     if (!map) return
 
     Object.keys(fiberNodeMarkersRef.current).forEach(id => {
-      fiberNodeMarkersRef.current[id].setMap(null)
+      fiberNodeMarkersRef.current[id].remove()
       delete fiberNodeMarkersRef.current[id]
     })
 
     if (!showFiberNodes) return
 
-    const winObj = window as unknown as { _mapInfoWindow?: google.maps.InfoWindow }
-    let infoWindow = winObj._mapInfoWindow
-    if (!infoWindow && typeof google !== 'undefined') {
-      infoWindow = new google.maps.InfoWindow()
-      winObj._mapInfoWindow = infoWindow
-    }
-
     fiberNodes.forEach(node => {
       const statusColor = getStatusColor(node.status)
       let svgShape = ''
       const typeLower = node.node_type ? node.node_type.toLowerCase() : ''
-      
+
       if (typeLower === 'manhole') {
         svgShape = `
           <circle cx="12" cy="12" r="10" fill="${statusColor}" stroke="#ffffff" stroke-width="2"/>
@@ -387,27 +397,27 @@ export default function MapAssetMarkerRenderer({
         </svg>
       `
 
-      const marker = new google.maps.Marker({
-        position: { lat: node.latitude, lng: node.longitude },
-        map: map,
+      const el = buildMarkerElement(svgPin, [30, 42])
+      el.title = `${node.node_tag} (${node.node_type})`
+      const marker = new maplibregl.Marker({
+        element: el,
         draggable: false,
-        title: `${node.node_tag} (${node.node_type})`,
-        icon: {
-          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svgPin),
-          scaledSize: new google.maps.Size(30, 42),
-          anchor: new google.maps.Point(15, 15)
-        }
+        anchor: 'center',
+        offset: [0, 6] // elementCenterY(21) - anchorY(15)
       })
+        .setLngLat([node.longitude, node.latitude])
+        .addTo(map)
 
       // Wire click: Fiber Path Design draw mode takes priority when callback is provided
-      marker.addListener('click', () => {
+      el.addEventListener('click', (e: MouseEvent) => {
+        e.stopPropagation()
         if (onFiberNodeClick) {
           onFiberNodeClick(node)
         }
         // When onFiberNodeClick is undefined, no click action fires (existing behavior)
       })
 
-      marker.addListener('mouseover', () => {
+      el.addEventListener('mouseenter', () => {
         const cables = fiberCables.filter(c => c.from_node_id === node.id || c.to_node_id === node.id)
         const served = fiberAssignments.filter(a => a.source_node_id === node.id)
         const servedTags = served.map(a => {
@@ -417,21 +427,29 @@ export default function MapAssetMarkerRenderer({
 
         const content = `
           <div style="padding: 8px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a; max-width: 200px;">
-            <div style="font-weight: bold; font-size: 12px; margin-bottom: 4px; border-b: 1px solid #e2e8f0; padding-bottom: 2px;">
+            <div style="font-weight: bold; font-size: 12px; margin-bottom: 4px; border-bottom: 1px solid #e2e8f0; padding-bottom: 2px;">
               ${node.node_tag}
             </div>
             <div><strong>Type:</strong> ${node.node_type}</div>
             <div><strong>Status:</strong> <span style="color: ${statusColor}; font-weight: bold;">${node.status}</span></div>
             <div><strong>Cables:</strong> ${cables.length > 0 ? cables.map(c => c.cable_tag).join(', ') : 'None'}</div>
             <div><strong>Served Cams:</strong> ${servedTags || 'None'}</div>
-            ${!onFiberNodeClick ? `<div style="margin-top: 8px; padding-top: 6px; border-t: 1px solid #e2e8f0; display: flex;">
-              <a href="/projects/${projectId}/fiber?selectedNodeId=${node.id}" style="display: inline-block; padding: 4px 8px; background-color: #4f46e5; color: white; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 9px; text-align: center; flex: 1;">Editar Nodo</a>
-            </div>` : `<div style="margin-top: 6px; padding-top: 4px; border-t: 1px solid #e2e8f0; color: #818cf8; font-size: 9px; font-weight: bold;">Click to select as route endpoint</div>`}
+            ${!onFiberNodeClick ? `<div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #e2e8f0; display: flex;">
+              <a href="/projects/${projectId}/fiber?selectedNodeId=${node.id}" style="display: inline-block; padding: 4px 8px; background-color: #4f46e5; color: white; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 9px; text-align: center; flex: 1;">Edit Node</a>
+            </div>` : `<div style="margin-top: 6px; padding-top: 4px; border-top: 1px solid #e2e8f0; color: #818cf8; font-size: 9px; font-weight: bold;">Click to select as route endpoint</div>`}
           </div>
         `
-        if (infoWindow) {
-          infoWindow.setContent(content)
-          infoWindow.open(map, marker)
+        if (nodePopupRef.current) nodePopupRef.current.remove()
+        nodePopupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: false })
+          .setLngLat([node.longitude, node.latitude])
+          .setHTML(content)
+          .addTo(map)
+      })
+
+      el.addEventListener('mouseleave', () => {
+        if (nodePopupRef.current) {
+          nodePopupRef.current.remove()
+          nodePopupRef.current = null
         }
       })
 
@@ -447,16 +465,17 @@ export default function MapAssetMarkerRenderer({
     return () => {
       Object.keys(currentCameraMarkers).forEach(id => {
         const marker = currentCameraMarkers[id]
-        if (marker) marker.setMap(null)
+        if (marker) marker.remove()
       })
       Object.keys(currentDeviceMarkers).forEach(id => {
         const marker = currentDeviceMarkers[id]
-        if (marker) marker.setMap(null)
+        if (marker) marker.remove()
       })
       Object.keys(currentFiberNodeMarkers).forEach(id => {
         const marker = currentFiberNodeMarkers[id]
-        if (marker) marker.setMap(null)
+        if (marker) marker.remove()
       })
+      if (nodePopupRef.current) nodePopupRef.current.remove()
     }
   }, [])
 

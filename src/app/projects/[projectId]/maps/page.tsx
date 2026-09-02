@@ -155,7 +155,6 @@ export default async function ProjectMapsPage({ params }: PageProps) {
           defaultLatitude={Number(project.default_latitude)}
           defaultLongitude={Number(project.default_longitude)}
           defaultZoom={project.default_zoom}
-          googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
         />
       </div>
     </div>

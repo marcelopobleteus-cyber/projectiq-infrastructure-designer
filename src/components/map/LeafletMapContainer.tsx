@@ -335,7 +335,7 @@ export default function LeafletMapContainer({
               : 'text-[var(--text-secondary)] hover:text-white hover:bg-slate-800'
           }`}
         >
-          Satélite Esri (Gratis)
+          Esri Satellite (Free)
         </button>
       </div>
     </div>

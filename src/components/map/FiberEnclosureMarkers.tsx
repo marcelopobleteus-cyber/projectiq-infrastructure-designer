@@ -1,9 +1,10 @@
 'use client'
 
 import React, { useEffect, useRef } from 'react'
+import * as maplibregl from 'maplibre-gl'
 
 interface FiberEnclosureMarkersProps {
-  map: google.maps.Map | null
+  map: maplibregl.Map | null
   fiberEnclosures: any[]
   fiberNodes: any[]
   layerVisibility: Record<string, boolean>
@@ -21,7 +22,7 @@ export default function FiberEnclosureMarkers({
   setSelectedCamera,
   setSelectedDevice
 }: FiberEnclosureMarkersProps) {
-  const enclosureMarkersRef = useRef<{ [id: string]: google.maps.Marker }>({})
+  const enclosureMarkersRef = useRef<{ [id: string]: maplibregl.Marker }>({})
 
   // Synchronize Fiber Enclosure Markers
   useEffect(() => {
@@ -31,7 +32,7 @@ export default function FiberEnclosureMarkers({
     Object.keys(enclosureMarkersRef.current).forEach(id => {
       const enc = fiberEnclosures.find(e => e.id === id)
       if (!enc || !layerVisibility['fiber-enclosures']) {
-        enclosureMarkersRef.current[id].setMap(null)
+        enclosureMarkersRef.current[id].remove()
         delete enclosureMarkersRef.current[id]
       }
     })
@@ -68,11 +69,9 @@ export default function FiberEnclosureMarkers({
         lng += 0.00003
       }
 
-      const position = { lat, lng }
-
       // SVG Definition
       const isAerial = enclosure.enclosure_type?.toLowerCase().includes('aerial')
-      
+
       let svgShape = ''
       if (isAerial) {
         // Horizontal cylinder
@@ -107,25 +106,26 @@ export default function FiberEnclosureMarkers({
 
       if (enclosureMarkersRef.current[enclosure.id]) {
         const marker = enclosureMarkersRef.current[enclosure.id]
-        marker.setPosition(position)
-        marker.setIcon({
-          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svgPin),
-          scaledSize: new google.maps.Size(32, 42),
-          anchor: new google.maps.Point(16, 16)
-        })
+        marker.setLngLat([lng, lat])
+        marker.getElement().innerHTML = svgPin
       } else {
-        const marker = new google.maps.Marker({
-          position,
-          map,
-          title: `${enclosure.enclosure_tag} (${enclosure.enclosure_type})`,
-          icon: {
-            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svgPin),
-            scaledSize: new google.maps.Size(32, 42),
-            anchor: new google.maps.Point(16, 16)
-          }
-        })
+        const el = document.createElement('div')
+        el.style.width = '32px'
+        el.style.height = '42px'
+        el.style.cursor = 'pointer'
+        el.innerHTML = svgPin
+        el.title = `${enclosure.enclosure_tag} (${enclosure.enclosure_type})`
 
-        marker.addListener('click', () => {
+        const marker = new maplibregl.Marker({
+          element: el,
+          anchor: 'center',
+          offset: [0, 5] // elementCenterY(21) - anchorY(16)
+        })
+          .setLngLat([lng, lat])
+          .addTo(map)
+
+        el.addEventListener('click', (e: MouseEvent) => {
+          e.stopPropagation()
           setSelectedCamera(null)
           setSelectedDevice(null)
           setSelectedEnclosure(enclosure)
@@ -134,13 +134,14 @@ export default function FiberEnclosureMarkers({
         enclosureMarkersRef.current[enclosure.id] = marker
       }
     })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fiberEnclosures, map, layerVisibility['fiber-enclosures'], fiberNodes, setSelectedCamera, setSelectedDevice, setSelectedEnclosure])
 
   // Cleanup enclosure markers on unmount
   useEffect(() => {
     return () => {
       Object.keys(enclosureMarkersRef.current).forEach(id => {
-        enclosureMarkersRef.current[id].setMap(null)
+        enclosureMarkersRef.current[id].remove()
       })
     }
   }, [])

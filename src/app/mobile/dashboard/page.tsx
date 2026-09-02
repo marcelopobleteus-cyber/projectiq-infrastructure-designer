@@ -13,7 +13,7 @@ export default function MobileDashboardStubPage() {
             Mobile Dashboard Stub
           </h2>
           <p className="text-xs text-[var(--text-secondary)] max-w-xs mx-auto leading-relaxed">
-            Métricas generales de la organización optimizadas para dispositivos móviles.
+            Organization-wide metrics, optimized for mobile devices.
           </p>
         </div>
       </div>

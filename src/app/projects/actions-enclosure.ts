@@ -270,7 +270,7 @@ export async function placeEnclosureKit(params: {
 
   if (trayItem) {
     if (!params.mountedOnNodeId) {
-      spliceWarning = 'La bandeja de empalme no se creo: la caja no esta asociada a un poste o nodo.'
+      spliceWarning = 'Splice tray not created: the enclosure is not attached to a pole or node.'
     } else {
       const { data: fiberEnc, error: encErr } = await supabase
         .from('fiber_enclosures')
@@ -294,7 +294,7 @@ export async function placeEnclosureKit(params: {
 
       if (encErr) {
         console.error('Failed to create fiber enclosure:', encErr.message)
-        spliceWarning = `La bandeja de empalme no se creo: ${encErr.message}`
+        spliceWarning = `Splice tray not created: ${encErr.message}`
       } else {
         const { error: trayErr } = await supabase.from('splice_trays').insert({
           project_id: params.projectId,
@@ -360,7 +360,7 @@ export async function placeEnclosureKit(params: {
     reusedComponents,
     warning: [
       reusedComponents > 0
-        ? `${reusedComponents} de ${items.length} componentes son existentes y se reutilizan: no generan material, solo mano de obra.`
+        ? `${reusedComponents} of ${items.length} components are existing and reused: no material, labor only.`
         : null,
       spliceWarning ?? null,
     ].filter(Boolean).join(' ') || undefined,
@@ -415,8 +415,8 @@ export async function assignCameraToEnclosure(params: {
 
   if (dropFt > MAX_ETHERNET_DROP_FT) {
     return {
-      error: `El tendido son ${dropFt.toFixed(0)} ft y Ethernet sobre cobre muere a los ${MAX_ETHERNET_DROP_FT} ft (100 m). ` +
-             `La camara ${camera.camera_id_tag} necesita una caja mas cerca, o un extensor/media converter.`,
+      error: `The drop is ${dropFt.toFixed(0)} ft and Ethernet over copper dies at ${MAX_ETHERNET_DROP_FT} ft (100 m). ` +
+             `${camera.camera_id_tag} needs a closer enclosure, or an extender / media converter.`,
     }
   }
 
@@ -441,7 +441,7 @@ export async function assignCameraToEnclosure(params: {
 
   const port = freePorts?.[0]
   if (!port) {
-    return { error: `El switch de ${cabinet.cabinet_tag} no tiene puertos PoE libres.` }
+    return { error: `The switch in ${cabinet.cabinet_tag} has no free PoE ports.` }
   }
 
   const { error: portErr } = await supabase
@@ -475,7 +475,7 @@ export async function assignCameraToEnclosure(params: {
     success: true,
     portNumber: port.port_number,
     warning: params.dropCableFt === undefined
-      ? `Tendido estimado en ${dropFt.toFixed(0)} ft desde la distancia en el mapa. Confirma el largo real en terreno.`
+      ? `Drop estimated at ${dropFt.toFixed(0)} ft from map distance. Confirm the real length in the field.`
       : undefined,
   }
 }
@@ -591,7 +591,7 @@ export async function allocateCameraFiber(params: {
     .maybeSingle()
 
   if (!fiberEnc) {
-    return { error: 'Esa caja no tiene bandeja de empalme donde guardar las fusiones.' }
+    return { error: 'That enclosure has no splice tray to hold the fusions.' }
   }
 
   const { data: tray } = await supabase
@@ -611,7 +611,7 @@ export async function allocateCameraFiber(params: {
     .order('strand_number')
 
   if (!dropStrands?.length) {
-    return { error: 'Ese drop no tiene hilos cargados. Genera los hilos del cable primero.' }
+    return { error: 'That drop has no strands loaded. Generate the cable strands first.' }
   }
 
   const drop: StrandUse[] = []
@@ -623,13 +623,13 @@ export async function allocateCameraFiber(params: {
     const color = strandColor(n)
 
     if (!s) {
-      conflicts.push(`hilo ${n} (${color}) no existe en el drop`)
+      conflicts.push(`strand ${n} (${color}) does not exist in the drop`)
       drop.push({ strandNumber: n, color, strandId: null, role })
       continue
     }
 
     if (s.assigned_camera_id && s.assigned_camera_id !== params.cameraLocationId) {
-      conflicts.push(`hilo ${n} (${color}) ya esta tomado por otra camara`)
+      conflicts.push(`strand ${n} (${color}) is already taken by another camera`)
       drop.push({ strandNumber: n, color, strandId: s.id, role })
       continue
     }
@@ -639,8 +639,8 @@ export async function allocateCameraFiber(params: {
       .update({
         assigned_camera_id: params.cameraLocationId,
         assigned_purpose: role === 'spliced'
-          ? `${camera.camera_id_tag} activo`
-          : `${camera.camera_id_tag} reserva`,
+          ? `${camera.camera_id_tag} active`
+          : `${camera.camera_id_tag} spare`,
         splice_status: 'Not Spliced',
         updated_at: new Date().toISOString(),
       })
@@ -676,7 +676,7 @@ export async function allocateCameraFiber(params: {
     }
 
     if (a === 0) {
-      conflicts.push(`el backbone no tiene pares libres (${capacity} hilos, ${used.size} camaras asignadas)`)
+      conflicts.push(`the backbone has no free pairs (${capacity} strands, ${used.size} cameras assigned)`)
     } else {
       const b = a + 1
       const { error: camErr } = await supabase
@@ -689,7 +689,7 @@ export async function allocateCameraFiber(params: {
         })
         .eq('id', params.cameraLocationId)
 
-      if (camErr) conflicts.push(`no se pudo reservar el par del backbone: ${camErr.message}`)
+      if (camErr) conflicts.push(`could not reserve the backbone pair: ${camErr.message}`)
       else backbonePair = { a, b, colorA: strandColor(a), colorB: strandColor(b) }
     }
   }
@@ -710,12 +710,12 @@ export async function allocateCameraFiber(params: {
       splice_type: 'Fusion' as const,
       splice_status: 'Not Spliced',
       notes: backbonePair
-        ? `${camera.camera_id_tag}: drop hilo ${s.strandNumber} (${s.color}) <-> backbone hilo ${s.strandNumber === 1 ? backbonePair.a : backbonePair.b}`
-        : `${camera.camera_id_tag}: drop hilo ${s.strandNumber} (${s.color})`,
+        ? `${camera.camera_id_tag}: drop strand ${s.strandNumber} (${s.color}) <-> backbone strand ${s.strandNumber === 1 ? backbonePair.a : backbonePair.b}`
+        : `${camera.camera_id_tag}: drop strand ${s.strandNumber} (${s.color})`,
     }))
 
     const { error: splErr } = await supabase.from('fiber_splice_records').insert(rows as any)
-    if (splErr) return { error: `Hilos reservados, pero fallo el registro de empalmes: ${splErr.message}` }
+    if (splErr) return { error: `Strands reserved, but the splice records failed: ${splErr.message}` }
     splicesCreated = rows.length
   }
 
@@ -724,10 +724,10 @@ export async function allocateCameraFiber(params: {
   const spares = drop.filter(s => s.role === 'spare').length
   const notes: string[] = []
   if (spares > 0) {
-    notes.push(`${spares} pigtails quedan de reserva, sin fusionar.`)
+    notes.push(`${spares} pigtails left as spares, not fused.`)
   }
   if (conflicts.length > 0) {
-    notes.push(`Revisar antes de mandar la cuadrilla: ${conflicts.join(', ')}.`)
+    notes.push(`Review before dispatching the crew: ${conflicts.join(', ')}.`)
   }
 
   return {

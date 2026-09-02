@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import {
   getOrganizationTeamData,
   inviteTeamMember,
@@ -50,6 +50,7 @@ export default function SettingsClient({ initialTeamData }: { initialTeamData: O
   const [ratesError, setRatesError] = useState<string | null>(null)
   const [canEditRates, setCanEditRates] = useState(false)
   const [savingRate, setSavingRate] = useState<string | null>(null)
+  const ratesRequested = useRef(false)
 
   const [memberToRemove, setMemberToRemove] = useState<TeamMemberItem | null>(null)
   const [isRemoving, setIsRemoving] = useState(false)
@@ -152,8 +153,16 @@ export default function SettingsClient({ initialTeamData }: { initialTeamData: O
   }
 
   // Carga diferida: las tarifas solo se piden cuando se abre su pestana.
+  //
+  // El guardia va en un ref, NO en las dependencias. Tener `loadingRates` en
+  // deps hacia que el propio efecto se cancelara solo: lo ponia en true, eso
+  // cambiaba las deps, React corria la limpieza del efecto anterior marcando
+  // cancelled = true, y la respuesta llegaba sin nadie escuchando. La pantalla
+  // quedaba en "Loading rates..." para siempre, sin ningun error en consola.
   useEffect(() => {
-    if (activeTab !== 'rates' || laborRates.length > 0 || loadingRates) return
+    if (activeTab !== 'rates' || ratesRequested.current) return
+    ratesRequested.current = true
+
     let cancelled = false
     setLoadingRates(true)
     setRatesError(null)
@@ -169,7 +178,7 @@ export default function SettingsClient({ initialTeamData }: { initialTeamData: O
       .catch(() => { if (!cancelled) setRatesError('Could not load labor rates.') })
       .finally(() => { if (!cancelled) setLoadingRates(false) })
     return () => { cancelled = true }
-  }, [activeTab, laborRates.length, loadingRates])
+  }, [activeTab])
 
   // Solo cuenta como cambio si el numero es valido y distinto del guardado.
   const dirtyRateCodes = laborRates
@@ -357,9 +366,9 @@ export default function SettingsClient({ initialTeamData }: { initialTeamData: O
                 y cotizar con ellas sin revisar produce numeros equivocados. */}
             <div className="bg-[var(--surface-1)] border-l-2 border-l-[var(--accent)] border border-[var(--border)] p-4 rounded-xl">
               <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
-                <span className="font-bold text-[var(--text-primary)]">Los valores marcados &ldquo;System default&rdquo; no son precios verificados.</span>{' '}
-                Son un punto de partida para que el calculo funcione. Ajustalos con tus costos reales
-                antes de cotizar a un cliente.
+                <span className="font-bold text-[var(--text-primary)]">Values marked &ldquo;System default&rdquo; are not verified prices.</span>{' '}
+                They are a starting point so the math works. Replace them with your real costs
+                before quoting a client.
               </p>
             </div>
 
@@ -449,8 +458,8 @@ export default function SettingsClient({ initialTeamData }: { initialTeamData: O
             )}
 
             <p className="text-[11px] text-[var(--text-tertiary)] leading-relaxed">
-              Cambiar una tarifa afecta las lineas de mano de obra que se generen de aqui en adelante.
-              Las que ya estan en un BOM conservan el precio con que se crearon.
+              Changing a rate affects labor lines created from now on. Lines already in a BOM keep
+              the price they were created with — use Recalc Labor on the BOM to bring them up to date.
             </p>
           </div>
         )}
@@ -651,8 +660,8 @@ export default function SettingsClient({ initialTeamData }: { initialTeamData: O
       {/* Member Deletion Confirmation Modal */}
       <ConfirmModal
         isOpen={Boolean(memberToRemove)}
-        title={`¿Remover a ${memberToRemove?.fullName}?`}
-        message={`Esta acción revocará el acceso de ${memberToRemove?.email} a los proyectos y recursos de la organización.`}
+        title={`Remove ${memberToRemove?.fullName}?`}
+        message={`This will revoke ${memberToRemove?.email}'s access to this organization's projects and resources.`}
         confirmText="Remover Miembro"
         cancelText="Cancelar"
         variant="danger"

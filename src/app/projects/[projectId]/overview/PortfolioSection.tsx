@@ -16,10 +16,10 @@ const currency = (n: number) =>
 const DISCIPLINE_LABELS: Record<string, string> = {
   cctv: 'CCTV',
   fiber: 'Fibra',
-  conduit: 'Ductos',
+  conduit: 'Conduit',
   networking: 'Networking',
   wireless: 'Wireless',
-  power: 'Energía',
+  power: 'Power',
   lighting: 'Alumbrado',
 }
 
@@ -91,7 +91,7 @@ export default function PortfolioSection({ projectId, portfolio }: PortfolioSect
           disabled={isPending}
           className="text-[10.5px] font-bold text-[var(--text-secondary)] dark:text-[var(--text-tertiary)] hover:text-red-600 dark:hover:text-red-400 transition disabled:opacity-50"
         >
-          {isPending ? 'Quitando...' : 'Quitar vínculo'}
+          {isPending ? 'Unlinking…' : 'Unlink'}
         </button>
         {error && <span className="text-[10.5px] text-red-600 dark:text-red-400 basis-full">{error}</span>}
       </div>
@@ -207,7 +207,7 @@ export default function PortfolioSection({ projectId, portfolio }: PortfolioSect
           </button>
           {portfolio.linkableParents.length === 0 && (
             <span className="text-[10.5px] text-[var(--text-secondary)] dark:text-[var(--text-tertiary)] basis-full">
-              No hay otros proyectos raíz disponibles todavía en esta organización.
+              No other root projects are available in this organization yet.
             </span>
           )}
           {error && <span className="text-[10.5px] text-red-600 dark:text-red-400 basis-full">{error}</span>}

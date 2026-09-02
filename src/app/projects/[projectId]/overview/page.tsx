@@ -158,7 +158,6 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
         completedActiveSteps={completedActiveSteps.length}
         activeSteps={activeSteps.length}
         nextRecommendedStep={nextRecommendedStep}
-        googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
         portfolio={portfolio}
       />
     </div>

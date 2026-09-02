@@ -40,7 +40,6 @@ interface OverviewDashboardProps {
   completedActiveSteps: number
   activeSteps: number
   nextRecommendedStep: WorkflowStep | undefined
-  googleMapsApiKey: string | undefined
   portfolio: PortfolioData
 }
 
@@ -53,7 +52,6 @@ export default function OverviewDashboard({
   completedActiveSteps,
   activeSteps,
   nextRecommendedStep,
-  googleMapsApiKey,
   portfolio,
 }: OverviewDashboardProps) {
   const [activeGroup, setActiveGroup] = useState<WorkflowGroup>('Setup')
@@ -466,7 +464,6 @@ export default function OverviewDashboard({
                 default_longitude: Number(project.default_longitude),
                 default_zoom: project.default_zoom,
               }}
-              googleMapsApiKey={googleMapsApiKey}
             />
           </div>
 

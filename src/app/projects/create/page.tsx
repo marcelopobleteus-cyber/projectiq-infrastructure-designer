@@ -8,13 +8,13 @@ import { createClient } from '@/utils/supabase/client'
 // Canonical discipline ids — must match ALL_DISCIPLINES in ProjectSidebar.tsx
 // and DISCIPLINE_LABELS in overview/PortfolioSection.tsx.
 const DISCIPLINE_OPTIONS = [
-  { id: 'cctv', title: 'CCTV & Videovigilancia', subtitle: 'Cámaras 4K PTZ, LPR, VLANs, NVRs y Cobertura FOV', icon: '📹', color: 'border-[var(--accent)]/50 bg-[var(--accent)]/10 text-[var(--accent-text)]', ready: true },
-  { id: 'fiber', title: 'Fibra Óptica (OSP / ISP)', subtitle: 'Trazados SMF 24F/48F, Manholes, Empalmes y FDUs', icon: '🌐', color: 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400', ready: true },
+  { id: 'cctv', title: 'CCTV & Video Surveillance', subtitle: '4K PTZ cameras, LPR, VLANs, NVRs and FOV coverage', icon: '📹', color: 'border-[var(--accent)]/50 bg-[var(--accent)]/10 text-[var(--accent-text)]', ready: true },
+  { id: 'fiber', title: 'Fiber Optic (OSP / ISP)', subtitle: 'SMF 24F/48F routes, manholes, splices and FDUs', icon: '🌐', color: 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400', ready: true },
   { id: 'networking', title: 'Networking & Switches', subtitle: 'Switches Industriales PoE, Racks, Patch Cords & Ports', icon: '🖧', color: 'border-purple-500/50 bg-purple-500/10 text-purple-400', ready: true },
   { id: 'wireless', title: 'Enlaces Wireless & PTP', subtitle: 'Antenas Punto a Punto, PtMP, LoS y Cobertura Wi-Fi', icon: '📡', color: 'border-cyan-500/50 bg-cyan-500/10 text-cyan-400', ready: true },
-  { id: 'power', title: 'Energía & Subestaciones', subtitle: 'Acometidas AC, Transformadores, UPS y Carga Watts', icon: '⚡', color: 'border-red-500/50 bg-red-500/10 text-red-400', ready: true },
-  { id: 'conduit', title: 'Canalizaciones & Ductos', subtitle: 'Banco de Ductos, Tubería PVC/HDPE y Handholes', icon: '🏗️', color: 'border-amber-500/50 bg-amber-500/10 text-amber-400', ready: false },
-  { id: 'lighting', title: 'Alumbrado Público & Privado', subtitle: 'Smart Lighting, Postes, Luminarias LED & Fotocélulas', icon: '💡', color: 'border-yellow-500/50 bg-yellow-500/10 text-yellow-400', ready: false },
+  { id: 'power', title: 'Power & Substations', subtitle: 'AC services, transformers, UPS and wattage load', icon: '⚡', color: 'border-red-500/50 bg-red-500/10 text-red-400', ready: true },
+  { id: 'conduit', title: 'Conduit & Duct Bank', subtitle: 'Duct bank, PVC/HDPE pipe and handholes', icon: '🏗️', color: 'border-amber-500/50 bg-amber-500/10 text-amber-400', ready: false },
+  { id: 'lighting', title: 'Public & Private Lighting', subtitle: 'Smart lighting, poles, LED luminaires and photocells', icon: '💡', color: 'border-yellow-500/50 bg-yellow-500/10 text-yellow-400', ready: false },
 ]
 
 const READY_IDS = DISCIPLINE_OPTIONS.filter(d => d.ready).map(d => d.id)
@@ -119,7 +119,7 @@ export default function CreateProjectPage() {
             <div className="flex items-center justify-between mb-3">
               <label className="block text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider">
                 Disciplinas del Proyecto
-                <span className="ml-2 text-[var(--text-tertiary)] normal-case font-normal">elige una o varias según tu plan contratado</span>
+                <span className="ml-2 text-[var(--text-tertiary)] normal-case font-normal">pick one or more, according to your plan</span>
               </label>
               <div className="flex items-center gap-3 text-[11px] font-semibold">
                 <button type="button" onClick={selectAllAllowed} className="text-[var(--accent-text)] hover:text-indigo-300">
@@ -191,7 +191,7 @@ export default function CreateProjectPage() {
             </div>
             {selectedDisciplines.some(d => !READY_IDS.includes(d)) && (
               <p className="text-[10.5px] text-amber-400 mt-2">
-                Las disciplinas marcadas &ldquo;En desarrollo&rdquo; se guardan en el proyecto, pero su módulo de trabajo todavía no está construido en la app.
+                Disciplines marked &ldquo;In development&rdquo; are saved to the project, but their work module is not built in the app yet.
               </p>
             )}
           </div>

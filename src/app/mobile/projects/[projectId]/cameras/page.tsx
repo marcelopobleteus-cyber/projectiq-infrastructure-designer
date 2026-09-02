@@ -12,7 +12,7 @@ export default async function MobileCamerasStubPage({ params }: MobileCamerasPro
 
   return (
     <MobileAppShell
-      title="Inventario de Cámaras"
+      title="Camera Inventory"
       subtitle={`ID: ${projectId}`}
       projectId={projectId}
     >
@@ -25,7 +25,7 @@ export default async function MobileCamerasStubPage({ params }: MobileCamerasPro
             Mobile Cameras Inventory Stub
           </h2>
           <p className="text-xs text-[var(--text-secondary)] max-w-xs mx-auto leading-relaxed">
-            Lista de cámaras en formato de tarjetas apiladas para dispositivos móviles.
+            Camera list as stacked cards, optimized for mobile devices.
           </p>
         </div>
       </div>

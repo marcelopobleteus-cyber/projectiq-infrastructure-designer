@@ -261,7 +261,7 @@ export async function recalculateProjectLabor(params: {
           original_id: row.id,
           project_id: params.projectId,
           payload: row as any,
-          removed_reason: 'Recalculo de mano de obra: el elemento ya no califica',
+          removed_reason: 'Labor recalculation: the element no longer qualifies',
         }))
       )
     }

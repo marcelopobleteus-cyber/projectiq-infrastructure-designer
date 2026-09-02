@@ -2,9 +2,14 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { setOptions, importLibrary } from '@googlemaps/js-api-loader'
 import { updateProjectMetadata, deleteProject } from '../../actions'
 import ConfirmModal from '@/components/ui/ConfirmModal'
+
+interface NominatimResult {
+  display_name: string
+  lat: string
+  lon: string
+}
 
 interface ProjectData {
   id: string
@@ -17,16 +22,18 @@ interface ProjectData {
 
 interface OverviewEditPanelProps {
   project: ProjectData
-  googleMapsApiKey: string | undefined
 }
 
-export default function OverviewEditPanel({ project, googleMapsApiKey }: OverviewEditPanelProps) {
+export default function OverviewEditPanel({ project }: OverviewEditPanelProps) {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [placesAvailable, setPlacesAvailable] = useState(!!googleMapsApiKey)
-  const [placesLoaded, setPlacesLoaded] = useState(false)
+  // Address search now uses the free OSM Nominatim geocoder — always available, no API key.
+  const [addressSuggestions, setAddressSuggestions] = useState<NominatimResult[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [searchingAddress, setSearchingAddress] = useState(false)
+  const addressSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [showConfirmDelete, setShowConfirmDelete] = useState(false)
 
@@ -52,39 +59,44 @@ export default function OverviewEditPanel({ project, googleMapsApiKey }: Overvie
 
   const addressInputRef = useRef<HTMLInputElement>(null)
 
-  // Load Google Places library when the edit panel opens
-  useEffect(() => {
-    if (!isOpen || !googleMapsApiKey || placesLoaded) return
+  // Free address search via OSM Nominatim, debounced — replaces Google Places Autocomplete.
+  const handleAddressInputChange = (value: string) => {
+    setAddressDisplay(value)
 
-    setOptions({ key: googleMapsApiKey, v: 'weekly' })
+    if (addressSearchTimer.current) clearTimeout(addressSearchTimer.current)
 
-    importLibrary('places')
-      .then((placesLib: unknown) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const lib = placesLib as any
-        if (!addressInputRef.current) return
+    if (value.trim().length < 3) {
+      setAddressSuggestions([])
+      setShowSuggestions(false)
+      return
+    }
 
-        const autocomplete = new lib.Autocomplete(addressInputRef.current, {
-          types: ['geocode', 'establishment'],
-          fields: ['geometry', 'formatted_address', 'name'],
-        })
+    addressSearchTimer.current = setTimeout(async () => {
+      setSearchingAddress(true)
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(value)}`
+        )
+        if (res.ok) {
+          const results = (await res.json()) as NominatimResult[]
+          setAddressSuggestions(results)
+          setShowSuggestions(results.length > 0)
+        }
+      } catch {
+        // Silently ignore — the manual latitude/longitude fields remain usable.
+      } finally {
+        setSearchingAddress(false)
+      }
+    }, 500)
+  }
 
-        autocomplete.addListener('place_changed', () => {
-          const place = autocomplete.getPlace()
-          if (place.geometry?.location) {
-            setLat(place.geometry.location.lat().toFixed(6))
-            setLng(place.geometry.location.lng().toFixed(6))
-            setAddressDisplay(place.formatted_address || place.name || '')
-          }
-        })
-
-        setPlacesLoaded(true)
-        setPlacesAvailable(true)
-      })
-      .catch(() => {
-        setPlacesAvailable(false)
-      })
-  }, [isOpen, googleMapsApiKey, placesLoaded])
+  const handleSelectAddress = (result: NominatimResult) => {
+    setLat(parseFloat(result.lat).toFixed(6))
+    setLng(parseFloat(result.lon).toFixed(6))
+    setAddressDisplay(result.display_name)
+    setShowSuggestions(false)
+    setAddressSuggestions([])
+  }
 
   const validate = (): string | null => {
     if (!name.trim()) return 'Project name is required.'
@@ -196,17 +208,6 @@ export default function OverviewEditPanel({ project, googleMapsApiKey }: Overvie
             </div>
           )}
 
-          {/* Places warning */}
-          {!placesAvailable && (
-            <div className="p-3 rounded-xl border border-amber-500/20 bg-amber-500/5 text-amber-600 dark:text-amber-400 text-xs flex items-start gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5">
-                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
-                <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
-              </svg>
-              Google Places is not configured. You can still enter latitude and longitude manually.
-            </div>
-          )}
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* Project Name */}
             <div className="md:col-span-2">
@@ -235,19 +236,42 @@ export default function OverviewEditPanel({ project, googleMapsApiKey }: Overvie
                   ref={addressInputRef}
                   type="text"
                   value={addressDisplay}
-                  onChange={(e) => setAddressDisplay(e.target.value)}
-                  placeholder={placesAvailable ? 'Search address or place...' : 'Google Places not configured'}
-                  disabled={!googleMapsApiKey}
-                  className="w-full px-3 py-2.5 pl-9 bg-slate-50 dark:bg-[var(--surface-2)] border border-slate-200 dark:border-[var(--border)] rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none focus:border-[var(--accent)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  onChange={(e) => handleAddressInputChange(e.target.value)}
+                  onFocus={() => { if (addressSuggestions.length > 0) setShowSuggestions(true) }}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                  placeholder="Search address or place..."
+                  className="w-full px-3 py-2.5 pl-9 bg-slate-50 dark:bg-[var(--surface-2)] border border-slate-200 dark:border-[var(--border)] rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none focus:border-[var(--accent)] transition-colors"
                 />
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] dark:text-slate-600 pointer-events-none">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-                  </svg>
+                  {searchingAddress ? (
+                    <svg className="animate-spin" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                  )}
                 </div>
+                {showSuggestions && addressSuggestions.length > 0 && (
+                  <div className="absolute z-30 mt-1 w-full bg-white dark:bg-[var(--surface-1)] border border-slate-200 dark:border-[var(--border)] rounded-xl shadow-xl overflow-hidden">
+                    {addressSuggestions.map((result, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => handleSelectAddress(result)}
+                        className="w-full text-left px-3 py-2 text-xs text-slate-700 dark:text-[var(--text-primary)] hover:bg-slate-100 dark:hover:bg-[var(--surface-2)] transition-colors border-b border-slate-100 dark:border-[var(--border)] last:border-b-0"
+                      >
+                        {result.display_name}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <p className="text-[9px] text-[var(--text-tertiary)] dark:text-slate-600 mt-1">
-                Address is resolved for geocoding only — not stored in the database. Coordinates are what get saved.
+                Address search uses OpenStreetMap (Nominatim) and is resolved for geocoding only — not stored in the database. Coordinates are what get saved.
               </p>
             </div>
 
@@ -380,8 +404,8 @@ export default function OverviewEditPanel({ project, googleMapsApiKey }: Overvie
       {/* Styled App Modal Confirmation for Project Deletion */}
       <ConfirmModal
         isOpen={showConfirmDelete}
-        title={`¿Eliminar proyecto "${project.name}"?`}
-        message={`Esta acción borrará PERMANENTEMENTE de la base de datos todas las cámaras, nodos de fibra, switches, BOM y órdenes de trabajo asociadas.\n\nEsta acción NO se puede deshacer.`}
+        title={`Delete project "${project.name}"?`}
+        message={`This will PERMANENTLY delete from the Supabase database every camera, fiber node, switch, BOM line and work order in this project. This cannot be undone.`}
         confirmText="Eliminar Proyecto"
         cancelText="Cancelar"
         variant="danger"

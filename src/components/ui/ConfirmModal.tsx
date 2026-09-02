@@ -18,7 +18,7 @@ export default function ConfirmModal({
   isOpen,
   title,
   message,
-  confirmText = 'Confirmar',
+  confirmText = 'Confirm',
   cancelText = 'Cancelar',
   variant = 'danger',
   isLoading = false,

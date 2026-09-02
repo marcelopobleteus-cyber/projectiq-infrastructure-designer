@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import * as maplibregl from 'maplibre-gl'
 import { Database } from '@/types/supabase'
 
 type FiberNode = Database['public']['Tables']['fiber_nodes']['Row']
@@ -11,7 +12,7 @@ type CameraFiberAssignment = Database['public']['Tables']['camera_fiber_assignme
 type CameraLocation = Database['public']['Tables']['camera_locations']['Row']
 
 interface MapPolylineRendererProps {
-  map: google.maps.Map | null
+  map: maplibregl.Map | null
   fiberNodes: FiberNode[]
   fiberRoutes: FiberRoute[]
   fiberRouteSegments: FiberRouteSegment[]
@@ -26,6 +27,9 @@ interface MapPolylineRendererProps {
   previewNodes?: FiberNode[]
 }
 
+// Module-scope so different renderer instances on the same map don't collide.
+let polylineRendererInstanceId = 0
+
 export default function MapPolylineRenderer({
   map,
   fiberNodes,
@@ -39,7 +43,50 @@ export default function MapPolylineRenderer({
   onRouteClick,
   previewNodes,
 }: MapPolylineRendererProps) {
-  const fiberRoutePolylinesRef = useRef<google.maps.Polyline[]>([])
+  const instanceIdRef = useRef(0)
+  if (instanceIdRef.current === 0) {
+    polylineRendererInstanceId += 1
+    instanceIdRef.current = polylineRendererInstanceId
+  }
+  const routeLayerIdsRef = useRef<string[]>([])
+  const previewLayerIdRef = useRef<string | null>(null)
+  const hoverPopupRef = useRef<maplibregl.Popup | null>(null)
+
+  const addLine = (
+    mapInstance: maplibregl.Map,
+    id: string,
+    coordinates: [number, number][],
+    color: string,
+    opts: { width?: number; dashed?: boolean; opacity?: number } = {}
+  ) => {
+    const { width = 4, dashed = false, opacity = 0.8 } = opts
+    if (mapInstance.getLayer(id)) mapInstance.removeLayer(id)
+    if (mapInstance.getSource(id)) mapInstance.removeSource(id)
+    mapInstance.addSource(id, {
+      type: 'geojson',
+      data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates } }
+    })
+    mapInstance.addLayer({
+      id,
+      type: 'line',
+      source: id,
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-color': color,
+        'line-width': width,
+        'line-opacity': opacity,
+        ...(dashed ? { 'line-dasharray': [2, 2] } : {})
+      }
+    })
+  }
+
+  const removeLines = (mapInstance: maplibregl.Map | null, ids: string[]) => {
+    if (!mapInstance) return
+    ids.forEach(id => {
+      if (mapInstance.getLayer(id)) mapInstance.removeLayer(id)
+      if (mapInstance.getSource(id)) mapInstance.removeSource(id)
+    })
+  }
 
   useEffect(() => {
     if (!map) return
@@ -63,77 +110,78 @@ export default function MapPolylineRenderer({
       return '#eab308'
     }
 
-    // 1. Clear old route polylines
-    fiberRoutePolylinesRef.current.forEach(p => p.setMap(null))
-    fiberRoutePolylinesRef.current = []
+    // 1. Clear old route layers
+    removeLines(map, routeLayerIdsRef.current)
+    routeLayerIdsRef.current = []
 
     if (!showFiberRoutes) return
 
-    const winObj = window as unknown as { _mapInfoWindow?: google.maps.InfoWindow }
-    let infoWindow = winObj._mapInfoWindow
-    if (!infoWindow && typeof google !== 'undefined') {
-      infoWindow = new google.maps.InfoWindow()
-      winObj._mapInfoWindow = infoWindow
+    const showHoverPopup = (lngLat: maplibregl.LngLat, content: string) => {
+      if (hoverPopupRef.current) hoverPopupRef.current.remove()
+      hoverPopupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: false })
+        .setLngLat(lngLat)
+        .setHTML(content)
+        .addTo(map)
+    }
+    const hideHoverPopup = () => {
+      if (hoverPopupRef.current) {
+        hoverPopupRef.current.remove()
+        hoverPopupRef.current = null
+      }
     }
 
     // 2. Draw conduits
     fiberRoutes.forEach(route => {
       const segs = fiberRouteSegments.filter(s => s.route_id === route.id)
-      const points: google.maps.LatLngLiteral[] = []
+      const points: [number, number][] = []
       segs.forEach(s => {
         if (s.start_latitude !== null && s.start_longitude !== null) {
-          points.push({ lat: s.start_latitude, lng: s.start_longitude })
+          points.push([s.start_longitude, s.start_latitude])
         }
         if (s.end_latitude !== null && s.end_longitude !== null) {
-          points.push({ lat: s.end_latitude, lng: s.end_longitude })
+          points.push([s.end_longitude, s.end_latitude])
         }
       })
 
       if (points.length === 0) return
 
-      const strokeCol = getRouteColor(route)
-      const poly = new google.maps.Polyline({
-        path: points,
-        geodesic: true,
-        strokeColor: strokeCol,
-        strokeOpacity: 0.8,
-        strokeWeight: 4,
-        map: map
-      })
+      const layerId = `poly-r${instanceIdRef.current}-route-${route.id}`
+      addLine(map, layerId, points, getRouteColor(route), { width: 4, opacity: 0.8 })
 
-      poly.addListener('mouseover', (e: google.maps.PolyMouseEvent) => {
+      map.on('mousemove', layerId, (e: maplibregl.MapMouseEvent) => {
         const cable = fiberCables.find(c => c.route_id === route.id)
         const content = `
           <div style="padding: 8px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a; min-width: 150px;">
-            <div style="font-weight: bold; font-size: 12px; margin-bottom: 4px; border-b: 1px solid #e2e8f0; padding-bottom: 2px;">
+            <div style="font-weight: bold; font-size: 12px; margin-bottom: 4px; border-bottom: 1px solid #e2e8f0; padding-bottom: 2px;">
               Route: ${route.route_id_tag}
             </div>
             <div><strong>Length:</strong> ${route.measured_length_feet} ft</div>
             <div><strong>Conduit Size:</strong> ${route.conduit_diameter_inches} in</div>
             <div><strong>Cable:</strong> ${cable ? `${cable.cable_tag} (${cable.fiber_count}F)` : 'No cable'}</div>
             ${onRouteClick
-              ? `<div style="margin-top: 6px; padding-top: 4px; border-t: 1px solid #e2e8f0; color: #818cf8; font-size: 9px; font-weight: bold;">Click route to view/delete details</div>`
-              : `<div style="margin-top: 8px; padding-top: 6px; border-t: 1px solid #e2e8f0; display: flex;">
-              <a href="/projects/${projectId}/fiber?selectedRouteId=${route.id}" style="display: inline-block; padding: 4px 8px; background-color: #4f46e5; color: white; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 9px; text-align: center; flex: 1;">Editar Ruta</a>
+              ? `<div style="margin-top: 6px; padding-top: 4px; border-top: 1px solid #e2e8f0; color: #818cf8; font-size: 9px; font-weight: bold;">Click route to view/delete details</div>`
+              : `<div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #e2e8f0; display: flex;">
+              <a href="/projects/${projectId}/fiber?selectedRouteId=${route.id}" style="display: inline-block; padding: 4px 8px; background-color: #4f46e5; color: white; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 9px; text-align: center; flex: 1;">Edit Route</a>
             </div>`
             }
           </div>
         `
-        if (infoWindow && e.latLng) {
-          infoWindow.setContent(content)
-          infoWindow.setPosition(e.latLng)
-          infoWindow.open(map)
-        }
+        showHoverPopup(e.lngLat, content)
+        map.getCanvas().style.cursor = 'pointer'
+      })
+      map.on('mouseleave', layerId, () => {
+        hideHoverPopup()
+        map.getCanvas().style.cursor = ''
       })
 
       // Wire route click: open details drawer when callback is provided
       if (onRouteClick) {
-        poly.addListener('click', () => {
+        map.on('click', layerId, () => {
           onRouteClick(route)
         })
       }
 
-      fiberRoutePolylinesRef.current.push(poly)
+      routeLayerIdsRef.current.push(layerId)
     })
 
     // 3. Draw drop cables (dashed)
@@ -143,28 +191,16 @@ export default function MapPolylineRenderer({
       const camera = cameras.find(c => c.id === assignment.camera_id)
 
       if (node && camera) {
-        const symbol = {
-          path: 'M 0,-1 0,1',
-          strokeOpacity: 0.8,
-          scale: 2
-        }
-        const poly = new google.maps.Polyline({
-          path: [
-            { lat: node.latitude, lng: node.longitude },
-            { lat: camera.latitude, lng: camera.longitude }
-          ],
-          geodesic: true,
-          strokeColor: getStatusColor(assignment.fiber_path_status),
-          strokeOpacity: 0,
-          icons: [{
-            icon: symbol,
-            offset: '0',
-            repeat: '10px'
-          }],
-          map: map
-        })
+        const layerId = `poly-r${instanceIdRef.current}-drop-${assignment.id}`
+        addLine(
+          map,
+          layerId,
+          [[node.longitude, node.latitude], [camera.longitude, camera.latitude]],
+          getStatusColor(assignment.fiber_path_status),
+          { width: 2, dashed: true, opacity: 0.85 }
+        )
 
-        poly.addListener('mouseover', (e: google.maps.PolyMouseEvent) => {
+        map.on('mousemove', layerId, (e: maplibregl.MapMouseEvent) => {
           const content = `
             <div style="padding: 8px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a;">
               <strong>Camera Drop: ${camera.camera_id_tag}</strong><br/>
@@ -173,20 +209,22 @@ export default function MapPolylineRenderer({
               Testing: ${assignment.test_status || 'N/A'}
             </div>
           `
-          if (infoWindow && e.latLng) {
-            infoWindow.setContent(content)
-            infoWindow.setPosition(e.latLng)
-            infoWindow.open(map)
-          }
+          showHoverPopup(e.lngLat, content)
+          map.getCanvas().style.cursor = 'pointer'
         })
 
-        poly.addListener('mouseout', () => {
-          if (infoWindow) infoWindow.close()
+        map.on('mouseleave', layerId, () => {
+          hideHoverPopup()
+          map.getCanvas().style.cursor = ''
         })
 
-        fiberRoutePolylinesRef.current.push(poly)
+        routeLayerIdsRef.current.push(layerId)
       }
     })
+
+    return () => {
+      hideHoverPopup()
+    }
   }, [
     map,
     fiberNodes,
@@ -200,55 +238,35 @@ export default function MapPolylineRenderer({
     onRouteClick,
   ])
 
-  const previewPolylineRef = useRef<google.maps.Polyline | null>(null)
-
   // Draw temporary preview polyline connecting selected nodes in sequence order
   useEffect(() => {
     if (!map) return
 
-    if (previewPolylineRef.current) {
-      previewPolylineRef.current.setMap(null)
-      previewPolylineRef.current = null
+    if (previewLayerIdRef.current) {
+      removeLines(map, [previewLayerIdRef.current])
+      previewLayerIdRef.current = null
     }
 
     if (!previewNodes || previewNodes.length < 2) return
 
-    const points = previewNodes.map(n => ({ lat: n.latitude, lng: n.longitude }))
-    const symbol = {
-      path: 'M 0,-1 0,1',
-      strokeOpacity: 0.8,
-      scale: 2
-    }
-
-    const poly = new google.maps.Polyline({
-      path: points,
-      geodesic: true,
-      strokeColor: '#818cf8', // Indigo preview color
-      strokeOpacity: 0,
-      icons: [{
-        icon: symbol,
-        offset: '0',
-        repeat: '10px'
-      }],
-      strokeWeight: 3,
-      map: map
-    })
-
-    previewPolylineRef.current = poly
+    const points: [number, number][] = previewNodes.map(n => [n.longitude, n.latitude])
+    const layerId = `poly-r${instanceIdRef.current}-preview`
+    addLine(map, layerId, points, '#818cf8', { width: 3, dashed: true, opacity: 0.9 })
+    previewLayerIdRef.current = layerId
 
     return () => {
-      if (poly) poly.setMap(null)
+      removeLines(map, [layerId])
     }
   }, [map, previewNodes])
 
   // Cleanup on unmount
   useEffect(() => {
-    const currentPolylines = fiberRoutePolylinesRef.current
-    const currentPreviewPolyline = previewPolylineRef.current
     return () => {
-      currentPolylines.forEach(p => p.setMap(null))
-      if (currentPreviewPolyline) currentPreviewPolyline.setMap(null)
+      removeLines(map, routeLayerIdsRef.current)
+      if (previewLayerIdRef.current) removeLines(map, [previewLayerIdRef.current])
+      if (hoverPopupRef.current) hoverPopupRef.current.remove()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return null

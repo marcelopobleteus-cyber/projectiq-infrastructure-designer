@@ -1,13 +1,8 @@
 'use client'
 
 import React, { useEffect, useRef, useState, useTransition } from 'react'
-import dynamic from 'next/dynamic'
-import { setOptions, importLibrary } from '@googlemaps/js-api-loader'
-
-const LeafletMapContainer = dynamic(() => import('@/components/map/LeafletMapContainer'), {
-  ssr: false,
-  loading: () => <div className="w-full h-full bg-[var(--surface-2)] flex items-center justify-center text-[var(--text-secondary)] text-xs font-semibold animate-pulse">Cargando OpenStreetMap & Satélite Esri...</div>
-})
+import * as maplibregl from 'maplibre-gl'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import { Database } from '@/types/supabase'
 import {
   createCameraLocation,
@@ -71,7 +66,6 @@ interface ProjectMapCanvasProps {
   defaultLatitude: number
   defaultLongitude: number
   defaultZoom: number
-  googleMapsApiKey: string | undefined
 }
 
 export default function ProjectMapCanvas({
@@ -81,13 +75,12 @@ export default function ProjectMapCanvas({
   cameraModels,
   defaultLatitude,
   defaultLongitude,
-  defaultZoom,
-  googleMapsApiKey
+  defaultZoom
 }: ProjectMapCanvasProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapRectRef = useRef<DOMRect | null>(null)
-  const [map, setMap] = useState<google.maps.Map | null>(null)
-  const [activeLayer, setActiveLayer] = useState<'hybrid' | 'roadmap' | 'satellite'>('hybrid')
+  const [map, setMap] = useState<maplibregl.Map | null>(null)
+  const [activeLayer, setActiveLayer] = useState<'hybrid' | 'roadmap' | 'satellite'>('roadmap')
   
   // Elements states
   const [cameras, setCameras] = useState<CameraLocation[]>(initialCameras)
@@ -237,16 +230,61 @@ export default function ProjectMapCanvas({
   const [devicePanelMessage, setDevicePanelMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   // Map markers dictionaries
-  const cameraMarkersRef = useRef<{ [id: string]: google.maps.Marker }>({})
-  const deviceMarkersRef = useRef<{ [id: string]: google.maps.Marker }>({})
+  const cameraMarkersRef = useRef<{ [id: string]: maplibregl.Marker }>({})
+  const deviceMarkersRef = useRef<{ [id: string]: maplibregl.Marker }>({})
   const cameraMarkerStateRef = useRef<{ [id: string]: { isSelected: boolean; status: string; tag: string } }>({})
   const deviceMarkerStateRef = useRef<{ [id: string]: { isSelected: boolean; deviceType: string; name: string } }>({})
-  const fiberNodeMarkersRef = useRef<{ [id: string]: google.maps.Marker }>({})
-  const fiberRoutePolylinesRef = useRef<google.maps.Polyline[]>([])
-  const wirelessRoutePolylinesRef = useRef<google.maps.Polyline[]>([])
-  const clickListenerRef = useRef<google.maps.MapsEventListener | null>(null)
+  const fiberNodeMarkersRef = useRef<{ [id: string]: maplibregl.Marker }>({})
+  // Layer ids of GeoJSON line layers currently on the map for fiber routes/drop cables and wireless links
+  const fiberRouteLayerIdsRef = useRef<string[]>([])
+  const wirelessRouteLayerIdsRef = useRef<string[]>([])
+  const popupRef = useRef<maplibregl.Popup | null>(null)
+  const clickHandlerRef = useRef<((e: maplibregl.MapMouseEvent) => void) | null>(null)
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isHoveringCardRef = useRef(false)
+
+  // ── Line-layer helpers: MapLibre has no Polyline object, so each "polyline" is a
+  // GeoJSON source + line layer pair we add/remove by id. ──
+  const addLineLayer = (
+    mapInstance: maplibregl.Map,
+    id: string,
+    coordinates: [number, number][],
+    color: string,
+    opts: { width?: number; dashed?: boolean; opacity?: number } = {}
+  ) => {
+    const { width = 4, dashed = false, opacity = 0.85 } = opts
+    if (mapInstance.getLayer(id)) mapInstance.removeLayer(id)
+    if (mapInstance.getSource(id)) mapInstance.removeSource(id)
+    mapInstance.addSource(id, {
+      type: 'geojson',
+      data: {
+        type: 'Feature',
+        properties: {},
+        geometry: { type: 'LineString', coordinates }
+      }
+    })
+    mapInstance.addLayer({
+      id,
+      type: 'line',
+      source: id,
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-color': color,
+        'line-width': width,
+        'line-opacity': opacity,
+        ...(dashed ? { 'line-dasharray': [2, 2] } : {})
+      }
+    })
+    return id
+  }
+
+  const removeLineLayers = (mapInstance: maplibregl.Map | null, ids: string[]) => {
+    if (!mapInstance) return
+    ids.forEach(id => {
+      if (mapInstance.getLayer(id)) mapInstance.removeLayer(id)
+      if (mapInstance.getSource(id)) mapInstance.removeSource(id)
+    })
+  }
 
 
   // Sync props to state
@@ -493,15 +531,19 @@ export default function ProjectMapCanvas({
     }
   }, [selectedDevice])
 
-  // Map layer controls
+  // Map layer controls — 'roadmap' shows the OSM street basemap, 'hybrid' & 'satellite'
+  // both show the Esri satellite imagery basemap (kept as two values for compat with
+  // the existing 3-way sidebar control).
   const handleLayerChange = (layer: 'hybrid' | 'roadmap' | 'satellite') => {
     setActiveLayer(layer)
-    if (map) {
-      map.setMapTypeId(layer)
+    if (map && map.getLayer('street-layer') && map.getLayer('satellite-layer')) {
+      const showSatellite = layer === 'satellite' || layer === 'hybrid'
+      map.setLayoutProperty('street-layer', 'visibility', showSatellite ? 'none' : 'visible')
+      map.setLayoutProperty('satellite-layer', 'visibility', showSatellite ? 'visible' : 'none')
     }
   }
 
-  // ── Color helpers (no google.maps dependency – safe to call in JSX render) ──
+  // ── Color helpers (no map-library dependency – safe to call in JSX render) ──
 
   const getCameraStatusColor = (status: Database['public']['Enums']['camera_status']): string => {
     if (status === 'in_progress') return '#3b82f6'   // Blue
@@ -522,7 +564,13 @@ export default function ProjectMapCanvas({
   }
 
   // ── Camera marker: custom SVG with CCTV body, lens, video module, and label ──
-  // Only call inside useEffect — requires google.maps.Size / Point to be available
+  // Builds an HTML element for a maplibregl.Marker. Visual anchor (the circle's center,
+  // at svg-space (23,23)) is offset from the element's true center (23,30) because the
+  // label pill extends below — the marker element is created with a matching pixel
+  // offset so the circle (not the whole 46x60 box) sits on the coordinate.
+  const CAMERA_ICON_SIZE: [number, number] = [46, 60]
+  const CAMERA_ICON_OFFSET: [number, number] = [0, 7] // elementCenterY(30) - anchorY(23)
+
   const createCameraMarkerIcon = (
     status: Database['public']['Enums']['camera_status'],
     tag: string,
@@ -556,81 +604,105 @@ export default function ProjectMapCanvas({
       `</svg>`,
     ].join('')
 
-    return {
-      url: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
-      scaledSize: new google.maps.Size(46, 60),
-      anchor: new google.maps.Point(23, 23), // Anchor at circle center
-    }
+    return svg
   }
 
-  // ── Network device marker: kept as SVG path for visual distinction from cameras ──
+  const buildMarkerElement = (svg: string, size: [number, number], cursor = 'pointer'): HTMLDivElement => {
+    const el = document.createElement('div')
+    el.style.width = `${size[0]}px`
+    el.style.height = `${size[1]}px`
+    el.style.cursor = cursor
+    el.innerHTML = svg
+    const svgEl = el.firstElementChild as SVGElement | null
+    if (svgEl) {
+      svgEl.style.width = '100%'
+      svgEl.style.height = '100%'
+      svgEl.style.display = 'block'
+    }
+    return el
+  }
+
+  // ── Network device marker: SVG rack-icon, replacing Google's vector Symbol path ──
+  const NETWORK_ICON_BASE_SIZE = 24
   const getNetworkMarkerIcon = (type: Database['public']['Enums']['device_type'], isSelected = false) => {
     const color = getNetworkDeviceColor(type)
-    return {
-      path: 'M2 5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5zm3 2h14v2H5V7zm0 4h14v2H5v-2zm0 4h14v2H5v-2z',
-      fillColor: color,
-      fillOpacity: 1,
-      strokeColor: isSelected ? '#ffffff' : '#0f172a',
-      strokeWeight: isSelected ? 3 : 1.5,
-      scale: isSelected ? 1.3 : 1.1,
-      anchor: typeof google !== 'undefined' && google.maps ? new google.maps.Point(12, 12) : undefined,
-    }
+    const scale = isSelected ? 1.3 : 1.1
+    const size = Math.round(NETWORK_ICON_BASE_SIZE * scale)
+    const strokeColor = isSelected ? '#ffffff' : '#0f172a'
+    const strokeWidth = isSelected ? 1.5 : 0.9
+    const svg = [
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24">`,
+      `<path d="M2 5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5zm3 2h14v2H5V7zm0 4h14v2H5v-2zm0 4h14v2H5v-2z" `,
+      `fill="${color}" stroke="${strokeColor}" stroke-width="${strokeWidth}"/>`,
+      `</svg>`
+    ].join('')
+    return { svg, size: [size, size] as [number, number] }
   }
 
 
 
-  const [mapsAuthError, setMapsAuthError] = useState(false)
-  const [useLeafletEngine, setUseLeafletEngine] = useState(false)
-
-  // Initialize Map
+  // Initialize Map (MapLibre GL, free raster tile sources — no API key required)
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      (window as any).gm_authFailure = () => {
-        console.warn('Google Maps API Key Authentication Failure or Billing Warning.')
-        setMapsAuthError(true)
-      }
-    }
+    if (!mapRef.current) return
 
-    const apiKey = googleMapsApiKey || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
-    if (!apiKey || !mapRef.current) return
+    const showSatelliteInitially = activeLayer === 'satellite' || activeLayer === 'hybrid'
 
-    setOptions({
-      key: apiKey,
-      v: 'weekly',
-    })
-
-    Promise.all([
-      importLibrary('maps'),
-      importLibrary('marker'),
-      importLibrary('geometry'),
-      importLibrary('drawing')
-    ]).then(([mapsLib]) => {
-      if (!mapRef.current) return
-      
-      const newMap = new mapsLib.Map(mapRef.current, {
-        center: { lat: defaultLatitude, lng: defaultLongitude },
-        zoom: defaultZoom,
-        mapTypeId: activeLayer,
-        tilt: 0,
-        mapTypeControl: true,
-        streetViewControl: false,
-        fullscreenControl: true,
-        styles: [
-          { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-          { featureType: 'transit', elementType: 'labels', stylers: [{ visibility: 'off' }] }
+    const newMap = new maplibregl.Map({
+      container: mapRef.current,
+      style: {
+        version: 8,
+        sources: {
+          street: {
+            type: 'raster',
+            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+            tileSize: 256,
+            maxzoom: 19,
+            attribution: '© OpenStreetMap contributors'
+          },
+          satellite: {
+            type: 'raster',
+            tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+            tileSize: 256,
+            maxzoom: 20,
+            attribution: 'Imagery © Esri, Maxar, Earthstar Geographics'
+          }
+        },
+        layers: [
+          {
+            id: 'street-layer',
+            type: 'raster',
+            source: 'street',
+            layout: { visibility: showSatelliteInitially ? 'none' : 'visible' }
+          },
+          {
+            id: 'satellite-layer',
+            type: 'raster',
+            source: 'satellite',
+            layout: { visibility: showSatelliteInitially ? 'visible' : 'none' }
+          }
         ]
-      })
-
-      newMap.addListener('click', () => {
-        const iw = (window as any)._mapInfoWindow
-        if (iw) iw.close()
-      })
-
-      setMap(newMap)
-    }).catch(err => {
-      console.error('Failed to load Google Maps API:', err)
+      },
+      center: [defaultLongitude, defaultLatitude],
+      zoom: defaultZoom,
+      attributionControl: { compact: true }
     })
-  }, [googleMapsApiKey, defaultLatitude, defaultLongitude, defaultZoom])
+
+    newMap.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
+
+    newMap.on('click', () => {
+      if (popupRef.current) popupRef.current.remove()
+    })
+
+    newMap.on('load', () => {
+      setMap(newMap)
+    })
+
+    return () => {
+      newMap.remove()
+      setMap(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultLatitude, defaultLongitude, defaultZoom])
 
   // Synchronize Camera Markers
   useEffect(() => {
@@ -640,8 +712,9 @@ export default function ProjectMapCanvas({
     Object.keys(cameraMarkersRef.current).forEach(id => {
       const cam = cameras.find(c => c.id === id)
       if (!cam || !showCameras) {
-        cameraMarkersRef.current[id].setMap(null)
+        cameraMarkersRef.current[id].remove()
         delete cameraMarkersRef.current[id]
+        delete cameraMarkerStateRef.current[id]
       }
     })
 
@@ -650,7 +723,6 @@ export default function ProjectMapCanvas({
     // Add or Update camera markers
     cameras.forEach(cam => {
       const isSelected = selectedCamera?.id === cam.id
-      const position = { lat: cam.latitude, lng: cam.longitude }
 
       const prevState = cameraMarkerStateRef.current[cam.id]
       const needsIconUpdate = !prevState ||
@@ -660,49 +732,49 @@ export default function ProjectMapCanvas({
 
       if (cameraMarkersRef.current[cam.id]) {
         const marker = cameraMarkersRef.current[cam.id]
-        marker.setPosition(position)
+        marker.setLngLat([cam.longitude, cam.latitude])
         if (needsIconUpdate) {
-          const icon = createCameraMarkerIcon(cam.status, cam.camera_id_tag, isSelected)
-          marker.setIcon(icon)
-          marker.setTitle(`${cam.camera_id_tag} (${cam.status})`)
+          const svg = createCameraMarkerIcon(cam.status, cam.camera_id_tag, isSelected)
+          marker.getElement().innerHTML = svg
+          marker.getElement().title = `${cam.camera_id_tag} (${cam.status})`
           cameraMarkerStateRef.current[cam.id] = { isSelected, status: cam.status, tag: cam.camera_id_tag }
         }
       } else {
-        const icon = createCameraMarkerIcon(cam.status, cam.camera_id_tag, isSelected)
-        const marker = new google.maps.Marker({
-          position,
-          map,
+        const svg = createCameraMarkerIcon(cam.status, cam.camera_id_tag, isSelected)
+        const el = buildMarkerElement(svg, CAMERA_ICON_SIZE)
+        el.title = `${cam.camera_id_tag} (${cam.status})`
+        const marker = new maplibregl.Marker({
+          element: el,
           draggable: true,
-          icon,
-          title: `${cam.camera_id_tag} (${cam.status})`,
+          anchor: 'center',
+          offset: CAMERA_ICON_OFFSET
         })
+          .setLngLat([cam.longitude, cam.latitude])
+          .addTo(map)
 
         cameraMarkerStateRef.current[cam.id] = { isSelected, status: cam.status, tag: cam.camera_id_tag }
 
-        marker.addListener('click', (e: google.maps.MapMouseEvent) => {
+        el.addEventListener('click', (e: MouseEvent) => {
+          e.stopPropagation()
           setSelectedCamera(cam)
 
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const domEvent = (e as any).domEvent as MouseEvent
           let rect = mapRectRef.current
           if (!rect && mapRef.current) {
             rect = mapRef.current.getBoundingClientRect()
             mapRectRef.current = rect
           }
-          if (rect && domEvent) {
-            setHoverPosition({ x: domEvent.clientX - rect.left, y: domEvent.clientY - rect.top })
+          if (rect) {
+            setHoverPosition({ x: e.clientX - rect.left, y: e.clientY - rect.top })
           } else {
             setHoverPosition({ x: 300, y: 200 })
           }
           setHoveredCamera(cam)
         })
 
-        marker.addListener('dragend', async () => {
-          const newPos = marker.getPosition()
-          if (!newPos) return
-
-          const newLat = newPos.lat()
-          const newLng = newPos.lng()
+        marker.on('dragend', async () => {
+          const newPos = marker.getLngLat()
+          const newLat = newPos.lat
+          const newLng = newPos.lng
 
           setCameras(prev => prev.map(c => c.id === cam.id ? { ...c, latitude: newLat, longitude: newLng } : c))
           if (selectedCamera?.id === cam.id) {
@@ -736,8 +808,9 @@ export default function ProjectMapCanvas({
       const dev = networkDevices.find(d => d.id === id)
       const hasCoords = dev && dev.latitude !== null && dev.longitude !== null
       if (!dev || !hasCoords || !showDevices) {
-        deviceMarkersRef.current[id].setMap(null)
+        deviceMarkersRef.current[id].remove()
         delete deviceMarkersRef.current[id]
+        delete deviceMarkerStateRef.current[id]
       }
     })
 
@@ -746,9 +819,8 @@ export default function ProjectMapCanvas({
     // Add or Update markers
     networkDevices.forEach(dev => {
       if (dev.latitude === null || dev.longitude === null) return
-      
+
       const isSelected = selectedDevice?.id === dev.id
-      const position = { lat: dev.latitude, lng: dev.longitude }
 
       const prevState = deviceMarkerStateRef.current[dev.id]
       const needsIconUpdate = !prevState ||
@@ -758,35 +830,39 @@ export default function ProjectMapCanvas({
 
       if (deviceMarkersRef.current[dev.id]) {
         const marker = deviceMarkersRef.current[dev.id]
-        marker.setPosition(position)
+        marker.setLngLat([dev.longitude, dev.latitude])
         if (needsIconUpdate) {
           const icon = getNetworkMarkerIcon(dev.device_type, isSelected)
-          marker.setIcon(icon)
-          marker.setTitle(`${dev.name} (${dev.device_type})`)
+          const el = marker.getElement()
+          el.innerHTML = icon.svg
+          el.style.width = `${icon.size[0]}px`
+          el.style.height = `${icon.size[1]}px`
+          el.title = `${dev.name} (${dev.device_type})`
           deviceMarkerStateRef.current[dev.id] = { isSelected, deviceType: dev.device_type, name: dev.name }
         }
       } else {
         const icon = getNetworkMarkerIcon(dev.device_type, isSelected)
-        const marker = new google.maps.Marker({
-          position,
-          map,
+        const el = buildMarkerElement(icon.svg, icon.size)
+        el.title = `${dev.name} (${dev.device_type})`
+        const marker = new maplibregl.Marker({
+          element: el,
           draggable: true,
-          icon,
-          title: `${dev.name} (${dev.device_type})`,
+          anchor: 'center'
         })
+          .setLngLat([dev.longitude, dev.latitude])
+          .addTo(map)
 
         deviceMarkerStateRef.current[dev.id] = { isSelected, deviceType: dev.device_type, name: dev.name }
 
-        marker.addListener('click', () => {
+        el.addEventListener('click', (e: MouseEvent) => {
+          e.stopPropagation()
           setSelectedDevice(dev)
         })
 
-        marker.addListener('dragend', async () => {
-          const newPos = marker.getPosition()
-          if (!newPos) return
-
-          const newLat = newPos.lat()
-          const newLng = newPos.lng()
+        marker.on('dragend', async () => {
+          const newPos = marker.getLngLat()
+          const newLat = newPos.lat
+          const newLng = newPos.lng
 
           setNetworkDevices(prev => prev.map(d => d.id === dev.id ? { ...d, latitude: newLat, longitude: newLng } : d))
           if (selectedDevice?.id === dev.id) {
@@ -815,16 +891,9 @@ export default function ProjectMapCanvas({
   useEffect(() => {
     if (!map) return
 
-    // 1. Clear old wireless polylines
-    wirelessRoutePolylinesRef.current.forEach(p => p.setMap(null))
-    wirelessRoutePolylinesRef.current = []
-
-    const winObj = window as any
-    let infoWindow = winObj._mapInfoWindow
-    if (!infoWindow && typeof google !== 'undefined') {
-      infoWindow = new google.maps.InfoWindow()
-      winObj._mapInfoWindow = infoWindow
-    }
+    // 1. Clear old wireless line layers
+    removeLineLayers(map, wirelessRouteLayerIdsRef.current)
+    wirelessRouteLayerIdsRef.current = []
 
     // 2. Draw wireless links
     cameras.forEach(cam => {
@@ -849,29 +918,16 @@ export default function ProjectMapCanvas({
         color = '#ef4444' // Fault/issue: red dashed line
       }
 
-      const symbol = {
-        path: 'M 0,-1 0,1',
-        strokeOpacity: 0.8,
-        scale: 2
-      }
+      const layerId = `wireless-link-${cam.id}`
+      addLineLayer(
+        map,
+        layerId,
+        [[cam.longitude, cam.latitude], [dev.longitude, dev.latitude]],
+        color,
+        { width: 2, dashed: true, opacity: 0.85 }
+      )
 
-      const poly = new google.maps.Polyline({
-        path: [
-          { lat: cam.latitude, lng: cam.longitude },
-          { lat: dev.latitude, lng: dev.longitude }
-        ],
-        geodesic: true,
-        strokeColor: color,
-        strokeOpacity: 0,
-        icons: [{
-          icon: symbol,
-          offset: '0',
-          repeat: '12px'
-        }],
-        map: map
-      })
-
-      poly.addListener('click', (e: google.maps.PolyMouseEvent) => {
+      map.on('click', layerId, (e: maplibregl.MapMouseEvent) => {
         const content = `
           <div style="padding: 4px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a; min-width: 160px;">
             <div style="font-weight: bold; font-size: 12px; margin-bottom: 4px; border-bottom: 1px solid #e2e8f0; padding-bottom: 2px;">
@@ -883,18 +939,20 @@ export default function ProjectMapCanvas({
             <div><strong>Status:</strong> ${cam.status === 'issue' ? 'Degraded (Line of Sight blocked)' : 'Planned'}</div>
           </div>
         `
-        if (infoWindow && e.latLng) {
-          infoWindow.setContent(content)
-          infoWindow.setPosition(e.latLng)
-          infoWindow.open(map)
-        }
+        if (popupRef.current) popupRef.current.remove()
+        popupRef.current = new maplibregl.Popup({ closeButton: true })
+          .setLngLat(e.lngLat)
+          .setHTML(content)
+          .addTo(map)
       })
+      map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer' })
+      map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = '' })
 
-      wirelessRoutePolylinesRef.current.push(poly)
+      wirelessRouteLayerIdsRef.current.push(layerId)
     })
 
     return () => {
-      wirelessRoutePolylinesRef.current.forEach(p => p.setMap(null))
+      removeLineLayers(map, wirelessRouteLayerIdsRef.current)
     }
   }, [map, cameras, networkDevices])
 
@@ -902,13 +960,13 @@ export default function ProjectMapCanvas({
   useEffect(() => {
     if (!map) return
 
-    // 1. Clear old route polylines
-    fiberRoutePolylinesRef.current.forEach(p => p.setMap(null))
-    fiberRoutePolylinesRef.current = []
+    // 1. Clear old route line layers
+    removeLineLayers(map, fiberRouteLayerIdsRef.current)
+    fiberRouteLayerIdsRef.current = []
 
     // 2. Clear old node markers
     Object.keys(fiberNodeMarkersRef.current).forEach(id => {
-      fiberNodeMarkersRef.current[id].setMap(null)
+      fiberNodeMarkersRef.current[id].remove()
       delete fiberNodeMarkersRef.current[id]
     })
 
@@ -929,12 +987,6 @@ export default function ProjectMapCanvas({
       if (cable.install_status === 'Pulled') return '#3b82f6'
       if (cable.install_status === 'Blocked' || cable.install_status === 'Damaged') return '#ef4444'
       return '#eab308'
-    }
-
-    let infoWindow = (window as any)._mapInfoWindow
-    if (!infoWindow && typeof google !== 'undefined') {
-      infoWindow = new google.maps.InfoWindow();
-      (window as any)._mapInfoWindow = infoWindow
     }
 
     // 3. Draw Nodes if enabled
@@ -1010,21 +1062,20 @@ export default function ProjectMapCanvas({
           </svg>
         `
 
-        const marker = new google.maps.Marker({
-          position: { lat: node.latitude, lng: node.longitude },
-          map: map,
+        const el = buildMarkerElement(svgPin, [30, 42])
+        el.title = `${node.node_tag} (${node.node_type})`
+        const marker = new maplibregl.Marker({
+          element: el,
           draggable: false,
-          title: `${node.node_tag} (${node.node_type})`,
-          icon: {
-            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svgPin),
-            scaledSize: new google.maps.Size(30, 42),
-            anchor: new google.maps.Point(15, 15)
-          }
+          anchor: 'center',
+          offset: [0, 6] // elementCenterY(21) - anchorY(15)
         })
+          .setLngLat([node.longitude, node.latitude])
+          .addTo(map)
 
         // Click Card
-        marker.addListener('click', () => {
-          const enclosures = fiberEnclosures.filter((e: any) => e.node_id === node.id)
+        el.addEventListener('click', (e: MouseEvent) => {
+          e.stopPropagation()
           const cables = fiberCables.filter((c: any) => c.from_node_id === node.id || c.to_node_id === node.id)
           const served = fiberAssignments.filter((a: any) => a.source_node_id === node.id)
           const servedTags = served.map((a: any) => {
@@ -1042,14 +1093,15 @@ export default function ProjectMapCanvas({
               <div><strong>Cables:</strong> ${cables.length > 0 ? cables.map((c: any) => c.cable_tag).join(', ') : 'None'}</div>
               <div><strong>Served Cams:</strong> ${servedTags || 'None'}</div>
               <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #e2e8f0; display: flex;">
-                <a href="/projects/${projectId}/fiber?selectedNodeId=${node.id}" style="display: inline-block; padding: 4px 8px; background-color: #4f46e5; color: white; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 9px; text-align: center; flex: 1;">Editar Nodo</a>
+                <a href="/projects/${projectId}/fiber?selectedNodeId=${node.id}" style="display: inline-block; padding: 4px 8px; background-color: #4f46e5; color: white; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 9px; text-align: center; flex: 1;">Edit Node</a>
               </div>
             </div>
           `
-          if (infoWindow) {
-            infoWindow.setContent(content)
-            infoWindow.open(map, marker)
-          }
+          if (popupRef.current) popupRef.current.remove()
+          popupRef.current = new maplibregl.Popup({ closeButton: true })
+            .setLngLat([node.longitude, node.latitude])
+            .setHTML(content)
+            .addTo(map)
         })
 
         fiberNodeMarkersRef.current[node.id] = marker
@@ -1061,25 +1113,19 @@ export default function ProjectMapCanvas({
       // Draw conduits
       fiberRoutes.forEach(route => {
         const segs = fiberRouteSegments.filter(s => s.route_id === route.id)
-        const points: google.maps.LatLngLiteral[] = []
+        const points: [number, number][] = []
         segs.forEach(s => {
-          points.push({ lat: s.start_latitude, lng: s.start_longitude })
-          points.push({ lat: s.end_latitude, lng: s.end_longitude })
+          points.push([s.start_longitude, s.start_latitude])
+          points.push([s.end_longitude, s.end_latitude])
         })
 
         if (points.length === 0) return
 
         const strokeCol = getRouteColor(route)
-        const poly = new google.maps.Polyline({
-          path: points,
-          geodesic: true,
-          strokeColor: strokeCol,
-          strokeOpacity: 0.8,
-          strokeWeight: 4,
-          map: map
-        })
+        const layerId = `fiber-route-${route.id}`
+        addLineLayer(map, layerId, points, strokeCol, { width: 4, opacity: 0.8 })
 
-        poly.addListener('click', (e: google.maps.PolyMouseEvent) => {
+        map.on('click', layerId, (e: maplibregl.MapMouseEvent) => {
           const cable = fiberCables.find(c => c.route_id === route.id)
           const content = `
             <div style="padding: 4px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a; min-width: 150px;">
@@ -1090,18 +1136,20 @@ export default function ProjectMapCanvas({
               <div><strong>Conduit Size:</strong> ${route.conduit_diameter_inches} in</div>
               <div><strong>Cable:</strong> ${cable ? `${cable.cable_tag} (${cable.fiber_count}F)` : 'No cable'}</div>
               <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #e2e8f0; display: flex;">
-                <a href="/projects/${projectId}/fiber?selectedRouteId=${route.id}" style="display: inline-block; padding: 4px 8px; background-color: #4f46e5; color: white; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 9px; text-align: center; flex: 1;">Editar Ruta</a>
+                <a href="/projects/${projectId}/fiber?selectedRouteId=${route.id}" style="display: inline-block; padding: 4px 8px; background-color: #4f46e5; color: white; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 9px; text-align: center; flex: 1;">Edit Route</a>
               </div>
             </div>
           `
-          if (infoWindow && e.latLng) {
-            infoWindow.setContent(content)
-            infoWindow.setPosition(e.latLng)
-            infoWindow.open(map)
-          }
+          if (popupRef.current) popupRef.current.remove()
+          popupRef.current = new maplibregl.Popup({ closeButton: true })
+            .setLngLat(e.lngLat)
+            .setHTML(content)
+            .addTo(map)
         })
+        map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer' })
+        map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = '' })
 
-        fiberRoutePolylinesRef.current.push(poly)
+        fiberRouteLayerIdsRef.current.push(layerId)
       })
 
       // Draw drop cables (dashed)
@@ -1111,28 +1159,16 @@ export default function ProjectMapCanvas({
         const camera = cameras.find(c => c.id === assignment.camera_id)
 
         if (node && camera) {
-          const symbol = {
-            path: 'M 0,-1 0,1',
-            strokeOpacity: 0.8,
-            scale: 2
-          }
-          const poly = new google.maps.Polyline({
-            path: [
-              { lat: node.latitude, lng: node.longitude },
-              { lat: camera.latitude, lng: camera.longitude }
-            ],
-            geodesic: true,
-            strokeColor: getStatusColor(assignment.fiber_path_status),
-            strokeOpacity: 0,
-            icons: [{
-              icon: symbol,
-              offset: '0',
-              repeat: '10px'
-            }],
-            map: map
-          })
+          const layerId = `fiber-drop-${assignment.id}`
+          addLineLayer(
+            map,
+            layerId,
+            [[node.longitude, node.latitude], [camera.longitude, camera.latitude]],
+            getStatusColor(assignment.fiber_path_status),
+            { width: 2, dashed: true, opacity: 0.85 }
+          )
 
-          poly.addListener('click', (e: google.maps.PolyMouseEvent) => {
+          map.on('click', layerId, (e: maplibregl.MapMouseEvent) => {
             const content = `
               <div style="padding: 4px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a; min-width: 150px;">
                 <strong>Camera Drop: ${camera.camera_id_tag}</strong><br/>
@@ -1141,16 +1177,22 @@ export default function ProjectMapCanvas({
                 Testing: ${assignment.test_status}
               </div>
             `
-            if (infoWindow && e.latLng) {
-              infoWindow.setContent(content)
-              infoWindow.setPosition(e.latLng)
-              infoWindow.open(map)
-            }
+            if (popupRef.current) popupRef.current.remove()
+            popupRef.current = new maplibregl.Popup({ closeButton: true })
+              .setLngLat(e.lngLat)
+              .setHTML(content)
+              .addTo(map)
           })
+          map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer' })
+          map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = '' })
 
-          fiberRoutePolylinesRef.current.push(poly)
+          fiberRouteLayerIdsRef.current.push(layerId)
         }
       })
+    }
+
+    return () => {
+      removeLineLayers(map, fiberRouteLayerIdsRef.current)
     }
   }, [map, fiberNodes, fiberRoutes, fiberRouteSegments, fiberCables, fiberAssignments, showFiberNodes, showFiberRoutes, cameras])
 
@@ -1158,20 +1200,17 @@ export default function ProjectMapCanvas({
   useEffect(() => {
     if (!map) return
 
-    if (clickListenerRef.current) {
-      google.maps.event.removeListener(clickListenerRef.current)
-      clickListenerRef.current = null
+    if (clickHandlerRef.current) {
+      map.off('click', clickHandlerRef.current)
+      clickHandlerRef.current = null
     }
 
     if (addCameraMode || addDeviceMode) {
-      map.setOptions({ draggableCursor: 'crosshair' })
+      map.getCanvas().style.cursor = 'crosshair'
 
-      clickListenerRef.current = map.addListener('click', async (e: google.maps.MapMouseEvent) => {
-        const latLng = e.latLng
-        if (!latLng) return
-
-        const lat = latLng.lat()
-        const lng = latLng.lng()
+      const handler = (e: maplibregl.MapMouseEvent) => {
+        const lat = e.lngLat.lat
+        const lng = e.lngLat.lng
 
         startTransition(async () => {
           if (addCameraMode) {
@@ -1207,15 +1246,18 @@ export default function ProjectMapCanvas({
             }
           }
         })
-      })
+      }
+
+      map.on('click', handler)
+      clickHandlerRef.current = handler
     } else {
-      map.setOptions({ draggableCursor: null })
+      map.getCanvas().style.cursor = ''
     }
 
     return () => {
-      if (clickListenerRef.current) {
-        google.maps.event.removeListener(clickListenerRef.current)
-        clickListenerRef.current = null
+      if (clickHandlerRef.current) {
+        map.off('click', clickHandlerRef.current)
+        clickHandlerRef.current = null
       }
     }
   }, [addCameraMode, addDeviceMode, map, projectId])
@@ -1227,12 +1269,12 @@ export default function ProjectMapCanvas({
 
   const handleFitToElements = () => {
     if (!map) return
-    const bounds = new google.maps.LatLngBounds()
+    const bounds = new maplibregl.LngLatBounds()
     let count = 0
 
     if (showCameras) {
       cameras.forEach(c => {
-        bounds.extend({ lat: c.latitude, lng: c.longitude })
+        bounds.extend([c.longitude, c.latitude])
         count++
       })
     }
@@ -1240,7 +1282,7 @@ export default function ProjectMapCanvas({
     if (showDevices) {
       networkDevices.forEach(d => {
         if (d.latitude !== null && d.longitude !== null) {
-          bounds.extend({ lat: d.latitude, lng: d.longitude })
+          bounds.extend([d.longitude, d.latitude])
           count++
         }
       })
@@ -1248,13 +1290,7 @@ export default function ProjectMapCanvas({
 
     if (count === 0) return
 
-    map.fitBounds(bounds)
-    const listener = map.addListener('bounds_changed', () => {
-      if (map.getZoom()! > 20) {
-        map.setZoom(20)
-      }
-      google.maps.event.removeListener(listener)
-    })
+    map.fitBounds(bounds, { padding: 60, maxZoom: 20, duration: 500 })
   }
 
   // Camera settings form save
@@ -1735,19 +1771,6 @@ export default function ProjectMapCanvas({
     })
   }
 
-  // Render warnings or warnings fallbacks
-  if (!googleMapsApiKey) {
-    return (
-      <div className="w-full max-w-4xl mx-auto py-8">
-        <div className="bg-[var(--surface-1)] backdrop-blur-xl border border-amber-500/30 rounded-2xl p-8 text-center shadow-2xl relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-[2px] bg-amber-500/50" />
-          <h3 className="text-xl font-bold text-white tracking-tight">Google Maps API Key Missing</h3>
-          <p className="text-sm text-[var(--text-secondary)] mt-2">Enter your API key in .env.local to load visual layout designer.</p>
-        </div>
-      </div>
-    )
-  }
-
   // Calculate PoE warnings for context sidebar list
   const getPoeWarningsCount = () => {
     let count = 0
@@ -1791,7 +1814,7 @@ export default function ProjectMapCanvas({
               key={cam.id}
               onClick={() => {
                 setSelectedCamera(cam)
-                if (map) map.panTo({ lat: cam.latitude, lng: cam.longitude })
+                if (map) map.panTo([cam.longitude, cam.latitude])
               }}
               className={`w-full flex items-center justify-between text-left px-2 py-1.5 rounded-lg text-xs transition-colors ${
                 selectedCamera?.id === cam.id
@@ -1819,7 +1842,7 @@ export default function ProjectMapCanvas({
               onClick={() => {
                 setSelectedDevice(dev)
                 if (dev.latitude !== null && dev.longitude !== null && map) {
-                  map.panTo({ lat: dev.latitude, lng: dev.longitude })
+                  map.panTo([dev.longitude, dev.latitude])
                 }
               }}
               className={`w-full flex items-center justify-between text-left px-2 py-1.5 rounded-lg text-xs transition-colors ${
@@ -1881,19 +1904,6 @@ export default function ProjectMapCanvas({
             </button>
 
             <button
-              onClick={() => setUseLeafletEngine(!useLeafletEngine)}
-              className={`flex items-center gap-1.5 px-3 py-2 border rounded-xl font-semibold text-[11px] transition-all cursor-pointer ${
-                useLeafletEngine || mapsAuthError
-                  ? 'bg-emerald-950/40 border-emerald-800 text-emerald-300'
-                  : 'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text-primary)] hover:border-slate-700'
-              }`}
-              title="Cambiar Motor de Mapa (Google Maps / OpenStreetMap Free)"
-            >
-              <span className={`w-2 h-2 rounded-full ${useLeafletEngine || mapsAuthError ? 'bg-emerald-400' : 'bg-blue-400'}`} />
-              <span>{useLeafletEngine || mapsAuthError ? 'OSM Free Mode' : 'Google Maps'}</span>
-            </button>
-
-            <button
               onClick={handleRefresh}
               className="flex items-center justify-center p-2 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-white hover:border-slate-700"
               title="Refresh Layout"
@@ -1920,38 +1930,41 @@ export default function ProjectMapCanvas({
 
         {/* Map Canvas Viewport */}
         <div className="flex-1 relative bg-[var(--surface-2)] flex items-center justify-center overflow-hidden">
-          {useLeafletEngine || mapsAuthError || !(googleMapsApiKey || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) ? (
-            <LeafletMapContainer
-              defaultLatitude={defaultLatitude}
-              defaultLongitude={defaultLongitude}
-              defaultZoom={defaultZoom}
-              cameras={cameras}
-              fiberNodes={fiberNodes}
-              networkDevices={networkDevices}
-              fiberRoutes={fiberRoutes}
-              selectedCamera={selectedCamera}
-              onSelectCamera={setSelectedCamera}
-              onCameraDragEnd={async (cam, newLat, newLng) => {
-                await updateCameraCoordinates({ id: cam.id, projectId, latitude: newLat, longitude: newLng })
-              }}
-              showCameras={showCameras}
-              showFiberNodes={showFiberNodes}
-              showFiberRoutes={showFiberRoutes}
-              showNetworkDevices={showDevices}
-              onToggleMapEngine={() => setUseLeafletEngine(false)}
-              activeEngineLabel={mapsAuthError ? 'OpenStreetMap & Satélite Esri (Fallback Activo)' : 'OpenStreetMap & Satélite Esri'}
-            />
-          ) : (
-            <div
-              ref={mapRef}
-              className="absolute inset-0 w-full h-full"
-              onMouseEnter={() => {
-                if (mapRef.current) {
-                  mapRectRef.current = mapRef.current.getBoundingClientRect()
-                }
-              }}
-            />
-          )}
+          <div
+            ref={mapRef}
+            className="absolute inset-0 w-full h-full"
+            onMouseEnter={() => {
+              if (mapRef.current) {
+                mapRectRef.current = mapRef.current.getBoundingClientRect()
+              }
+            }}
+          />
+
+          {/* Basemap Toggle: Street (OpenStreetMap) / Satellite (Esri World Imagery) */}
+          <div className="absolute top-4 left-4 z-20 flex items-center gap-1 p-1 bg-[var(--surface-1)]/90 backdrop-blur-md border border-[var(--border)] rounded-xl shadow-xl">
+            <button
+              onClick={() => handleLayerChange('roadmap')}
+              className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                activeLayer === 'roadmap'
+                  ? 'bg-[var(--accent)] text-white shadow-xs'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+              title="Street basemap (OpenStreetMap)"
+            >
+              Street
+            </button>
+            <button
+              onClick={() => handleLayerChange('satellite')}
+              className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                activeLayer === 'satellite' || activeLayer === 'hybrid'
+                  ? 'bg-[var(--accent)] text-white shadow-xs'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+              title="Satellite basemap (Esri World Imagery)"
+            >
+              Satellite
+            </button>
+          </div>
 
           {/* OSP Fiber Layer Overlay Checkboxes */}
           <div className="absolute top-4 right-4 z-20 bg-[var(--surface-1)]/90 backdrop-blur-md border border-[var(--border)] p-2.5 rounded-xl shadow-xl flex flex-col gap-1.5 text-[10px] font-bold text-[var(--text-primary)] font-sans pointer-events-auto">
@@ -2113,7 +2126,7 @@ export default function ProjectMapCanvas({
                   </button>
                   <button
                     onClick={() => {
-                      if (map) map.panTo({ lat: displayCam.latitude, lng: displayCam.longitude })
+                      if (map) map.panTo([displayCam.longitude, displayCam.latitude])
                       setHoveredCamera(null)
                       setHoverPosition(null)
                     }}

@@ -51,17 +51,17 @@ export default function MobileDrawer({
     { label: 'Dashboard General', href: '/mobile/dashboard', icon: '📊' },
     { label: 'Lista de Proyectos', href: '/mobile/projects', icon: '📁' },
     { label: 'Reportes Ejecutivos', href: '/mobile/reports', icon: '📈' },
-    { label: 'Configuración', href: '/mobile/settings', icon: '⚙️' },
+    { label: 'Settings', href: '/mobile/settings', icon: '⚙️' },
   ]
 
   const projectNav = projectId
     ? [
         { label: 'Overview del Proyecto', href: `/mobile/projects/${projectId}/overview`, icon: '🏠' },
-        { label: 'Cámaras (CCTV)', href: `/mobile/projects/${projectId}/cameras`, icon: '📸' },
-        { label: 'Fibra Óptica (OSP/ISP)', href: `/mobile/projects/${projectId}/fiber`, icon: '🧬' },
+        { label: 'Cameras (CCTV)', href: `/mobile/projects/${projectId}/cameras`, icon: '📸' },
+        { label: 'Fiber Optic (OSP/ISP)', href: `/mobile/projects/${projectId}/fiber`, icon: '🧬' },
         { label: 'Networking & Switches', href: `/mobile/projects/${projectId}/network`, icon: '🔌' },
-        { label: 'Cómputo Métrico (BOM)', href: `/mobile/projects/${projectId}/bom`, icon: '📦' },
-        { label: 'Órdenes de Trabajo (Tasks)', href: `/mobile/projects/${projectId}/tasks`, icon: '📋' },
+        { label: 'Bill of Materials (BOM)', href: `/mobile/projects/${projectId}/bom`, icon: '📦' },
+        { label: 'Work Orders (Tasks)', href: `/mobile/projects/${projectId}/tasks`, icon: '📋' },
       ]
     : []
 
@@ -77,7 +77,7 @@ export default function MobileDrawer({
           <div>
             <span className="text-xs font-extrabold text-[var(--accent-text)] tracking-wider block">NextQ Mobile</span>
             <span className="text-[10px] text-[var(--text-secondary)] font-medium truncate block">
-              {projectId ? projectName : 'Navegación Terreno'}
+              {projectId ? projectName : 'Field Navigation'}
             </span>
           </div>
           <button
@@ -93,7 +93,7 @@ export default function MobileDrawer({
           {projectId && (
             <div className="space-y-1">
               <span className="text-[9.5px] font-bold text-[var(--accent-text)] uppercase tracking-wider block px-2">
-                Módulos del Proyecto
+                Project Modules
               </span>
               <div className="space-y-0.5">
                 {projectNav.map((item) => {
@@ -120,7 +120,7 @@ export default function MobileDrawer({
 
           <div className="space-y-1">
             <span className="text-[9.5px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider block px-2">
-              Navegación General
+              General Navigation
             </span>
             <div className="space-y-0.5">
               {globalNav.map((item) => {
@@ -146,7 +146,7 @@ export default function MobileDrawer({
 
           <div className="pt-4 border-t border-[var(--border)] space-y-2">
             <span className="text-[9.5px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider block px-2">
-              Modo de Visualización
+              Display Mode
             </span>
             <button
               type="button"
@@ -154,7 +154,7 @@ export default function MobileDrawer({
               className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-[var(--surface-2)] border border-[var(--border)] hover:bg-[var(--surface-hover)] text-[var(--text-primary)] rounded-lg text-xs font-bold transition cursor-pointer"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-              Ver versión de escritorio
+              View desktop version
             </button>
           </div>
         </div>

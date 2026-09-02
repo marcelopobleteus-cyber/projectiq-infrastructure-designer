@@ -73,30 +73,45 @@ export default async function ProjectBOMPage({ params }: PageProps) {
     })
   })
 
-  // 2. Add Camera Locations (grouped by model) dynamically
-  const cameraGroups: { [modelId: string]: { qty: number; model: any; status: string } } = {}
+  // 2. Add Camera Locations dynamically.
+  // Se agrupan por modelo Y por quien provee: una camara puesta por el
+  // cliente (OFCI) no puede ir en la misma linea que una que compramos
+  // nosotros, porque una entra en lo facturable y la otra no.
+  const cameraGroups: {
+    [key: string]: { qty: number; model: any; supply: string; suppliedBy: string | null; received: boolean }
+  } = {}
+
   cameras.forEach(cam => {
-    if (!cameraGroups[cam.camera_model_id]) {
-      const model = cameraModels.find(m => m.id === cam.camera_model_id)
-      cameraGroups[cam.camera_model_id] = {
+    const supply = cam.supply_responsibility || 'contractor'
+    const key = `${cam.camera_model_id}::${supply}`
+    if (!cameraGroups[key]) {
+      cameraGroups[key] = {
         qty: 0,
-        model,
-        status: cam.status,
+        model: cameraModels.find(m => m.id === cam.camera_model_id),
+        supply,
+        suppliedBy: cam.supplied_by || null,
+        received: cam.material_received ?? false,
       }
     }
-    cameraGroups[cam.camera_model_id].qty++
+    cameraGroups[key].qty++
+    // Un solo item sin recibir basta para que el grupo cuente como pendiente.
+    if (!(cam.material_received ?? false)) cameraGroups[key].received = false
   })
 
-  Object.keys(cameraGroups).forEach(modelId => {
-    const group = cameraGroups[modelId]
+  Object.entries(cameraGroups).forEach(([key, group]) => {
     const modelName = group.model ? `${group.model.manufacturer} ${group.model.model_number} CCTV Camera` : 'CCTV Camera'
     const estCost = group.model?.estimated_cost ? Number(group.model.estimated_cost) : 0
     mergedItems.push({
-      id: modelId,
+      id: key,
       description: modelName,
       manufacturer: group.model?.manufacturer || 'Generic',
       partNumber: group.model?.model_number || 'N/A',
       category: 'Camera',
+      module: 'cctv',
+      subcategory: 'camera',
+      supplyResponsibility: group.supply,
+      suppliedBy: group.suppliedBy,
+      materialReceived: group.received,
       quantity: group.qty,
       unit: 'pcs',
       unitCost: estCost,
@@ -138,6 +153,9 @@ export default async function ProjectBOMPage({ params }: PageProps) {
     // bom_module_categorization). El bloque heuristico por texto queda solo
     // como fallback para filas antiguas que todavia no tengan module.
     if (item.module) {
+      // Solo 'duct' mide la zanja. El innerduct y el mule tape van DENTRO
+      // del mismo ducto ('duct_accessory'): sumarlos cobraria tres veces
+      // la misma excavacion.
       if (item.module === 'conduit' && item.subcategory === 'duct' && item.unit === 'ft') {
         totalConduitFeet += qty
       } else if (item.module === 'conduit' && item.subcategory === 'structure') {
@@ -167,7 +185,11 @@ export default async function ProjectBOMPage({ params }: PageProps) {
     }
   })
 
-  // 4. Add Calculated OSP Labor Items
+  // 4. Add Calculated OSP Labor Items.
+  // Tarifas de REFERENCIA de mercado 2026 para el sureste de EE.UU.
+  // (HDD para fibra 15-50 USD/ft con mediana de despliegue ~18; empalme en
+  // camara subterranea 80-130 USD; set de estructura precast ~950 USD).
+  // No son la tarifa de NGT: se ajustan en Settings > Labor Rates.
   if (totalConduitFeet > 0 || totalCableFeet > 0 || totalNodePcs > 0 || totalEnclosurePcs > 0) {
     if (totalConduitFeet > 0) {
       mergedItems.push({
@@ -178,8 +200,8 @@ export default async function ProjectBOMPage({ params }: PageProps) {
         category: 'Labor',
         quantity: totalConduitFeet,
         unit: 'ft',
-        unitCost: 8.50,
-        totalCost: totalConduitFeet * 8.50,
+        unitCost: 18.00,
+        totalCost: totalConduitFeet * 18.00,
         status: 'Planned',
       })
     }
@@ -192,8 +214,8 @@ export default async function ProjectBOMPage({ params }: PageProps) {
         category: 'Labor',
         quantity: totalCableFeet,
         unit: 'ft',
-        unitCost: 2.50,
-        totalCost: totalCableFeet * 2.50,
+        unitCost: 2.75,
+        totalCost: totalCableFeet * 2.75,
         status: 'Planned',
       })
     }
@@ -206,8 +228,8 @@ export default async function ProjectBOMPage({ params }: PageProps) {
         category: 'Labor',
         quantity: totalNodePcs,
         unit: 'pcs',
-        unitCost: 750.00,
-        totalCost: totalNodePcs * 750.00,
+        unitCost: 950.00,
+        totalCost: totalNodePcs * 950.00,
         status: 'Planned',
       })
     }
@@ -221,8 +243,8 @@ export default async function ProjectBOMPage({ params }: PageProps) {
         category: 'Labor',
         quantity: estimatedSpliceCount,
         unit: 'splices',
-        unitCost: 45.00,
-        totalCost: estimatedSpliceCount * 45.00,
+        unitCost: 95.00,
+        totalCost: estimatedSpliceCount * 95.00,
         status: 'Planned',
       })
     }

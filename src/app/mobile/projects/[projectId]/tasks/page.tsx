@@ -12,7 +12,7 @@ export default async function MobileTasksStubPage({ params }: MobileTasksProps) 
 
   return (
     <MobileAppShell
-      title="Órdenes de Trabajo"
+      title="Work Orders"
       subtitle={`ID: ${projectId}`}
       projectId={projectId}
     >
@@ -25,7 +25,7 @@ export default async function MobileTasksStubPage({ params }: MobileTasksProps) 
             Mobile Field Tasks Stub
           </h2>
           <p className="text-xs text-[var(--text-secondary)] max-w-xs mx-auto leading-relaxed">
-            Gestión de tareas de terreno con filtro de pestañas y botones de avance rápido.
+            Field task management with tab filters and quick-advance buttons.
           </p>
         </div>
       </div>

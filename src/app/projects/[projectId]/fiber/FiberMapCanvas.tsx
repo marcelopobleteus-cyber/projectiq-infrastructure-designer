@@ -2,7 +2,8 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { setOptions, importLibrary } from '@googlemaps/js-api-loader'
+import * as maplibregl from 'maplibre-gl'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import { createClient } from '@/utils/supabase/client'
 import { 
   createFiberNode, 
@@ -24,25 +25,6 @@ import {
   setAssetCondition
 } from '../../actions-fiber'
 import type { AssetCondition } from '@/lib/assetCondition'
-
-/**
- * Linea segmentada para infraestructura existente, siguiendo la convencion
- * de los planos de construccion (solido = propuesto, segmentado = existente).
- * Google Maps no tiene dashArray: se hace con un simbolo repetido.
- */
-const DASHED_LINE_ICONS = (color: string): google.maps.IconSequence[] => [
-  {
-    icon: {
-      path: 'M 0,-1 0,1',
-      strokeOpacity: 0.9,
-      strokeColor: color,
-      strokeWeight: 2.5,
-      scale: 3,
-    },
-    offset: '0',
-    repeat: '14px',
-  },
-]
 
 const haversineDistanceMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const R = 6371000 // Earth radius in meters
@@ -100,7 +82,6 @@ interface FiberMapCanvasProps {
   defaultLatitude: number
   defaultLongitude: number
   defaultZoom: number
-  googleMapsApiKey?: string
 }
 
 export default function FiberMapCanvas({
@@ -109,8 +90,7 @@ export default function FiberMapCanvas({
   fiberCatalog,
   defaultLatitude,
   defaultLongitude,
-  defaultZoom,
-  googleMapsApiKey
+  defaultZoom
 }: FiberMapCanvasProps) {
   const router = useRouter()
   const [initialData, setInitialData] = useState(propInitialData)
@@ -136,23 +116,24 @@ export default function FiberMapCanvas({
     }
   }
   const mapRef = useRef<HTMLDivElement>(null)
-  const [map, setMap] = useState<google.maps.Map | null>(null)
-  const [googleLoaded, setGoogleLoaded] = useState(false)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [activeLayer, setActiveLayer] = useState<'hybrid' | 'roadmap' | 'satellite'>('hybrid')
+  const [map, setMap] = useState<maplibregl.Map | null>(null)
+  const [activeLayer, setActiveLayer] = useState<'hybrid' | 'roadmap' | 'satellite'>('roadmap')
 
+  // 'roadmap' shows the OSM street basemap; 'hybrid' & 'satellite' both show Esri
+  // satellite imagery (kept as three values for compat with the layer-toggle UI).
   const handleLayerChange = (layer: 'hybrid' | 'roadmap' | 'satellite') => {
     setActiveLayer(layer)
-    if (map) {
-      map.setMapTypeId(layer)
+    if (map && map.getLayer('street-layer') && map.getLayer('satellite-layer')) {
+      const showSatellite = layer === 'satellite' || layer === 'hybrid'
+      map.setLayoutProperty('street-layer', 'visibility', showSatellite ? 'none' : 'visible')
+      map.setLayoutProperty('satellite-layer', 'visibility', showSatellite ? 'visible' : 'none')
     }
   }
 
   // Map drawing mode state
   // Modes: 'select' (default), 'Manhole', 'Handhole', 'Pull Box', 'Cabinet', 'Pole', 'Building', 'Existing Fiber Source', 'Camera Location', 'Custom', 'draw_route'
   const [toolMode, setToolMode] = useState<'select' | 'Manhole' | 'Handhole' | 'Pull Box' | 'Cabinet' | 'Pole' | 'Building' | 'Existing Fiber Source' | 'Camera Location' | 'Custom' | 'draw_route'>('select')
-  const [tempRoutePoints, setTempRoutePoints] = useState<google.maps.LatLngLiteral[]>([])
-  const [tempPolyline, setTempPolyline] = useState<google.maps.Polyline | null>(null)
+  const [tempRoutePoints, setTempRoutePoints] = useState<{ lat: number; lng: number }[]>([])
 
   // Refs to avoid stale closures in map click listener
   const toolModeRef = useRef(toolMode)
@@ -194,7 +175,7 @@ export default function FiberMapCanvas({
   const [routeNotes, setRouteNotes] = useState('')
   const [nodeLat, setNodeLat] = useState<number>(0)
   const [nodeLng, setNodeLng] = useState<number>(0)
-  const [editedRoutePoints, setEditedRoutePoints] = useState<google.maps.LatLngLiteral[]>([])
+  const [editedRoutePoints, setEditedRoutePoints] = useState<{ lat: number; lng: number }[]>([])
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean
     title: string
@@ -252,9 +233,70 @@ export default function FiberMapCanvas({
   // Notification Messages
   const [notifyMessage, setNotifyMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
-  // Keep references to Google Maps markers & polylines to redraw them on data updates
-  const markersRef = useRef<google.maps.Marker[]>([])
-  const polylinesRef = useRef<google.maps.Polyline[]>([])
+  // Keep references to MapLibre markers & line-layer ids to redraw them on data updates
+  const markersRef = useRef<maplibregl.Marker[]>([])
+  const lineLayerIdsRef = useRef<string[]>([])
+  const popupRef = useRef<maplibregl.Popup | null>(null)
+
+  const addLineLayer = (
+    mapInstance: maplibregl.Map,
+    id: string,
+    coordinates: [number, number][],
+    color: string,
+    opts: { width?: number; dashed?: boolean; opacity?: number; haloWidth?: number; haloColor?: string; haloOpacity?: number } = {}
+  ) => {
+    const { width = 4, dashed = false, opacity = 0.85 } = opts
+    if (mapInstance.getSource(id)) {
+      // Update existing source/layer in place
+      ;(mapInstance.getSource(id) as maplibregl.GeoJSONSource).setData({
+        type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates }
+      })
+      return
+    }
+    mapInstance.addSource(id, {
+      type: 'geojson',
+      data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates } }
+    })
+
+    // Amber halo underneath, for unverified/unknown-condition assets
+    if (opts.haloColor) {
+      const haloId = `${id}-halo`
+      mapInstance.addLayer({
+        id: haloId,
+        type: 'line',
+        source: id,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': opts.haloColor,
+          'line-width': opts.haloWidth ?? 9,
+          'line-opacity': opts.haloOpacity ?? 0.35
+        }
+      })
+    }
+
+    mapInstance.addLayer({
+      id,
+      type: 'line',
+      source: id,
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-color': color,
+        'line-width': width,
+        'line-opacity': opacity,
+        ...(dashed ? { 'line-dasharray': [2, 2] } : {})
+      }
+    })
+  }
+
+  const removeLineLayers = (mapInstance: maplibregl.Map | null, ids: string[]) => {
+    if (!mapInstance) return
+    ids.forEach(id => {
+      const haloId = `${id}-halo`
+      if (mapInstance.getLayer(haloId)) mapInstance.removeLayer(haloId)
+      if (mapInstance.getLayer(id)) mapInstance.removeLayer(id)
+      if (mapInstance.getSource(id)) mapInstance.removeSource(id)
+    })
+  }
 
   // Fiber colors list (TLA/EIA color codes)
   const fiberColors = [
@@ -277,31 +319,6 @@ export default function FiberMapCanvas({
     return fiberColors[idx]
   }
 
-  // 1. Initial Google Maps API Loader (safe for SSR)
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    const apiKey = googleMapsApiKey || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
-
-    setOptions({
-      key: apiKey,
-      v: 'weekly'
-    })
-
-    Promise.all([
-      importLibrary('maps'),
-      importLibrary('marker'),
-      importLibrary('geometry'),
-      importLibrary('drawing')
-    ])
-      .then(() => {
-        setGoogleLoaded(true)
-      })
-      .catch((err) => {
-        console.error('Failed to load Google Maps:', err)
-        setErrorMessage('Google Maps API key is missing or invalid. Check credentials on Vercel.')
-      })
-  }, [googleMapsApiKey])
 
   // Synchronize form color and notes states on selection changes
   useEffect(() => {
@@ -331,7 +348,7 @@ export default function FiberMapCanvas({
       // Sync route coordinates
       const routeSegs = initialData.segments.filter(s => s.route_id === selectedRoute.id)
       const sortedSegs = [...routeSegs].sort((a, b) => a.segment_index - b.segment_index)
-      const points: google.maps.LatLngLiteral[] = []
+      const points: { lat: number; lng: number }[] = []
       sortedSegs.forEach((seg, idx) => {
         if (idx === 0) {
           points.push({ lat: seg.start_latitude, lng: seg.start_longitude })
@@ -348,7 +365,7 @@ export default function FiberMapCanvas({
 
   // Handle selectedNodeId / selectedRouteId from query parameters on load
   useEffect(() => {
-    if (typeof window === 'undefined' || !googleLoaded) return
+    if (typeof window === 'undefined' || !map) return
     const params = new URLSearchParams(window.location.search)
     const nodeId = params.get('selectedNodeId')
     const routeId = params.get('selectedRouteId')
@@ -370,8 +387,7 @@ export default function FiberMapCanvas({
           setNodeCapacity(enclosure.capacity || 12)
         }
         if (map) {
-          map.panTo({ lat: Number(node.latitude), lng: Number(node.longitude) })
-          map.setZoom(18)
+          map.flyTo({ center: [Number(node.longitude), Number(node.latitude)], zoom: 18 })
         }
       }
     } else if (routeId && initialData.routes.length > 0) {
@@ -386,12 +402,11 @@ export default function FiberMapCanvas({
         setInstallationType(route.installation_type || 'underground')
         const seg = initialData.segments.find((s: any) => s.route_id === route.id)
         if (seg && map) {
-          map.panTo({ lat: Number(seg.start_latitude), lng: Number(seg.start_longitude) })
-          map.setZoom(18)
+          map.flyTo({ center: [Number(seg.start_longitude), Number(seg.start_latitude)], zoom: 18 })
         }
       }
     }
-  }, [map, initialData, googleLoaded])
+  }, [map, initialData])
 
   // Register global select functions for InfoWindow clicks
   useEffect(() => {
@@ -413,8 +428,7 @@ export default function FiberMapCanvas({
           setNodeClosureType(enclosure.enclosure_type)
           setNodeCapacity(enclosure.capacity || 12)
         }
-        const iw = (window as any)._mapInfoWindow
-        if (iw) iw.close()
+        if (popupRef.current) popupRef.current.remove()
       }
     };
 
@@ -428,8 +442,7 @@ export default function FiberMapCanvas({
         setConduitDiameter(Number(route.conduit_diameter_inches || 2.0))
         setRouteSlackPercentage(Number(route.slack_percentage || 10.0))
         setInstallationType(route.installation_type || 'underground')
-        const iw = (window as any)._mapInfoWindow
-        if (iw) iw.close()
+        if (popupRef.current) popupRef.current.remove()
       }
     };
 
@@ -439,86 +452,108 @@ export default function FiberMapCanvas({
     }
   }, [initialData])
 
-  // 2. Initialize Google Map instance
+  // 2. Initialize MapLibre GL map instance (free raster tile sources — no API key)
   useEffect(() => {
-    if (!googleLoaded || !mapRef.current || map) return
+    if (!mapRef.current) return
 
-    try {
-      const gMap = new google.maps.Map(mapRef.current, {
-        center: { lat: defaultLatitude || 33.7490, lng: defaultLongitude || -84.3880 },
-        zoom: defaultZoom || 15,
-        mapTypeId: activeLayer,
-        tilt: 0,
-        streetViewControl: false,
-        mapTypeControl: false,
-        fullscreenControl: false,
-        styles: [
-          { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-          { featureType: 'transit', elementType: 'labels', stylers: [{ visibility: 'off' }] }
+    const showSatelliteInitially = activeLayer === 'satellite' || activeLayer === 'hybrid'
+
+    const gMap = new maplibregl.Map({
+      container: mapRef.current,
+      style: {
+        version: 8,
+        sources: {
+          street: {
+            type: 'raster',
+            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+            tileSize: 256,
+            maxzoom: 19,
+            attribution: '© OpenStreetMap contributors'
+          },
+          satellite: {
+            type: 'raster',
+            tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+            tileSize: 256,
+            maxzoom: 20,
+            attribution: 'Imagery © Esri, Maxar, Earthstar Geographics'
+          }
+        },
+        layers: [
+          { id: 'street-layer', type: 'raster', source: 'street', layout: { visibility: showSatelliteInitially ? 'none' : 'visible' } },
+          { id: 'satellite-layer', type: 'raster', source: 'satellite', layout: { visibility: showSatelliteInitially ? 'visible' : 'none' } }
         ]
-      })
+      },
+      center: [defaultLongitude || -84.3880, defaultLatitude || 33.7490],
+      zoom: defaultZoom || 15,
+      attributionControl: { compact: true }
+    })
 
-      // Clicking the map in node creation / route drawing mode
-      gMap.addListener('click', (e: google.maps.MapMouseEvent) => {
-        const iw = (window as any)._mapInfoWindow
-        if (iw) iw.close()
+    gMap.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
 
-        if (!e.latLng) return
-        const lat = e.latLng.lat()
-        const lng = e.latLng.lng()
- 
-        const currentMode = toolModeRef.current
-        if (currentMode === 'select') return
+    // Clicking the map in node creation / route drawing mode
+    gMap.on('click', (e: maplibregl.MapMouseEvent) => {
+      if (popupRef.current) popupRef.current.remove()
 
-        if (currentMode === 'draw_route') {
-          let finalLat = lat
-          let finalLng = lng
+      const lat = e.lngLat.lat
+      const lng = e.lngLat.lng
 
-          let closestNode = null
-          let minDistance = Infinity
-          initialData.nodes.forEach(n => {
-            const dist = haversineDistanceMeters(lat, lng, n.latitude, n.longitude)
-            if (dist < minDistance) {
-              minDistance = dist
-              closestNode = n
-            }
-          })
+      const currentMode = toolModeRef.current
+      if (currentMode === 'select') return
 
-          if (closestNode && minDistance < 15) {
-            finalLat = closestNode.latitude
-            finalLng = closestNode.longitude
+      if (currentMode === 'draw_route') {
+        let finalLat = lat
+        let finalLng = lng
+
+        let closestNode = null
+        let minDistance = Infinity
+        initialData.nodes.forEach(n => {
+          const dist = haversineDistanceMeters(lat, lng, n.latitude, n.longitude)
+          if (dist < minDistance) {
+            minDistance = dist
+            closestNode = n
           }
+        })
 
-          setTempRoutePoints(prev => {
-            if (prev.length > 0 && prev[prev.length - 1].lat === finalLat && prev[prev.length - 1].lng === finalLng) {
-              return prev
-            }
-            return [...prev, { lat: finalLat, lng: finalLng }]
-          })
-        } else {
-          if (handleMapCanvasClickRef.current) {
-            handleMapCanvasClickRef.current(lat, lng)
-          }
+        if (closestNode && minDistance < 15) {
+          finalLat = (closestNode as any).latitude
+          finalLng = (closestNode as any).longitude
         }
-      })
 
+        setTempRoutePoints(prev => {
+          if (prev.length > 0 && prev[prev.length - 1].lat === finalLat && prev[prev.length - 1].lng === finalLng) {
+            return prev
+          }
+          return [...prev, { lat: finalLat, lng: finalLng }]
+        })
+      } else {
+        if (handleMapCanvasClickRef.current) {
+          handleMapCanvasClickRef.current(lat, lng)
+        }
+      }
+    })
+
+    gMap.on('load', () => {
       setMap(gMap)
-    } catch (err) {
-      console.error('Error creating map canvas:', err)
+    })
+
+    return () => {
+      gMap.remove()
+      setMap(null)
     }
-  }, [googleLoaded, defaultLatitude, defaultLongitude, defaultZoom, map])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultLatitude, defaultLongitude, defaultZoom])
 
   // 3. Clear/Redraw markers and routes when database data updates
   useEffect(() => {
-    if (!map || !googleLoaded) return
+    if (!map) return
 
     // Clear old markers
-    markersRef.current.forEach(m => m.setMap(null))
+    markersRef.current.forEach(m => m.remove())
     markersRef.current = []
 
-    // Clear old polylines
-    polylinesRef.current.forEach(p => p.setMap(null))
-    polylinesRef.current = []
+    // Clear old line layers
+    removeLineLayers(map, lineLayerIdsRef.current)
+    lineLayerIdsRef.current = []
 
     const getStatusColor = (status: string) => {
       const s = status ? status.toLowerCase() : ''
@@ -542,17 +577,11 @@ export default function FiberMapCanvas({
       return '#eab308' // Planned (Yellow)
     }
 
-    let infoWindow = (window as any)._mapInfoWindow
-    if (!infoWindow && typeof google !== 'undefined') {
-      infoWindow = new google.maps.InfoWindow();
-      (window as any)._mapInfoWindow = infoWindow
-    }
-
     // Draw Routes (conduits)
     initialData.routes.forEach(route => {
       // Find segments matching this route
       const routeSegs = initialData.segments.filter(s => s.route_id === route.id)
-      const points: google.maps.LatLngLiteral[] = []
+      const points: { lat: number; lng: number }[] = []
 
       routeSegs.forEach(seg => {
         points.push({ lat: seg.start_latitude, lng: seg.start_longitude })
@@ -569,132 +598,107 @@ export default function FiberMapCanvas({
       // del recorrido, pero no es alcance que se cobre como material.
       const isExisting = (route as any).asset_condition === 'existing'
       const isUnverified = (route as any).asset_condition === 'unknown'
+      const isSelected = !!(selectedRoute && selectedRoute.id === route.id)
 
-      // Draw Polyline path
-      const poly = new google.maps.Polyline({
-        path: points,
-        geodesic: true,
-        strokeColor: strokeCol,
-        strokeOpacity: isExisting ? 0 : 0.8,
-        strokeWeight: 2.5,
-        ...(isExisting ? { icons: DASHED_LINE_ICONS(strokeCol) } : {}),
-        map: map
+      const layerId = `fiber-route-${route.id}`
+      const coords: [number, number][] = points.map(p => [p.lng, p.lat])
+
+      addLineLayer(map, layerId, coords, isSelected ? '#38bdf8' : strokeCol, {
+        width: isSelected ? 4 : 2.5,
+        dashed: isExisting,
+        opacity: isExisting ? 0.9 : 0.85,
+        ...(isUnverified ? { haloColor: '#f59e0b', haloWidth: 9, haloOpacity: 0.35 } : {})
       })
+      lineLayerIdsRef.current.push(layerId)
 
-      // Lo no verificado lleva un halo ambar: no se sabe si es existente o
-      // nuevo, y esa duda vale dinero. Debe verse, no esconderse.
-      if (isUnverified) {
-        const halo = new google.maps.Polyline({
-          path: points,
-          geodesic: true,
-          strokeColor: '#f59e0b',
-          strokeOpacity: 0.35,
-          strokeWeight: 7,
-          zIndex: -1,
-          map: map,
-        })
-        polylinesRef.current.push(halo)
-      }
+      // Highlight selected route + editable vertex handles
+      if (isSelected) {
+        const livePoints = points.map(p => ({ ...p }))
+        const vertexMarkers: maplibregl.Marker[] = []
 
-      // Highlight selected route
-      if (selectedRoute && selectedRoute.id === route.id) {
-        poly.setOptions({ strokeColor: '#38bdf8', strokeWeight: 4, editable: true })
-
-        // Track path edits dynamically
-        const path = poly.getPath()
-        const updatePoints = () => {
-          const newPoints: google.maps.LatLngLiteral[] = []
-          for (let i = 0; i < path.getLength(); i++) {
-            const xy = path.getAt(i)
-            newPoints.push({ lat: xy.lat(), lng: xy.lng() })
-          }
-          setEditedRoutePoints(newPoints)
-          if (endMarker && newPoints.length > 0) {
-            endMarker.setPosition(newPoints[newPoints.length - 1])
-          }
+        const redraw = () => {
+          addLineLayer(map, layerId, livePoints.map(p => [p.lng, p.lat]), '#38bdf8', { width: 4, dashed: false, opacity: 0.9 })
         }
 
-        let endMarker: google.maps.Marker | null = null
-        if (points.length > 0) {
-          const lastPoint = points[points.length - 1]
-          endMarker = new google.maps.Marker({
-            position: lastPoint,
-            map: map,
-            draggable: true,
-            icon: {
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: 7,
-              fillColor: '#ef4444',
-              fillOpacity: 1,
-              strokeColor: '#ffffff',
-              strokeWeight: 2
-            },
-            title: 'Arrastra para extender ruta',
-            zIndex: 9999
+        const makeVertexMarker = (idx: number, isEnd: boolean) => {
+          const el = document.createElement('div')
+          el.style.width = isEnd ? '18px' : '12px'
+          el.style.height = isEnd ? '18px' : '12px'
+          el.style.borderRadius = '50%'
+          el.style.background = isEnd ? '#ef4444' : '#ffffff'
+          el.style.border = isEnd ? '2px solid #ffffff' : '2px solid #38bdf8'
+          el.style.boxShadow = '0 1px 3px rgba(0,0,0,0.5)'
+          el.style.cursor = 'grab'
+          el.title = isEnd ? 'Drag to extend route' : 'Drag to move vertex'
+
+          const marker = new maplibregl.Marker({ element: el, draggable: true, anchor: 'center' })
+            .setLngLat([livePoints[idx].lng, livePoints[idx].lat])
+            .addTo(map)
+
+          if (isEnd) {
+            marker.on('dragstart', () => {
+              // Extending: duplicate the current last point so the segment grows,
+              // and turn the point that WAS last into a regular editable vertex.
+              const prevLastIdx = livePoints.length - 1
+              livePoints.push({ ...livePoints[prevLastIdx] })
+              const frozenIdx = prevLastIdx
+              const fixedMarker = makeVertexMarker(frozenIdx, false)
+              vertexMarkers.splice(frozenIdx, 0, fixedMarker)
+              redraw()
+            })
+          }
+
+          marker.on('drag', () => {
+            const pos = marker.getLngLat()
+            const liveIdx = vertexMarkers.indexOf(marker)
+            if (liveIdx === -1) return
+            livePoints[liveIdx] = { lat: pos.lat, lng: pos.lng }
+            redraw()
           })
 
-          endMarker.addListener('dragstart', () => {
-            const currentPath = poly.getPath()
-            const len = currentPath.getLength()
-            if (len > 0) {
-              const lastVal = currentPath.getAt(len - 1)
-              currentPath.push(new google.maps.LatLng(lastVal.lat(), lastVal.lng()))
-              updatePoints()
-            }
-          })
+          marker.on('dragend', () => {
+            const pos = marker.getLngLat()
+            const liveIdx = vertexMarkers.indexOf(marker)
+            if (liveIdx === -1) return
 
-          endMarker.addListener('drag', () => {
-            const pos = endMarker?.getPosition()
-            if (pos) {
-              const currentPath = poly.getPath()
-              const len = currentPath.getLength()
-              if (len > 0) {
-                currentPath.setAt(len - 1, pos)
-                updatePoints()
-              }
-            }
-          })
+            let finalLat = pos.lat
+            let finalLng = pos.lng
 
-          endMarker.addListener('dragend', () => {
-            const pos = endMarker?.getPosition()
-            if (pos) {
-              let finalLat = pos.lat()
-              let finalLng = pos.lng()
-
-              let closestNode = null
+            if (isEnd) {
+              let closestNode: any = null
               let minDistance = Infinity
               initialData.nodes.forEach(n => {
-                const dist = haversineDistanceMeters(pos.lat(), pos.lng(), n.latitude, n.longitude)
+                const dist = haversineDistanceMeters(pos.lat, pos.lng, n.latitude, n.longitude)
                 if (dist < minDistance) {
                   minDistance = dist
                   closestNode = n
                 }
               })
-
               if (closestNode && minDistance < 15) {
                 finalLat = closestNode.latitude
                 finalLng = closestNode.longitude
-                endMarker?.setPosition({ lat: finalLat, lng: finalLng })
-              }
-
-              const currentPath = poly.getPath()
-              const len = currentPath.getLength()
-              if (len > 0) {
-                currentPath.setAt(len - 1, new google.maps.LatLng(finalLat, finalLng))
-                updatePoints()
+                marker.setLngLat([finalLng, finalLat])
               }
             }
+
+            livePoints[liveIdx] = { lat: finalLat, lng: finalLng }
+            redraw()
+            setEditedRoutePoints(livePoints.map(p => ({ ...p })))
           })
 
-          markersRef.current.push(endMarker)
+          return marker
         }
 
-        path.addListener('set_at', updatePoints)
-        path.addListener('insert_at', updatePoints)
-        path.addListener('remove_at', updatePoints)
+        livePoints.forEach((_, idx) => {
+          const isEnd = idx === livePoints.length - 1
+          vertexMarkers.push(makeVertexMarker(idx, isEnd))
+        })
+
+        setEditedRoutePoints(livePoints.map(p => ({ ...p })))
+        markersRef.current.push(...vertexMarkers)
       }
 
-      poly.addListener('click', (e: google.maps.PolyMouseEvent) => {
+      map.on('click', layerId, (e: maplibregl.MapMouseEvent) => {
         setSelectedRoute(route)
         setSelectedNode(null)
         setActiveTab('properties')
@@ -729,19 +733,19 @@ export default function FiberMapCanvas({
               </div>
             ` : '<div style="margin-top: 4px;"><em>No Cable Installed</em></div>'}
             <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #e2e8f0; display: flex;">
-              <button onclick="window.selectRouteForEditing('${route.id}')" style="display: inline-block; padding: 4px 8px; background-color: #4f46e5; color: white; border-radius: 6px; border: none; font-weight: bold; font-size: 9px; text-align: center; flex: 1; cursor: pointer;">Editar Ruta</button>
+              <button onclick="window.selectRouteForEditing('${route.id}')" style="display: inline-block; padding: 4px 8px; background-color: #4f46e5; color: white; border-radius: 6px; border: none; font-weight: bold; font-size: 9px; text-align: center; flex: 1; cursor: pointer;">Edit Route</button>
             </div>
           </div>
         `
 
-        if (infoWindow && e.latLng) {
-          infoWindow.setContent(contentString)
-          infoWindow.setPosition(e.latLng)
-          infoWindow.open(map)
-        }
+        if (popupRef.current) popupRef.current.remove()
+        popupRef.current = new maplibregl.Popup({ closeButton: true })
+          .setLngLat(e.lngLat)
+          .setHTML(contentString)
+          .addTo(map)
       })
-
-      polylinesRef.current.push(poly)
+      map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer' })
+      map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = '' })
     })
 
     // Draw Nodes (markers)
@@ -816,20 +820,25 @@ export default function FiberMapCanvas({
           </text>
         </svg>
       `
-      const marker = new google.maps.Marker({
-        position: { lat: node.latitude, lng: node.longitude },
-        map: map,
+      const nodeEl = document.createElement('div')
+      nodeEl.style.width = '30px'
+      nodeEl.style.height = '42px'
+      nodeEl.style.cursor = 'pointer'
+      nodeEl.innerHTML = svgPin
+      nodeEl.title = `${node.node_tag} (${node.node_type.toUpperCase()})`
+
+      const marker = new maplibregl.Marker({
+        element: nodeEl,
         draggable: true,
-        title: `${node.node_tag} (${node.node_type.toUpperCase()})`,
-        icon: {
-          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svgPin),
-          scaledSize: new google.maps.Size(30, 42),
-          anchor: new google.maps.Point(15, 15)
-        }
+        anchor: 'center',
+        offset: [0, 6] // elementCenterY(21) - anchorY(15)
       })
+        .setLngLat([node.longitude, node.latitude])
+        .addTo(map)
 
       // Click to select node
-      marker.addListener('click', () => {
+      nodeEl.addEventListener('click', (evt: MouseEvent) => {
+        evt.stopPropagation()
         const currentMode = toolModeRef.current
         if (currentMode === 'draw_route') {
           setTempRoutePoints(prev => {
@@ -884,19 +893,20 @@ export default function FiberMapCanvas({
           </div>
         `
         
-        if (infoWindow) {
-          infoWindow.setContent(contentString)
-          infoWindow.open(map, marker)
-        }
+        if (popupRef.current) popupRef.current.remove()
+        popupRef.current = new maplibregl.Popup({ closeButton: true })
+          .setLngLat([node.longitude, node.latitude])
+          .setHTML(contentString)
+          .addTo(map)
       })
 
       // Drag node coordinates persist
-      marker.addListener('dragend', async () => {
-        const pos = marker.getPosition()
+      marker.on('dragend', async () => {
+        const pos = marker.getLngLat()
         if (!pos) return
 
-        const newLat = pos.lat()
-        const newLng = pos.lng()
+        const newLat = pos.lat
+        const newLng = pos.lng
 
         try {
           const supabase = await createClient()
@@ -910,7 +920,7 @@ export default function FiberMapCanvas({
 
           if (error) {
             showNotification('error', `Failed to move node: ${error.message}`)
-            marker.setPosition({ lat: node.latitude, lng: node.longitude })
+            marker.setLngLat([node.longitude, node.latitude])
           } else {
             showNotification('success', `Moved node ${node.node_tag} to new coordinates.`)
             node.latitude = newLat
@@ -932,8 +942,6 @@ export default function FiberMapCanvas({
     // Draw Cabinets
     if (initialData.cabinets) {
       initialData.cabinets.forEach((cab: any) => {
-        const position = { lat: cab.latitude, lng: cab.longitude }
-
         const hostedSwitches = (initialData.networkDevices || []).filter((d: any) => d.cabinet_id === cab.id)
         const hostedFdus = (initialData.fdus || []).filter((f: any) => f.cabinet_id === cab.id)
         const hostedFpps = (initialData.fpps || []).filter((f: any) => f.cabinet_id === cab.id)
@@ -975,23 +983,24 @@ export default function FiberMapCanvas({
           </svg>
         `
 
-        const marker = new google.maps.Marker({
-          position,
-          map: map,
-          draggable: false,
-          title: cab.cabinet_tag,
-          icon: {
-            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svgPin),
-            scaledSize: new google.maps.Size(20, 20),
-            anchor: new google.maps.Point(10, 10)
-          }
-        })
+        const cabEl = document.createElement('div')
+        cabEl.style.width = '20px'
+        cabEl.style.height = '20px'
+        cabEl.style.cursor = 'pointer'
+        cabEl.innerHTML = svgPin
+        cabEl.title = cab.cabinet_tag
 
-        marker.addListener('click', () => {
-          if (infoWindow) {
-            infoWindow.setContent(tooltipContent)
-            infoWindow.open(map, marker)
-          }
+        const marker = new maplibregl.Marker({ element: cabEl, draggable: false, anchor: 'center' })
+          .setLngLat([cab.longitude, cab.latitude])
+          .addTo(map)
+
+        cabEl.addEventListener('click', (evt: MouseEvent) => {
+          evt.stopPropagation()
+          if (popupRef.current) popupRef.current.remove()
+          popupRef.current = new maplibregl.Popup({ closeButton: true })
+            .setLngLat([cab.longitude, cab.latitude])
+            .setHTML(tooltipContent)
+            .addTo(map)
         })
 
         markersRef.current.push(marker)
@@ -1006,30 +1015,18 @@ export default function FiberMapCanvas({
       const camera = initialData.cameras.find(c => c.id === assignment.camera_id)
 
       if (sourceNode && camera) {
-        const dropLineSymbol = {
-          path: 'M 0,-1 0,1',
-          strokeOpacity: 0.8,
-          scale: 2
-        }
-
-        const poly = new google.maps.Polyline({
-          path: [
-            { lat: sourceNode.latitude, lng: sourceNode.longitude },
-            { lat: camera.latitude, lng: camera.longitude }
-          ],
-          geodesic: true,
-          strokeColor: getStatusColor(assignment.fiber_path_status),
-          strokeOpacity: 0,
-          icons: [{
-            icon: dropLineSymbol,
-            offset: '0',
-            repeat: '10px'
-          }],
-          map: map
-        })
+        const layerId = `fiber-drop-${assignment.id}`
+        addLineLayer(
+          map,
+          layerId,
+          [[sourceNode.longitude, sourceNode.latitude], [camera.longitude, camera.latitude]],
+          getStatusColor(assignment.fiber_path_status),
+          { width: 2, dashed: true, opacity: 0.85 }
+        )
+        lineLayerIdsRef.current.push(layerId)
 
         // Click tooltip for drop cable
-        poly.addListener('click', (e: google.maps.PolyMouseEvent) => {
+        map.on('click', layerId, (e: maplibregl.MapMouseEvent) => {
           const cable = initialData.cables.find(c => c.id === assignment.drop_cable_id)
           const contentString = `
             <div style="padding: 4px; font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #0f172a; max-width: 220px;">
@@ -1047,39 +1044,46 @@ export default function FiberMapCanvas({
               ` : ''}
             </div>
           `
-          if (infoWindow && e.latLng) {
-            infoWindow.setContent(contentString)
-            infoWindow.setPosition(e.latLng)
-            infoWindow.open(map)
-          }
+          if (popupRef.current) popupRef.current.remove()
+          popupRef.current = new maplibregl.Popup({ closeButton: true })
+            .setLngLat(e.lngLat)
+            .setHTML(contentString)
+            .addTo(map)
         })
-
-        polylinesRef.current.push(poly)
+        map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer' })
+        map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = '' })
       }
     })
-  }, [map, googleLoaded, initialData, selectedRoute])
+
+    return () => {
+      removeLineLayers(map, lineLayerIdsRef.current)
+    }
+  }, [map, initialData, selectedRoute])
 
   // 4. Temporary Polyline drawing synchronization
+  const TEMP_ROUTE_LAYER_ID = 'fiber-temp-route-preview'
   useEffect(() => {
-    if (!map || !googleLoaded) return
+    if (!map) return
 
-    if (tempPolyline) {
-      tempPolyline.setMap(null)
-    }
+    if (map.getLayer(TEMP_ROUTE_LAYER_ID)) map.removeLayer(TEMP_ROUTE_LAYER_ID)
+    if (map.getSource(TEMP_ROUTE_LAYER_ID)) map.removeSource(TEMP_ROUTE_LAYER_ID)
 
     if (tempRoutePoints.length > 1) {
-      const poly = new google.maps.Polyline({
-        path: tempRoutePoints,
-        strokeColor: '#f43f5e',
-        strokeOpacity: 0.9,
-        strokeWeight: 2,
-        map: map
-      })
-      setTempPolyline(poly)
-    } else {
-      setTempPolyline(null)
+      addLineLayer(
+        map,
+        TEMP_ROUTE_LAYER_ID,
+        tempRoutePoints.map(p => [p.lng, p.lat]),
+        '#f43f5e',
+        { width: 2, opacity: 0.9 }
+      )
     }
-  }, [tempRoutePoints, map, googleLoaded])
+
+    return () => {
+      if (map.getLayer(TEMP_ROUTE_LAYER_ID)) map.removeLayer(TEMP_ROUTE_LAYER_ID)
+      if (map.getSource(TEMP_ROUTE_LAYER_ID)) map.removeSource(TEMP_ROUTE_LAYER_ID)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tempRoutePoints, map])
 
   // Helper notification handler
   const showNotification = (type: 'success' | 'error', text: string) => {
@@ -1365,7 +1369,7 @@ export default function FiberMapCanvas({
       }
 
       if (map) {
-        map.panTo({ lat: nodeLat, lng: nodeLng })
+        map.panTo([nodeLng, nodeLat])
       }
 
       showNotification('success', 'Node specifications saved!')
@@ -1780,7 +1784,7 @@ export default function FiberMapCanvas({
             <div className="flex items-center gap-0.5 bg-[var(--surface-2)] border border-[var(--border)] p-0.5 rounded-lg">
               <button
                 onClick={() => setDrawCondition('new')}
-                title="Lo que se dibuje se instala en este proyecto: genera material en el BOM"
+                title="What you draw is installed in this project: generates material in the BOM"
                 className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide transition-all ${
                   drawCondition === 'new'
                     ? 'bg-[var(--accent)] text-white shadow-inner'
@@ -1791,7 +1795,7 @@ export default function FiberMapCanvas({
               </button>
               <button
                 onClick={() => setDrawCondition('existing')}
-                title="Ya existe en terreno: se reutiliza, NO genera material en el BOM"
+                title="Already in the field: reused, does NOT generate material in the BOM"
                 className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide transition-all ${
                   drawCondition === 'existing'
                     ? 'bg-[var(--text-secondary)] text-[var(--surface-1)] shadow-inner'
@@ -1871,39 +1875,27 @@ export default function FiberMapCanvas({
 
           {/* Map canvas container */}
           <div className="w-full h-full min-h-0 bg-[var(--surface-2)] flex-1 relative">
-            {/* Map layer toggle UI */}
-            {!errorMessage && (
-              <div className="absolute top-3 right-3 z-10 flex bg-[var(--surface-2)]/70 border border-slate-805 rounded-xl p-1 gap-1 backdrop-blur-md">
-                {(['hybrid', 'roadmap', 'satellite'] as const).map(layer => (
-                  <button
-                    key={layer}
-                    onClick={() => handleLayerChange(layer)}
-                    className={`px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider rounded-lg transition-all ${
-                      activeLayer === layer
-                        ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] font-bold'
-                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                    }`}
-                  >
-                    {layer === 'roadmap' ? 'Road' : layer === 'hybrid' ? 'Hybrid' : 'Sat'}
-                  </button>
-                ))}
-              </div>
-            )}
+            {/* Basemap toggle: Street (OpenStreetMap) / Satellite (Esri World Imagery) */}
+            <div className="absolute top-3 right-3 z-10 flex bg-[var(--surface-2)]/70 border border-slate-805 rounded-xl p-1 gap-1 backdrop-blur-md">
+              {(['roadmap', 'satellite'] as const).map(layer => (
+                <button
+                  key={layer}
+                  onClick={() => handleLayerChange(layer)}
+                  className={`px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider rounded-lg transition-all ${
+                    activeLayer === layer || (layer === 'satellite' && activeLayer === 'hybrid')
+                      ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] font-bold'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                  }`}
+                >
+                  {layer === 'roadmap' ? 'Street' : 'Satellite'}
+                </button>
+              ))}
+            </div>
 
-            {errorMessage ? (
-              <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center text-rose-450 bg-rose-950/10 font-mono text-xs max-w-md mx-auto relative z-10 border border-dashed border-rose-900/30 rounded-2xl my-auto">
-                <svg className="mb-2 shrink-0 animate-bounce" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                {errorMessage}
-              </div>
-            ) : (
-              <div 
-                ref={mapRef} 
-                className={`w-full h-full flex-1 ${toolMode !== 'select' ? 'cursor-crosshair' : ''}`}
-                onClick={() => {
-                  // Fallback map click if google click listener fails
-                }}
-              />
-            )}
+            <div
+              ref={mapRef}
+              className={`w-full h-full flex-1 ${toolMode !== 'select' ? 'cursor-crosshair' : ''}`}
+            />
           </div>
         </div>
 
@@ -2326,10 +2318,10 @@ export default function FiberMapCanvas({
                         </div>
                         <p className="text-[10px] text-[var(--text-tertiary)] mt-1.5 leading-snug">
                           {(selectedRoute as any).asset_condition === 'existing'
-                            ? 'Ducto existente reutilizado. No se cobra conduit; la fibra si.'
+                            ? 'Existing conduit, reused. Conduit is not billed; the fiber still is.'
                             : (selectedRoute as any).asset_condition === 'unknown'
-                            ? 'Sin verificar. Confirma si el ducto ya existia antes de cotizar.'
-                            : 'Ducto nuevo. Genera HDPE, innerduct y mule tape en el BOM.'}
+                            ? 'Unverified. Confirm whether the conduit already existed before quoting.'
+                            : 'New conduit. Generates HDPE, innerduct and mule tape in the BOM.'}
                         </p>
                       </div>
 
@@ -3518,8 +3510,7 @@ export default function FiberMapCanvas({
                               setSelectedRoute(null)
                               setActiveTab('properties')
                               if (map) {
-                                map.setCenter({ lat: n.latitude, lng: n.longitude })
-                                map.setZoom(17)
+                                map.flyTo({ center: [n.longitude, n.latitude], zoom: 17 })
                               }
                               setNodeIdTag(n.node_tag)
                               setNodeSize(n.size_description || '24x36x36')
@@ -3562,8 +3553,7 @@ export default function FiberMapCanvas({
                                 setActiveTab('properties')
                                 const segs = initialData.segments.filter((s: any) => s.route_id === route.id)
                                 if (segs.length > 0 && map) {
-                                  map.setCenter({ lat: segs[0].start_latitude, lng: segs[0].start_longitude })
-                                  map.setZoom(16)
+                                  map.flyTo({ center: [segs[0].start_longitude, segs[0].start_latitude], zoom: 16 })
                                 }
                               }
                             }}
@@ -3600,8 +3590,7 @@ export default function FiberMapCanvas({
                                   setSelectedRoute(null)
                                   setActiveTab('properties')
                                   if (map) {
-                                    map.setCenter({ lat: parentNode.latitude, lng: parentNode.longitude })
-                                    map.setZoom(17)
+                                    map.flyTo({ center: [parentNode.longitude, parentNode.latitude], zoom: 17 })
                                   }
                                 }
                               }}
@@ -3636,8 +3625,7 @@ export default function FiberMapCanvas({
                               key={ass.id}
                               onClick={() => {
                                 if (camera && map) {
-                                  map.setCenter({ lat: camera.latitude, lng: camera.longitude })
-                                  map.setZoom(17)
+                                  map.flyTo({ center: [camera.longitude, camera.latitude], zoom: 17 })
                                 }
                               }}
                               className="w-full text-left p-2 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--surface-2)] border border-[var(--border)] hover:border-slate-750 transition-colors flex justify-between items-center text-[11px]"

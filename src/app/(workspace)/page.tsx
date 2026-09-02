@@ -16,7 +16,7 @@ export default function ProjectsPage() {
   const [deviceCounts, setDeviceCounts] = useState<Record<string, number>>({})
 
   const handleDeleteProject = async (projId: string, projName: string) => {
-    const confirmDelete = window.confirm(`⚠️ ¿Estás seguro de ELIMINAR PERMANENTEMENTE el proyecto "${projName}"?\n\nEsta acción borrará de la base de datos todas las cámaras, nodos de fibra, switches, BOM y tareas asociadas. Esta acción NO se puede deshacer.`)
+    const confirmDelete = window.confirm(`⚠️ Permanently DELETE the project "${projName}"?\n\nThis will permanently delete every camera, fiber node, switch, BOM line and task in this project. This CANNOT be undone.`)
     if (!confirmDelete) return
 
     setDeletingId(projId)

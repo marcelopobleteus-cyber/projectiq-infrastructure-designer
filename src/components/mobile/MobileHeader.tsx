@@ -37,7 +37,7 @@ export default function MobileHeader({
       <button
         type="button"
         onClick={onToggleDrawer}
-        aria-label="Abrir menú de navegación"
+        aria-label="Open navigation menu"
         className="w-11 h-11 flex items-center justify-center rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--surface-hover)] active:scale-95 transition-all shrink-0 cursor-pointer"
       >
         {isDrawerOpen ? (

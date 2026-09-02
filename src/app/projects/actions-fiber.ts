@@ -612,7 +612,7 @@ export async function createFiberRoute(params: {
       project_id: params.projectId,
       category: 'Fiber',
       module: 'conduit' as const,
-      subcategory: 'duct',
+      subcategory: 'duct_accessory',
       work_scope: conduitWorkScope,
       part_number: 'INNER-1.25',
       description: innerduct?.description ?? '1.25-in Corrugated Innerduct',
@@ -628,7 +628,7 @@ export async function createFiberRoute(params: {
       project_id: params.projectId,
       category: 'Fiber',
       module: 'conduit' as const,
-      subcategory: 'duct',
+      subcategory: 'duct_accessory',
       work_scope: conduitWorkScope,
       part_number: 'MULE-WP1250',
       description: muleTape?.description ?? 'Mule Tape 1250 lbs Pull Tape',
@@ -898,7 +898,7 @@ export async function setAssetCondition(params: {
       asset_condition: params.assetCondition,
       work_scope: workScope,
       owner_of_record: params.ownerOfRecord,
-      condition_source: 'marcado en el mapa',
+      condition_source: 'marked on the map',
     })
     .eq('id', params.id)
 
@@ -945,7 +945,7 @@ export async function setAssetCondition(params: {
             original_id: row.id,
             project_id: params.projectId,
             payload: row as any,
-            removed_reason: `Reclasificado como ${params.assetCondition}/${workScope} desde el mapa`,
+            removed_reason: `Reclassified as ${params.assetCondition}/${workScope} from the map`,
           }))
         )
       }
@@ -985,9 +985,9 @@ export async function setAssetCondition(params: {
     laborLinesAdded: laborAdded,
     warning:
       buysMaterial && params.assetCondition === 'new'
-        ? 'Marcado como nuevo. Si antes era existente, revisa el BOM: las lineas de material no se recrean solas.'
+        ? 'Marked as new. If it was previously existing, review the BOM: material lines are not recreated automatically.'
         : !buysMaterial && removed > 0 && laborAdded === 0
-        ? 'Material retirado, pero no hay tarifa de mano de obra para este alcance: el trabajo de reuso quedo sin cobrar.'
+        ? 'Material removed, but there is no labor rate for this scope: the reuse work is uncharged.'
         : undefined,
   }
 }

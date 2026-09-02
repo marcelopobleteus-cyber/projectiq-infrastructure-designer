@@ -13,7 +13,7 @@ export default function MobileProjectsStubPage() {
             Mobile Projects List Stub
           </h2>
           <p className="text-xs text-[var(--text-secondary)] max-w-xs mx-auto leading-relaxed">
-            Esta es la estructura base de la vista móvil. La lista completa de proyectos optimizada para pantallas táctiles se implementará en la siguiente tarea.
+            This is the base mobile layout. The full touch-optimized project list will be implemented in the next task.
           </p>
         </div>
       </div>

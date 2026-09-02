@@ -25,7 +25,7 @@ export default async function MobileOverviewStubPage({ params }: MobileOverviewP
             Mobile Overview Stub
           </h2>
           <p className="text-xs text-[var(--text-secondary)] max-w-xs mx-auto leading-relaxed">
-            Vista móvil de resumen del proyecto (<code className="text-[var(--accent-text)] font-mono">{projectId}</code>). El panel adaptado se construirá en la siguiente fase.
+            Mobile project overview (<code className="text-[var(--accent-text)] font-mono">{projectId}</code>). The adapted panel will be built in the next phase.
           </p>
         </div>
       </div>

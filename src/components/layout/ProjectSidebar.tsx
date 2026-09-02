@@ -17,11 +17,11 @@ const ALL_DISCIPLINES: { id: string; name: string; href: string; icon: React.Rea
     icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>,
   },
   {
-    id: 'fiber', name: 'Fibra Óptica (OSP/ISP)', href: 'fiber', ready: true,
+    id: 'fiber', name: 'Fiber Optic (OSP/ISP)', href: 'fiber', ready: true,
     icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0z"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg>,
   },
   {
-    id: 'conduit', name: 'Canalización & Ductos', href: 'fiber', ready: true,
+    id: 'conduit', name: 'Conduit & Duct Bank', href: 'fiber', ready: true,
     icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h6a4 4 0 0 1 4 4v4a4 4 0 0 0 4 4h2"/><circle cx="4" cy="6" r="2"/><circle cx="20" cy="18" r="2"/></svg>,
   },
   {
@@ -33,11 +33,11 @@ const ALL_DISCIPLINES: { id: string; name: string; href: string; icon: React.Rea
     icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>,
   },
   {
-    id: 'power', name: 'Energía & Subestaciones', href: 'power', ready: true,
+    id: 'power', name: 'Power & Substations', href: 'power', ready: true,
     icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
   },
   {
-    id: 'lighting', name: 'Alumbrado Público (En desarrollo)', href: '', ready: false,
+    id: 'lighting', name: 'Street Lighting (In development)', href: '', ready: false,
     icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6M10 22h4M12 2a6 6 0 0 0-4 10.5c.6.55 1 1.36 1 2.5h6c0-1.14.4-1.95 1-2.5A6 6 0 0 0 12 2z"/></svg>,
   },
 ]
@@ -68,7 +68,7 @@ export default function ProjectSidebar({ projectId, projectName, disciplines }: 
       const disc = ALL_DISCIPLINES.find(d => d.id === activeDisciplines[0])
       return { title: disc?.name || 'Proyecto Especializado' }
     }
-    return { title: `Multi-Disciplina (${activeDisciplines.length} módulos)` }
+    return { title: `Multi-Discipline (${activeDisciplines.length} modules)` }
   }
 
   const badge = getDisciplineBadge()
@@ -108,7 +108,7 @@ export default function ProjectSidebar({ projectId, projectName, disciplines }: 
         },
         {
           id: 'topology',
-          label: 'Matriz & Topología',
+          label: 'Matrix & Topology',
           href: `/projects/${projectId}/locations`,
           active: pathname === `/projects/${projectId}/locations`,
           icon: (
@@ -118,15 +118,15 @@ export default function ProjectSidebar({ projectId, projectName, disciplines }: 
       ]
     },
     {
-      label: 'MÓDULOS DEL PROYECTO',
+      label: 'PROJECT MODULES',
       items: designItems
     },
     {
-      label: 'OPERACIÓN & ENTREGABLES',
+      label: 'OPERATIONS & DELIVERABLES',
       items: [
         {
           id: 'bom',
-          label: 'Cómputo Métrico (BOM)',
+          label: 'Bill of Materials (BOM)',
           href: `/projects/${projectId}/bom`,
           active: pathname === `/projects/${projectId}/bom`,
           icon: (
@@ -187,21 +187,21 @@ export default function ProjectSidebar({ projectId, projectName, disciplines }: 
 
       {/* Action Buttons: Add Module / Disciplines */}
       <div className="p-3 shrink-0 space-y-1.5 relative border-b border-[var(--border)] bg-[var(--surface-1)]">
-        {/* Dynamic + Unir Módulo Button */}
+        {/* Dynamic + Add Module button */}
         <button
           type="button"
           onClick={() => setShowAddMenu(!showAddMenu)}
           className="w-full py-1.5 px-3 bg-[var(--surface-2)] border border-[var(--border)] hover:bg-[var(--surface-hover)] text-[var(--text-primary)] rounded-lg font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Unir Módulo / Disciplina
+          Add Module / Discipline
         </button>
 
         {/* Dropdown menu for adding/removing modules */}
         {showAddMenu && (
           <div className="absolute top-full left-3 right-3 mt-1 bg-[var(--surface-1)] border border-[var(--border-strong)] rounded-xl shadow-lg p-2 z-50 space-y-1">
             <div className="text-[9.5px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider px-2 py-1 border-b border-[var(--border)]">
-              Activar Módulos en este Proyecto
+              Enable Modules in this Project
             </div>
             {ALL_DISCIPLINES.map(d => {
               const active = activeDisciplines.includes(d.id)
@@ -245,7 +245,7 @@ export default function ProjectSidebar({ projectId, projectName, disciplines }: 
                 sec.disabled ? (
                   <div
                     key={sec.id}
-                    title={`${sec.label} — módulo en desarrollo`}
+                    title={`${sec.label} — module in development`}
                     className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11.5px] text-[var(--text-tertiary)] cursor-not-allowed opacity-50"
                   >
                     <span>{sec.icon}</span>

@@ -13,7 +13,7 @@ export default function MobileReportsStubPage() {
             Mobile Reports Stub
           </h2>
           <p className="text-xs text-[var(--text-secondary)] max-w-xs mx-auto leading-relaxed">
-            Reportes ejecutivos y cómputos de terreno.
+            Executive reports and field quantities.
           </p>
         </div>
       </div>

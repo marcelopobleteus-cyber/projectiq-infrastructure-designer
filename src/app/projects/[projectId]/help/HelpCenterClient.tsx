@@ -20,7 +20,7 @@ interface HelpArticle {
 const HELP_ARTICLES: HelpArticle[] = [
   {
     id: 'delete-camera-drop',
-    title: 'How to delete a Camera Drop Cable (dashed orange line)? / ¿Cómo eliminar la línea punteada de acometida?',
+    title: 'How to delete a Camera Drop Cable (dashed orange line)?',
     category: 'fiber',
     categoryLabel: 'Fiber Pathways & GIS Map',
     tags: ['dashed line', 'orange line', 'camera drop', 'drop cable', 'delete', 'remove', 'acometida', 'linea punteada', 'eliminar', 'cam-001', 'clear assignment'],
@@ -30,12 +30,12 @@ const HELP_ARTICLES: HelpArticle[] = [
       'In the right-side configuration drawer, click on the "Cameras" tab.',
       'From the "Target Camera" dropdown menu, select the camera you want to edit (e.g., CAM-001).',
       'The "Camera Fiber Summary" card will load below. Scroll to the bottom of the card.',
-      'Click the red button labeled "Clear Assignment & Splices" (Limpiar Asignación y Empalmes) and confirm. The dashed line will disappear from the map.'
+      'Click the red button labeled "Clear Assignment & Splices" and confirm. The dashed line will disappear from the map.'
     ]
   },
   {
     id: 'draw-fiber-route',
-    title: 'How to draw a new Fiber Route? / ¿Cómo dibujar una nueva ruta de fibra?',
+    title: 'How to draw a new Fiber Route?',
     category: 'fiber',
     categoryLabel: 'Fiber Pathways & GIS Map',
     tags: ['draw route', 'conduit', 'pathway', 'nodes', 'vertices', 'dibujar', 'ruta', 'fibra'],
@@ -49,7 +49,7 @@ const HELP_ARTICLES: HelpArticle[] = [
   },
   {
     id: 'delete-node-route',
-    title: 'How to delete a node or route segment? / ¿Cómo borrar un nodo o ruta?',
+    title: 'How to delete a node or route segment?',
     category: 'fiber',
     categoryLabel: 'Fiber Pathways & GIS Map',
     tags: ['delete node', 'delete route', 'remove', 'cleanup', 'bom check', 'borrar', 'eliminar', 'segmento'],
@@ -63,7 +63,7 @@ const HELP_ARTICLES: HelpArticle[] = [
   },
   {
     id: 'topology-drag',
-    title: 'How to position devices in the Topology Diagram? / ¿Cómo ubicar equipos en el diagrama?',
+    title: 'How to position devices in the Topology Diagram?',
     category: 'network',
     categoryLabel: 'Network Topology',
     tags: ['drag', 'drop', 'switch', 'topology', 'diagram', 'layout', 'save position', 'arrastrar', 'ubicar', 'switches', 'red'],
@@ -78,7 +78,7 @@ const HELP_ARTICLES: HelpArticle[] = [
   },
   {
     id: 'assign-port',
-    title: 'How to link a camera to a network switch port? / ¿Cómo conectar una cámara al switch?',
+    title: 'How to link a camera to a network switch port?',
     category: 'network',
     categoryLabel: 'Network Topology',
     tags: ['port matrix', 'switch port', 'assign camera', 'poe budget', 'matriz', 'puertos', 'conectar', 'camara'],
@@ -93,7 +93,7 @@ const HELP_ARTICLES: HelpArticle[] = [
   },
   {
     id: 'bom-export',
-    title: 'How to manage and export Bill of Materials (BOM)? / ¿Cómo exportar la lista de materiales?',
+    title: 'How to manage and export Bill of Materials (BOM)?',
     category: 'bom',
     categoryLabel: 'Inventory & Materials',
     tags: ['bom', 'bill of materials', 'catalog', 'pricing', 'inventory', 'materials', 'export', 'materiales'],
@@ -106,7 +106,7 @@ const HELP_ARTICLES: HelpArticle[] = [
   },
   {
     id: 'print-pdf',
-    title: 'How to generate clean PDF reports? / ¿Cómo guardar reportes en PDF?',
+    title: 'How to generate clean PDF reports?',
     category: 'reports',
     categoryLabel: 'Reports & Delivery',
     tags: ['print pdf', 'save pdf', 'report pdf', 'export', 'r-fib-04', 'imprimir', 'guardar', 'pdf'],
@@ -249,7 +249,7 @@ export default function HelpCenterClient({ projectId, projectName }: HelpCenterC
               {article.steps && article.steps.length > 0 && (
                 <div className="bg-slate-50 dark:bg-[var(--surface-2)] border border-slate-200 dark:border-[var(--border)]/60 p-4 rounded-xl space-y-2">
                   <h4 className="text-[10px] font-mono text-[var(--text-secondary)] dark:text-[var(--text-tertiary)] uppercase tracking-widest border-b border-slate-200 dark:border-[var(--border)] pb-1.5 mb-2">
-                    Step-by-step Guide / Guía paso a paso
+                    Step-by-step Guide
                   </h4>
                   <ol className="space-y-2 text-xs">
                     {article.steps.map((step, idx) => (

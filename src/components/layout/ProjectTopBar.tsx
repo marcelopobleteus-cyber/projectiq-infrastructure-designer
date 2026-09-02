@@ -179,7 +179,7 @@ export default function ProjectTopBar({
                 className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                Ver Cómputo Métrico (BOM)
+                View Bill of Materials (BOM)
               </Link>
 
               <Link
@@ -210,8 +210,8 @@ export default function ProjectTopBar({
       {/* Styled App Confirm Modal for Project Deletion */}
       <ConfirmModal
         isOpen={showConfirmDelete}
-        title={`¿Eliminar proyecto "${projectName}"?`}
-        message={`Esta acción borrará PERMANENTEMENTE de la base de datos Supabase todas las cámaras, nodos de fibra, switches, cómputos métricos (BOM) y órdenes de trabajo asociadas.\n\nEsta acción NO se puede deshacer.`}
+        title={`Delete project "${projectName}"?`}
+        message={`This will PERMANENTLY delete from the Supabase database every camera, fiber node, switch, BOM line and work order in this project. This cannot be undone.`}
         confirmText="Eliminar Proyecto"
         cancelText="Cancelar"
         variant="danger"
@@ -224,7 +224,7 @@ export default function ProjectTopBar({
       <ConfirmModal
         isOpen={demoNotice}
         title="Proyecto Protegido"
-        message="El proyecto de demostración no se puede eliminar porque sirve como plantilla para nuevos usuarios."
+        message="The demo project cannot be deleted because it serves as a template for new users."
         confirmText="Entendido"
         cancelText="Cerrar"
         variant="info"
