@@ -654,10 +654,14 @@ export default function ProjectMapCanvas({
         sources: {
           street: {
             type: 'raster',
-            tiles: ['https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}.png'],
+            tiles: [
+              'https://a.tile.opentopomap.org/{z}/{x}/{y}.png',
+              'https://b.tile.opentopomap.org/{z}/{x}/{y}.png',
+              'https://c.tile.opentopomap.org/{z}/{x}/{y}.png',
+            ],
             tileSize: 256,
-            maxzoom: 19,
-            attribution: '© OpenStreetMap contributors'
+            maxzoom: 17,
+            attribution: '© OpenTopoMap (CC-BY-SA) © OpenStreetMap contributors'
           },
           satellite: {
             type: 'raster',

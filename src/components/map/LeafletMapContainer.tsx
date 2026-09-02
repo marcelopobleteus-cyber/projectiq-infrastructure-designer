@@ -115,7 +115,7 @@ export default function LeafletMapContainer({
     // Define Tile Layers
     const tileUrls = {
       dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-      streets: 'https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}.png',
+      streets: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
       satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     }
 
@@ -150,8 +150,8 @@ export default function LeafletMapContainer({
         attr: '&copy; CartoDB & OpenStreetMap',
       },
       streets: {
-        url: 'https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}.png',
-        attr: '&copy; OpenStreetMap contributors',
+        url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+        attr: '&copy; OpenTopoMap (CC-BY-SA) &copy; OpenStreetMap contributors',
       },
       satellite: {
         url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
