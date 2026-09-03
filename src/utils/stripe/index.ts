@@ -12,7 +12,7 @@ export function getStripe(): Stripe | null {
     stripeInstance = new Stripe(secretKey, {
       apiVersion: '2025-02-24.acacia' as any,
       appInfo: {
-        name: 'ProjectIQ Infrastructure Designer',
+        name: 'NextQ Designer Suite',
         version: '0.1.0',
       },
     })

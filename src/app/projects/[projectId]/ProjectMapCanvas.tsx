@@ -1797,7 +1797,7 @@ export default function ProjectMapCanvas({
 
   return (
     <>
-      <div className="flex-1 flex overflow-hidden h-full w-full">
+      <div className="flex-1 flex overflow-hidden h-full w-full relative">
       {/* 1. Contextual Sidebar */}
       <ContextSidebar
         view="map"
@@ -2183,7 +2183,7 @@ export default function ProjectMapCanvas({
         const completeCount = cameraTasks.filter(t => t.status === 'Complete').length
 
         return (
-          <div className="w-80 bg-[var(--surface-1)] border-l border-[var(--border)] flex flex-col justify-between shrink-0 h-full p-6 relative z-10 overflow-hidden shadow-2xl">
+          <div className="absolute top-4 right-4 bottom-4 w-80 max-h-[calc(100%-2rem)] bg-[var(--surface-1)] border border-[var(--border-strong)] rounded-2xl flex flex-col justify-between p-6 z-30 overflow-hidden shadow-2xl">
             <form onSubmit={handleSaveCamera} className="flex flex-col h-full justify-between overflow-hidden">
               <div className="space-y-4 overflow-y-auto pr-1 flex-1 scrollbar-thin pb-4">
                 
@@ -2963,7 +2963,7 @@ export default function ProjectMapCanvas({
       })()}
       
       {selectedDevice && (
-        <div className="w-80 bg-[var(--surface-1)] border-l border-[var(--border)] flex flex-col justify-between shrink-0 h-full p-6 relative z-10 overflow-hidden shadow-2xl">
+        <div className="absolute top-4 right-4 bottom-4 w-80 max-h-[calc(100%-2rem)] bg-[var(--surface-1)] border border-[var(--border-strong)] rounded-2xl flex flex-col justify-between p-6 z-30 overflow-hidden shadow-2xl">
           <form onSubmit={handleSaveDevice} className="flex flex-col h-full justify-between">
             <div className="space-y-4 overflow-y-auto pr-1 flex-1 scrollbar-thin">
               <div className="flex justify-between items-start border-b border-[var(--border)] pb-4">

@@ -100,7 +100,7 @@ export default function MainSidebar({ userEmail, userName, isPlatformAdmin, onSi
       <div className="flex flex-col items-center gap-6">
         <Link
           href="/dashboard"
-          title="NextQ Infrastructure Designer"
+          title="NextQ Designer Suite"
           className="w-10 h-10 rounded-xl bg-[var(--accent)] text-white flex items-center justify-center font-black text-sm tracking-wider shadow-sm hover:bg-[var(--accent-hover)] transition-all"
         >
           NQ

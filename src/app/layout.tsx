@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import MobileRedirectHandler from "@/components/mobile/MobileRedirectHandler";
+import FieldRedirectHandler from "@/components/field/FieldRedirectHandler";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "NextQ Infrastructure Designer",
+  title: "NextQ Designer Suite",
   description: "Spatial planner for CCTV, networking, power, BOM, and infrastructure deployments.",
 };
 
@@ -62,7 +62,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col">
-        <MobileRedirectHandler />
+        <FieldRedirectHandler />
         {children}
       </body>
     </html>

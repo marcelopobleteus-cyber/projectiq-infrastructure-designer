@@ -72,7 +72,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
               <div>
                 <h4 className="text-sm font-semibold text-foreground">Appearance</h4>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Select how NextQ Infrastructure Designer should appear on this device.
+                  Select how NextQ Designer Suite should appear on this device.
                 </p>
               </div>
 

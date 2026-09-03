@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useTransition } from 'react'
+import React, { useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { updateProjectDisciplines } from '@/app/projects/actions'
@@ -42,11 +42,45 @@ const ALL_DISCIPLINES: { id: string; name: string; href: string; icon: React.Rea
   },
 ]
 
+// Routes that need every pixel of horizontal space for the map/canvas —
+// the sidebar collapses to icons here even if the user pinned it open
+// elsewhere in the project.
+const CANVAS_ROUTE_PATTERN = /\/(maps|cameras|fiber|network|wireless|power)(\/|$)/
+
+const EXPANDED_WIDTH = 222
+const COLLAPSED_WIDTH = 56
+
 export default function ProjectSidebar({ projectId, projectName, disciplines }: ProjectSidebarProps) {
   const pathname = usePathname()
   const [showAddMenu, setShowAddMenu] = useState(false)
   const [activeDisciplines, setActiveDisciplines] = useState<string[]>(disciplines)
   const [isPending, startTransition] = useTransition()
+
+  // Pinned = user manually chose to keep the full sidebar open. Defaults to
+  // collapsed (icons only) so the map/diagrams get the space by default;
+  // hovering the collapsed rail still peeks the full labels temporarily.
+  const [pinned, setPinned] = useState(false)
+  const [hovered, setHovered] = useState(false)
+
+  useEffect(() => {
+    try {
+      setPinned(localStorage.getItem('projectiq_sidebar_pinned') === 'true')
+    } catch {}
+  }, [])
+
+  const togglePinned = () => {
+    setPinned((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem('projectiq_sidebar_pinned', String(next))
+      } catch {}
+      return next
+    })
+  }
+
+  const isCanvasRoute = CANVAS_ROUTE_PATTERN.test(pathname || '')
+  const isPinnedEffective = pinned && !isCanvasRoute
+  const isOverlayOpen = hovered && !isPinnedEffective
 
   const toggleDiscipline = (discId: string) => {
     const next = activeDisciplines.includes(discId)
@@ -169,109 +203,185 @@ export default function ProjectSidebar({ projectId, projectName, disciplines }: 
     }
   ]
 
-  return (
-    <aside className="w-[222px] bg-[var(--bg)] border-r border-[var(--border)] flex flex-col shrink-0 h-full overflow-hidden relative z-10 font-sans select-none">
-      {/* Brand logo identity header */}
-      <div className="p-3.5 border-b border-[var(--border)] bg-[var(--surface-1)] shrink-0 flex flex-col gap-1.5">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-black text-[var(--text-primary)] tracking-wider">NextQ Suite</span>
-          <span className="text-[10px] text-[var(--accent-text)] font-mono font-bold bg-[var(--accent-soft)] px-1.5 py-0.5 rounded border border-[var(--accent-border)]">v2.0</span>
-        </div>
-
-        {/* Specialty Discipline Indicator Badge */}
-        <div className="flex items-center justify-between gap-1 px-2 py-1 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-[10.5px] text-[var(--text-secondary)] font-medium truncate">
-          <span className="truncate">{badge.title}</span>
-          {isPending && <span className="w-2.5 h-2.5 rounded-full border border-[var(--accent)] border-t-transparent animate-spin shrink-0" />}
-        </div>
-      </div>
-
-      {/* Action Buttons: Add Module / Disciplines */}
-      <div className="p-3 shrink-0 space-y-1.5 relative border-b border-[var(--border)] bg-[var(--surface-1)]">
-        {/* Dynamic + Add Module button */}
-        <button
-          type="button"
-          onClick={() => setShowAddMenu(!showAddMenu)}
-          className="w-full py-1.5 px-3 bg-[var(--surface-2)] border border-[var(--border)] hover:bg-[var(--surface-hover)] text-[var(--text-primary)] rounded-lg font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Add Module / Discipline
-        </button>
-
-        {/* Dropdown menu for adding/removing modules */}
-        {showAddMenu && (
-          <div className="absolute top-full left-3 right-3 mt-1 bg-[var(--surface-1)] border border-[var(--border-strong)] rounded-xl shadow-lg p-2 z-50 space-y-1">
-            <div className="text-[9.5px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider px-2 py-1 border-b border-[var(--border)]">
-              Enable Modules in this Project
-            </div>
-            {ALL_DISCIPLINES.map(d => {
-              const active = activeDisciplines.includes(d.id)
-              return (
-                <button
-                  key={d.id}
-                  type="button"
-                  onClick={() => d.ready && toggleDiscipline(d.id)}
-                  disabled={!d.ready}
-                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] transition-all cursor-pointer ${
-                    !d.ready
-                      ? 'text-[var(--text-tertiary)] opacity-50 cursor-not-allowed'
-                      : active
-                      ? 'bg-[var(--accent-soft)] text-[var(--accent-text)] font-semibold'
-                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]'
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <span className={active ? 'text-[var(--accent)]' : 'text-[var(--text-tertiary)]'}>{d.icon}</span>
-                    <span>{d.name}</span>
-                  </span>
-                  {active && (
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--accent)] shrink-0"><path d="M4 12.5 9.5 18 20 6.5"/></svg>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Navigation Sections */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-4 scrollbar-thin">
-        {categories.map((cat, idx) => (
-          <div key={idx} className="space-y-1">
-            <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider block px-2.5 mb-1">
-              {cat.label}
-            </span>
-            <div className="space-y-0.5">
-              {cat.items.map((sec: any) => (
-                sec.disabled ? (
-                  <div
-                    key={sec.id}
-                    title={`${sec.label} — module in development`}
-                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11.5px] text-[var(--text-tertiary)] cursor-not-allowed opacity-50"
-                  >
-                    <span>{sec.icon}</span>
-                    <span className="truncate">{sec.label}</span>
-                  </div>
-                ) : (
-                  <Link
-                    key={sec.id}
-                    href={sec.href}
-                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11.5px] transition-all border-l-2 ${
-                      sec.active
-                        ? 'bg-[var(--surface-2)] border-l-[var(--accent)] text-[var(--text-primary)] font-semibold'
-                        : 'bg-transparent border-l-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]'
+  // Rendered twice: once for the collapsed icon rail (expanded=false) and
+  // once for the pinned/hovered full view (expanded=true) — same data, two looks.
+  function renderContent(expanded: boolean) {
+    return (
+      <>
+        {/* Brand logo identity header */}
+        <div className={`border-b border-[var(--border)] bg-[var(--surface-1)] shrink-0 flex flex-col gap-1.5 ${expanded ? 'p-3.5' : 'p-2 items-center'}`}>
+          {expanded ? (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-[var(--text-primary)] tracking-wider" title="NextQ Designer Suite">NextQ Suite</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-[var(--accent-text)] font-mono font-bold bg-[var(--accent-soft)] px-1.5 py-0.5 rounded border border-[var(--accent-border)]">v2.0</span>
+                  <button
+                    type="button"
+                    onClick={togglePinned}
+                    title={pinned ? 'Unpin sidebar (auto-collapse)' : 'Pin sidebar open'}
+                    className={`w-5 h-5 rounded flex items-center justify-center transition-colors cursor-pointer ${
+                      pinned ? 'text-[var(--accent-text)] bg-[var(--accent-soft)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]'
                     }`}
                   >
-                    <span className={sec.active ? 'text-[var(--accent)]' : 'text-[var(--text-tertiary)]'}>
-                      {sec.icon}
+                    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill={pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Specialty Discipline Indicator Badge */}
+              <div className="flex items-center justify-between gap-1 px-2 py-1 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-[10.5px] text-[var(--text-secondary)] font-medium truncate">
+                <span className="truncate">{badge.title}</span>
+                {isPending && <span className="w-2.5 h-2.5 rounded-full border border-[var(--accent)] border-t-transparent animate-spin shrink-0" />}
+              </div>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={togglePinned}
+              title={pinned ? 'Unpin sidebar' : 'Pin sidebar open'}
+              className={`w-9 h-9 rounded-lg flex items-center justify-center font-black text-[10px] tracking-wider transition-colors cursor-pointer ${
+                pinned ? 'text-[var(--accent-text)] bg-[var(--accent-soft)]' : 'text-[var(--text-primary)] bg-[var(--surface-2)] hover:bg-[var(--surface-hover)]'
+              }`}
+            >
+              NQ
+            </button>
+          )}
+        </div>
+
+        {/* Action Buttons: Add Module / Disciplines */}
+        <div className={`shrink-0 relative border-b border-[var(--border)] bg-[var(--surface-1)] ${expanded ? 'p-3 space-y-1.5' : 'p-2 flex justify-center'}`}>
+          <button
+            type="button"
+            onClick={() => setShowAddMenu(!showAddMenu)}
+            title="Add Module / Discipline"
+            className={
+              expanded
+                ? 'w-full py-1.5 px-3 bg-[var(--surface-2)] border border-[var(--border)] hover:bg-[var(--surface-hover)] text-[var(--text-primary)] rounded-lg font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs'
+                : 'w-9 h-9 bg-[var(--surface-2)] border border-[var(--border)] hover:bg-[var(--surface-hover)] text-[var(--text-primary)] rounded-lg transition flex items-center justify-center cursor-pointer shadow-xs'
+            }
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            {expanded && 'Add Module / Discipline'}
+          </button>
+
+          {/* Dropdown menu for adding/removing modules */}
+          {showAddMenu && (
+            <div className={`absolute top-full mt-1 bg-[var(--surface-1)] border border-[var(--border-strong)] rounded-xl shadow-lg p-2 z-50 space-y-1 ${expanded ? 'left-3 right-3' : 'left-2 w-56'}`}>
+              <div className="text-[9.5px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider px-2 py-1 border-b border-[var(--border)]">
+                Enable Modules in this Project
+              </div>
+              {ALL_DISCIPLINES.map(d => {
+                const active = activeDisciplines.includes(d.id)
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => d.ready && toggleDiscipline(d.id)}
+                    disabled={!d.ready}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] transition-all cursor-pointer ${
+                      !d.ready
+                        ? 'text-[var(--text-tertiary)] opacity-50 cursor-not-allowed'
+                        : active
+                        ? 'bg-[var(--accent-soft)] text-[var(--accent-text)] font-semibold'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className={active ? 'text-[var(--accent)]' : 'text-[var(--text-tertiary)]'}>{d.icon}</span>
+                      <span>{d.name}</span>
                     </span>
-                    <span className="truncate">{sec.label}</span>
-                  </Link>
+                    {active && (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--accent)] shrink-0"><path d="M4 12.5 9.5 18 20 6.5"/></svg>
+                    )}
+                  </button>
                 )
-              ))}
+              })}
             </div>
-          </div>
-        ))}
-      </div>
-    </aside>
+          )}
+        </div>
+
+        {/* Navigation Sections */}
+        <div className={`flex-1 overflow-y-auto scrollbar-thin ${expanded ? 'p-2 space-y-4' : 'p-2 space-y-3 flex flex-col items-center'}`}>
+          {categories.map((cat, idx) => (
+            <div key={idx} className={expanded ? 'space-y-1 w-full' : 'space-y-1 w-full flex flex-col items-center'}>
+              {expanded && (
+                <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider block px-2.5 mb-1">
+                  {cat.label}
+                </span>
+              )}
+              {!expanded && idx > 0 && <div className="w-6 h-px bg-[var(--border)] my-1" />}
+              <div className={expanded ? 'space-y-0.5' : 'space-y-1 flex flex-col items-center'}>
+                {cat.items.map((sec: any) => (
+                  sec.disabled ? (
+                    <div
+                      key={sec.id}
+                      title={`${sec.label} — module in development`}
+                      className={
+                        expanded
+                          ? 'w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11.5px] text-[var(--text-tertiary)] cursor-not-allowed opacity-50'
+                          : 'w-9 h-9 flex items-center justify-center rounded-lg text-[var(--text-tertiary)] cursor-not-allowed opacity-50'
+                      }
+                    >
+                      <span>{sec.icon}</span>
+                      {expanded && <span className="truncate">{sec.label}</span>}
+                    </div>
+                  ) : (
+                    <Link
+                      key={sec.id}
+                      href={sec.href}
+                      title={sec.label}
+                      className={
+                        expanded
+                          ? `w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11.5px] transition-all border-l-2 ${
+                              sec.active
+                                ? 'bg-[var(--surface-2)] border-l-[var(--accent)] text-[var(--text-primary)] font-semibold'
+                                : 'bg-transparent border-l-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]'
+                            }`
+                          : `w-9 h-9 flex items-center justify-center rounded-lg transition-all ${
+                              sec.active
+                                ? 'bg-[var(--surface-2)] text-[var(--accent-text)] font-semibold'
+                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]'
+                            }`
+                      }
+                    >
+                      <span className={sec.active ? 'text-[var(--accent)]' : 'text-[var(--text-tertiary)]'}>
+                        {sec.icon}
+                      </span>
+                      {expanded && <span className="truncate">{sec.label}</span>}
+                    </Link>
+                  )
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </>
+    )
+  }
+
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="relative shrink-0 h-full font-sans select-none"
+      style={{ width: isPinnedEffective ? EXPANDED_WIDTH : COLLAPSED_WIDTH }}
+    >
+      {/* Base rail — always occupies real layout width (icons only unless pinned open) */}
+      <aside className="w-full h-full bg-[var(--bg)] border-r border-[var(--border)] flex flex-col overflow-hidden relative z-10">
+        {renderContent(isPinnedEffective)}
+      </aside>
+
+      {/* Hover peek — floats the full labeled sidebar over the content without
+          shifting layout, and folds back automatically when the mouse leaves */}
+      {isOverlayOpen && (
+        <aside
+          className="absolute top-0 left-0 h-full bg-[var(--bg)] border-r border-[var(--border)] flex flex-col overflow-hidden shadow-2xl z-40 transition-all duration-150"
+          style={{ width: EXPANDED_WIDTH }}
+        >
+          {renderContent(true)}
+        </aside>
+      )}
+    </div>
   )
 }
