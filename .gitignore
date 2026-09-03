@@ -46,3 +46,4 @@ next-env.d.ts
 .agents/
 mcp_config.json
 supabase/.temp/
+Claude outputs/
