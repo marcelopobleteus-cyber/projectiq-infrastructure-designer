@@ -30,11 +30,11 @@ export async function login(formData: FormData) {
   redirect('/projects')
 }
 
-// Fully separate sign-in path for the employee mobile app (/mobile). Kept apart
+// Fully separate sign-in path for the employee field app (/field). Kept apart
 // from the desktop `login()` above on purpose: different landing page, and any
 // future change to admin/desktop auth (SSO, extra checks, etc.) should not
 // silently affect how field employees clock in from their phones.
-export async function loginMobile(formData: FormData) {
+export async function loginField(formData: FormData) {
   const supabase = await createClient()
 
   const email = formData.get('email') as string
@@ -57,7 +57,7 @@ export async function loginMobile(formData: FormData) {
   }
 
   revalidatePath('/', 'layout')
-  redirect('/mobile/dashboard')
+  redirect('/field/dashboard')
 }
 
 export async function forgotPassword(formData: FormData) {
