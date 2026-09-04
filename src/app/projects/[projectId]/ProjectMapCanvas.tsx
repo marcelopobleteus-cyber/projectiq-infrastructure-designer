@@ -1796,8 +1796,8 @@ export default function ProjectMapCanvas({
   const isCompleteButTasksOpen = cameraStatus === 'complete' && (totalCount === 0 || completeCount < totalCount)
 
   return (
-    <>
-      <div className="flex-1 flex overflow-hidden h-full w-full relative">
+    <div className="relative h-full w-full">
+      <div className="flex-1 flex overflow-hidden h-full w-full">
       {/* 1. Contextual Sidebar */}
       <ContextSidebar
         view="map"
@@ -3531,6 +3531,6 @@ export default function ProjectMapCanvas({
         </div>
       </div>
     )}
-    </>
+    </div>
   )
 }
