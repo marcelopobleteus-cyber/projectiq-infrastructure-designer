@@ -195,7 +195,7 @@ export default function PortfolioSection({ projectId, portfolio }: PortfolioSect
           <button
             onClick={handleLink}
             disabled={!selectedParent || isPending}
-            className="px-3.5 py-1.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white disabled:opacity-40 text-white text-xs font-bold rounded-lg transition"
+            className="px-3.5 py-1.5 bg-[var(--accent)] text-white hover:bg-[var(--accent)] text-white disabled:opacity-40 text-white text-xs font-bold rounded-lg transition"
           >
             {isPending ? 'Vinculando...' : 'Vincular'}
           </button>

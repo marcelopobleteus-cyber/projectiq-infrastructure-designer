@@ -79,7 +79,7 @@ export default function FiberPathToolbar({
             w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl font-bold text-[11px] tracking-wide
             transition-all border shadow-lg
             ${isDrawMode
-              ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white border-[var(--accent)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:shadow-indigo-500/10'
+              ? 'bg-[var(--accent)] text-white border-[var(--accent)] text-white hover:bg-[var(--accent)] text-white hover:shadow-indigo-500/10'
               : 'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text-primary)] hover:border-[var(--accent)]/40 hover:text-indigo-300'
             }
           `}
@@ -117,7 +117,7 @@ export default function FiberPathToolbar({
                       key={node.id}
                       className="flex items-center gap-2 px-3 py-1.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-xs"
                     >
-                      <span className="flex items-center justify-center w-4 h-4 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white/20 text-[var(--accent-text)] text-[9px] font-bold font-mono">
+                      <span className="flex items-center justify-center w-4 h-4 rounded-full bg-[var(--accent)] text-white/20 text-[var(--accent-text)] text-[9px] font-bold font-mono">
                         {index + 1}
                       </span>
                       <span className="font-mono text-white font-medium truncate flex-1">{node.node_tag}</span>

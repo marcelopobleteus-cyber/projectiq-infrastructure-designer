@@ -184,7 +184,7 @@ export default function EquipmentCatalogPage() {
         <button
           type="button"
           onClick={() => setIsImportRulesOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold rounded-lg transition-all shadow-xs active:scale-[0.98] cursor-pointer"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--accent)] text-white text-xs font-bold rounded-lg transition-all shadow-xs active:scale-[0.98] cursor-pointer"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
           Configure Import Rules
@@ -484,7 +484,7 @@ export default function EquipmentCatalogPage() {
             <button 
               type="button"
               onClick={() => showToast(`Added ${selectedItem.model} to active project BOM list!`)}
-              className="w-full py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer"
+              className="w-full py-2 bg-[var(--accent)] text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer"
             >
               Add to Project Plan
             </button>

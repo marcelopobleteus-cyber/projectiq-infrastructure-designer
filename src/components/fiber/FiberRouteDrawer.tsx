@@ -300,7 +300,7 @@ export default function FiberRouteDrawer({
           <div className="space-y-1 max-h-[110px] overflow-y-auto pr-1">
             {segments.map((seg) => (
               <div key={seg.index} className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] text-white" />
                 <span className="font-mono text-white truncate max-w-[90px]">{seg.startTag}</span>
                 <span className="text-slate-600">➔</span>
                 <span className="font-mono text-white truncate max-w-[90px]">{seg.endTag}</span>
@@ -591,7 +591,7 @@ export default function FiberRouteDrawer({
             type="submit"
             onClick={handleSubmit}
             disabled={isSaving || pathNodes.length < 2}
-            className="w-full py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-white font-bold text-[12px] rounded-xl
+            className="w-full py-2.5 bg-[var(--accent)] text-white hover:bg-[var(--accent)] text-white text-white font-bold text-[12px] rounded-xl
               transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSaving ? 'Saving Route…' : 'Save Route'}

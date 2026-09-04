@@ -140,7 +140,7 @@ export default function OverviewDashboard({
             {nextRecommendedStep && (
               <Link
                 href={`/projects/${project.id}/${nextRecommendedStep.relatedRoute}`}
-                className="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold text-xs rounded-lg shadow-xs transition flex items-center gap-1.5"
+                className="px-4 py-2 bg-[var(--accent)] text-white font-bold text-xs rounded-lg shadow-xs transition flex items-center gap-1.5"
               >
                 {nextRecommendedStep.nextActionLabel}
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
@@ -281,7 +281,7 @@ export default function OverviewDashboard({
           <div className="shrink-0 w-full md:w-auto">
             <Link
               href={`/projects/${project.id}/${nextRecommendedStep.relatedRoute}`}
-              className="w-full md:w-auto inline-flex items-center justify-center px-5 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold text-xs rounded-lg shadow-xs transition gap-1.5"
+              className="w-full md:w-auto inline-flex items-center justify-center px-5 py-2.5 bg-[var(--accent)] text-white font-bold text-xs rounded-lg shadow-xs transition gap-1.5"
             >
               {nextRecommendedStep.nextActionLabel}
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>

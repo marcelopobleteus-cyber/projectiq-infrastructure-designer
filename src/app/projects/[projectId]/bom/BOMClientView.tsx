@@ -379,7 +379,7 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
                   <button
                     onClick={handleApplyLabor}
                     disabled={laborBusy}
-                    className="px-3.5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white text-xs font-bold rounded-lg transition cursor-pointer shadow-xs"
+                    className="px-3.5 py-2 bg-[var(--accent)] disabled:opacity-50 text-white text-xs font-bold rounded-lg transition cursor-pointer shadow-xs"
                   >
                     {laborBusy ? 'Applying…' : `Apply ${laborPreview.changes.length} change${laborPreview.changes.length > 1 ? 's' : ''}`}
                   </button>

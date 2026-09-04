@@ -208,7 +208,7 @@ export default function HelpCenterClient({ projectId, projectName }: HelpCenterC
                 onClick={() => setSelectedCategory(cat.id)}
                 className={`px-3 py-1 rounded-lg text-2xs font-bold uppercase transition-all ${
                   selectedCategory === cat.id
-                    ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] shadow-inner'
+                    ? 'bg-[var(--accent)] text-white text-[var(--text-primary)] shadow-inner'
                     : 'bg-slate-100 dark:bg-[var(--surface-1)] text-slate-600 dark:text-[var(--text-secondary)] hover:text-slate-900 dark:hover:text-[var(--text-primary)] border border-slate-200 dark:border-[var(--border)]/40 hover:border-slate-300 dark:hover:border-slate-700'
                 }`}
               >

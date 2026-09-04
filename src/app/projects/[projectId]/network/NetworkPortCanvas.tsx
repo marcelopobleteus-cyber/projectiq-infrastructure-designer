@@ -168,7 +168,7 @@ export default function NetworkPortCanvas({
                 onClick={() => setSelectedSwitchId(sw.id)}
                 className={`w-full flex items-center justify-between text-left px-3 py-2.5 rounded-xl border text-xs transition-all ${
                   selectedSwitchId === sw.id
-                    ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white/10 border-[var(--accent)]/30 text-[var(--text-primary)] font-semibold'
+                    ? 'bg-[var(--accent)] text-white/10 border-[var(--accent)]/30 text-[var(--text-primary)] font-semibold'
                     : 'bg-[var(--surface-2)] border-[var(--border)] hover:border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                 }`}
               >
@@ -205,7 +205,7 @@ export default function NetworkPortCanvas({
                 </div>
                 <div className="w-full bg-[var(--surface-1)] rounded-full h-1 border border-[var(--border)] overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all ${isExceeded ? 'bg-amber-500' : 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white'}`}
+                    className={`h-full rounded-full transition-all ${isExceeded ? 'bg-amber-500' : 'bg-[var(--accent)] text-white'}`}
                     style={{ width: `${Math.min(poe.percentage, 100)}%` }}
                   />
                 </div>
@@ -221,7 +221,7 @@ export default function NetworkPortCanvas({
           <>
             {/* Selected Switch summary cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-[var(--surface-1)] backdrop-blur-md border border-[var(--border)] p-6 rounded-2xl shadow-lg relative overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-[2px] bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white/40" />
+              <div className="absolute top-0 left-0 right-0 h-[2px] bg-[var(--accent)] text-white/40" />
               
               {/* Hardware Summary */}
               <div className="space-y-1">
@@ -471,7 +471,7 @@ export default function NetworkPortCanvas({
                                   <button
                                     onClick={() => handleQuickAssign(port.id)}
                                     disabled={!quickAssignCam[port.id] || isPending}
-                                    className="px-2.5 py-1 rounded bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white disabled:bg-[var(--surface-2)] disabled:border-[var(--border)] disabled:text-slate-600 text-[10px] border border-[var(--accent)]/20 font-semibold text-[var(--text-primary)] transition-all"
+                                    className="px-2.5 py-1 rounded bg-[var(--accent)] text-white hover:bg-[var(--accent)] text-white disabled:bg-[var(--surface-2)] disabled:border-[var(--border)] disabled:text-slate-600 text-[10px] border border-[var(--accent)]/20 font-semibold text-[var(--text-primary)] transition-all"
                                   >
                                     Assign
                                   </button>

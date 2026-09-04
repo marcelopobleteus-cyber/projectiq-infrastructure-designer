@@ -23,7 +23,7 @@ export default function FieldAppShell({
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
 
   return (
-    <div className="flex flex-col min-h-screen w-full bg-background text-foreground font-sans pb-16 selection:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white selection:text-white">
+    <div className="flex flex-col min-h-screen w-full bg-[var(--bg)] text-[var(--text-primary)] font-sans pb-16 selection:bg-[var(--accent)] selection:text-white">
       {/* Top field header */}
       <FieldHeader
         title={title}
@@ -34,7 +34,9 @@ export default function FieldAppShell({
 
       {/* Main Page Area */}
       <main className="flex-1 w-full flex flex-col p-4 overflow-y-auto">
-        {children}
+        <div className="w-full max-w-md mx-auto flex flex-col flex-1">
+          {children}
+        </div>
       </main>
 
       {/* Bottom Quick-Tab Bar */}

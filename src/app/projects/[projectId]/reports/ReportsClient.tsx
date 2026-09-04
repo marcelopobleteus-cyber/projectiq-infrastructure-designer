@@ -306,7 +306,7 @@ export default function ReportsClient({ projectId, projectName, fiberData }: Rep
                         {rep.interactive ? (
                           <button
                             onClick={() => setSelectedReport(rep.code)}
-                            className="px-3 py-1 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] border border-[var(--accent)]/20 rounded-lg text-[10px] font-bold transition-all shadow-md active:scale-95"
+                            className="px-3 py-1 bg-[var(--accent)] text-white hover:bg-[var(--accent)] text-white text-[var(--text-primary)] border border-[var(--accent)]/20 rounded-lg text-[10px] font-bold transition-all shadow-md active:scale-95"
                           >
                             Open Report
                           </button>
@@ -341,7 +341,7 @@ export default function ReportsClient({ projectId, projectName, fiberData }: Rep
             <div className="flex items-center gap-2">
               <button
                 onClick={handlePrint}
-                className="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-md active:scale-95 transition-all"
+                className="px-4 py-2 bg-[var(--accent)] text-white hover:bg-[var(--accent)] text-white text-[var(--text-primary)] font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-md active:scale-95 transition-all"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                 Print / Save PDF
@@ -543,7 +543,7 @@ export default function ReportsClient({ projectId, projectName, fiberData }: Rep
                                 : node.status === 'Existing'
                                 ? 'bg-sky-500/10 text-sky-450 border border-sky-500/10'
                                 : node.status === 'Planned'
-                                ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white/10 text-indigo-405 border border-[var(--accent)]/10'
+                                ? 'bg-[var(--accent)] text-white/10 text-indigo-405 border border-[var(--accent)]/10'
                                 : node.status === 'Blocked'
                                 ? 'bg-rose-500/10 text-rose-450 border border-rose-500/10'
                                 : 'bg-slate-800 text-[var(--text-secondary)] border border-slate-700/50'

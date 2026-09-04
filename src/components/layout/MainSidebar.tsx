@@ -101,7 +101,7 @@ export default function MainSidebar({ userEmail, userName, isPlatformAdmin, onSi
         <Link
           href="/dashboard"
           title="NextQ Designer Suite"
-          className="w-10 h-10 rounded-xl bg-[var(--accent)] text-white flex items-center justify-center font-black text-sm tracking-wider shadow-sm hover:bg-[var(--accent-hover)] transition-all"
+          className="w-10 h-10 rounded-xl bg-[var(--accent)] text-white flex items-center justify-center font-black text-sm tracking-wider shadow-sm transition-all"
         >
           NQ
         </Link>

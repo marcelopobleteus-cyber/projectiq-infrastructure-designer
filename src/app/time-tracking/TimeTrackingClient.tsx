@@ -236,7 +236,7 @@ export default function TimeTrackingClient({
           </div>
           <button
             onClick={handleExportCsv}
-            className="ml-auto h-9 px-4 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold uppercase tracking-wide"
+            className="ml-auto h-9 px-4 rounded-lg bg-[var(--accent)] text-white text-xs font-bold uppercase tracking-wide"
           >
             Export CSV
           </button>
@@ -459,7 +459,7 @@ function EditModal({
               onSubmit(clockIn, clockOut, projectId === 'office' ? null : projectId, costCodeId || null, description)
             }
             disabled={isPending || !clockIn}
-            className="flex-1 h-10 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold text-xs disabled:opacity-50"
+            className="flex-1 h-10 rounded-xl bg-[var(--accent)] text-white font-bold text-xs disabled:opacity-50"
           >
             {isPending ? 'Saving…' : 'Save changes'}
           </button>
@@ -587,7 +587,7 @@ function CostCodesModal({
           <button
             onClick={handleCreate}
             disabled={isPending || !newName.trim()}
-            className="h-10 px-4 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold disabled:opacity-50"
+            className="h-10 px-4 rounded-lg bg-[var(--accent)] text-white text-xs font-bold disabled:opacity-50"
           >
             Add
           </button>

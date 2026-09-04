@@ -27,7 +27,7 @@ export default function LayerControlPanel({
       case 'Partial':
         return <span className="text-[8px] font-bold px-1.5 py-0.25 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded shrink-0">Partial</span>
       case 'Planned':
-        return <span className="text-[8px] font-bold px-1.5 py-0.25 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white/10 border border-[var(--accent)]/20 text-[var(--accent-text)] rounded shrink-0">Planned</span>
+        return <span className="text-[8px] font-bold px-1.5 py-0.25 bg-[var(--accent)] text-white/10 border border-[var(--accent)]/20 text-[var(--accent-text)] rounded shrink-0">Planned</span>
       case 'Future':
         return <span className="text-[8px] font-bold px-1.5 py-0.25 bg-purple-500/10 border border-purple-500/20 text-purple-400 rounded shrink-0">Future</span>
       default:
@@ -50,7 +50,7 @@ export default function LayerControlPanel({
             <polyline points="2 12 12 17 22 12"/>
           </svg>
           {activeLayersCount > 0 && (
-            <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-white text-[8px] font-black rounded-full flex items-center justify-center border border-[var(--border)]">
+            <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-[var(--accent)] text-white text-white text-[8px] font-black rounded-full flex items-center justify-center border border-[var(--border)]">
               {activeLayersCount}
             </span>
           )}

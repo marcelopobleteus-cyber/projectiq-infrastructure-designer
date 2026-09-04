@@ -118,7 +118,7 @@ export default function GlobalReportsPage() {
               <button
                 type="button"
                 onClick={() => handleGenerateReport(r)}
-                className="w-full py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg text-xs font-bold transition tracking-wide cursor-pointer shadow-xs active:scale-98"
+                className="w-full py-2 bg-[var(--accent)] text-white rounded-lg text-xs font-bold transition tracking-wide cursor-pointer shadow-xs active:scale-98"
               >
                 Generate Report
               </button>
@@ -209,7 +209,7 @@ export default function GlobalReportsPage() {
               <button 
                 type="button" 
                 onClick={() => showToast('Mock PDF generation complete — starting download.')}
-                className="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg text-xs font-bold transition shadow-xs"
+                className="px-4 py-2 bg-[var(--accent)] text-white rounded-lg text-xs font-bold transition shadow-xs"
               >
                 Export PDF (Mock)
               </button>

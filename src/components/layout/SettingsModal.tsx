@@ -39,7 +39,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
             onClick={() => setActiveTab('general')}
             className={`w-full text-left px-3 py-2 rounded-xl text-sm font-medium flex items-center gap-2.5 transition-all ${
               activeTab === 'general'
-                ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white/10 text-[var(--accent-text)] dark:text-[var(--accent-text)] font-semibold'
+                ? 'bg-[var(--accent)] text-white/10 text-[var(--accent-text)] dark:text-[var(--accent-text)] font-semibold'
                 : 'text-muted-foreground hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800/40'
             }`}
           >
@@ -83,14 +83,14 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                   onClick={() => handleThemeChange('light')}
                   className={`border rounded-xl p-3 text-left transition-all relative flex flex-col justify-between h-24 ${
                     theme === 'light'
-                      ? 'border-[var(--accent)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white/5 ring-1 ring-indigo-500'
+                      ? 'border-[var(--accent)] bg-[var(--accent)] text-white/5 ring-1 ring-indigo-500'
                       : 'border-border bg-slate-50 dark:bg-[var(--surface-1)]/10 hover:border-slate-300 dark:hover:border-slate-700'
                   }`}
                 >
                   <div className="flex items-center justify-between w-full">
                     <span className="text-xs font-semibold text-foreground">Light</span>
                     {theme === 'light' && (
-                      <span className="w-2 h-2 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white" />
+                      <span className="w-2 h-2 rounded-full bg-[var(--accent)] text-white" />
                     )}
                   </div>
                   {/* Visual design hint */}
@@ -105,14 +105,14 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                   onClick={() => handleThemeChange('dark')}
                   className={`border rounded-xl p-3 text-left transition-all relative flex flex-col justify-between h-24 ${
                     theme === 'dark'
-                      ? 'border-[var(--accent)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white/5 ring-1 ring-indigo-500'
+                      ? 'border-[var(--accent)] bg-[var(--accent)] text-white/5 ring-1 ring-indigo-500'
                       : 'border-border bg-slate-50 dark:bg-[var(--surface-1)]/10 hover:border-slate-300 dark:hover:border-slate-700'
                   }`}
                 >
                   <div className="flex items-center justify-between w-full">
                     <span className="text-xs font-semibold text-foreground">Dark</span>
                     {theme === 'dark' && (
-                      <span className="w-2 h-2 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white" />
+                      <span className="w-2 h-2 rounded-full bg-[var(--accent)] text-white" />
                     )}
                   </div>
                   {/* Visual design hint */}
@@ -127,14 +127,14 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                   onClick={() => handleThemeChange('system')}
                   className={`border rounded-xl p-3 text-left transition-all relative flex flex-col justify-between h-24 ${
                     theme === 'system'
-                      ? 'border-[var(--accent)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white/5 ring-1 ring-indigo-500'
+                      ? 'border-[var(--accent)] bg-[var(--accent)] text-white/5 ring-1 ring-indigo-500'
                       : 'border-border bg-slate-50 dark:bg-[var(--surface-1)]/10 hover:border-slate-300 dark:hover:border-slate-700'
                   }`}
                 >
                   <div className="flex items-center justify-between w-full">
                     <span className="text-xs font-semibold text-foreground">System</span>
                     {theme === 'system' && (
-                      <span className="w-2 h-2 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white" />
+                      <span className="w-2 h-2 rounded-full bg-[var(--accent)] text-white" />
                     )}
                   </div>
                   {/* Visual design hint */}
@@ -160,7 +160,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
             </span>
             <button
               onClick={onClose}
-              className="px-4 py-1.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-white font-semibold text-xs tracking-wide transition-colors"
+              className="px-4 py-1.5 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)] text-white text-white font-semibold text-xs tracking-wide transition-colors"
             >
               Done
             </button>

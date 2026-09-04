@@ -261,7 +261,7 @@ export default function TimeClockClient({ projects, costCodes, openEntry, histor
           <button
             onClick={handleClockIn}
             disabled={isPending}
-            className="w-full h-12 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold text-sm uppercase tracking-wide disabled:opacity-50"
+            className="w-full h-12 rounded-xl bg-[var(--accent)] text-white font-bold text-sm uppercase tracking-wide disabled:opacity-50"
           >
             {isPending ? 'Clocking in…' : 'Clock In'}
           </button>

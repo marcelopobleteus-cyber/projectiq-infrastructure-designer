@@ -281,7 +281,7 @@ export default function CreateProjectPage() {
             <button
               type="submit"
               disabled={isPending}
-              className="px-5 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white disabled:opacity-50 text-sm font-semibold rounded-xl transition-all shadow-lg shadow-indigo-600/10 active:scale-[0.98] cursor-pointer"
+              className="px-5 py-2.5 bg-[var(--accent)] text-white disabled:opacity-50 text-sm font-semibold rounded-xl transition-all shadow-lg shadow-indigo-600/10 active:scale-[0.98] cursor-pointer"
             >
               {isPending ? 'Creating...' : 'Create Infrastructure Project'}
             </button>

@@ -623,7 +623,7 @@ export default function NetworkTopologyDiagram({
                           className={`h-full rounded-full ${
                             (selectedNodeDetails.poe_used / selectedNodeDetails.poe_budget_watts) > 1
                               ? 'bg-rose-500'
-                              : 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white'
+                              : 'bg-[var(--accent)] text-white'
                           }`}
                           style={{
                             width: `${Math.min(100, (selectedNodeDetails.poe_used / selectedNodeDetails.poe_budget_watts) * 100)}%`

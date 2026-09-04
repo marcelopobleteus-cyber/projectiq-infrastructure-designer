@@ -1822,7 +1822,7 @@ export default function ProjectMapCanvas({
               }}
               className={`w-full flex items-center justify-between text-left px-2 py-1.5 rounded-lg text-xs transition-colors ${
                 selectedCamera?.id === cam.id
-                  ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white/15 border border-[var(--accent)]/30 text-white'
+                  ? 'bg-[var(--accent)] text-white/15 border border-[var(--accent)]/30 text-white'
                   : 'hover:bg-slate-800 text-[var(--text-secondary)] hover:text-white border border-transparent'
               }`}
             >
@@ -1851,7 +1851,7 @@ export default function ProjectMapCanvas({
               }}
               className={`w-full flex items-center justify-between text-left px-2 py-1.5 rounded-lg text-xs transition-colors ${
                 selectedDevice?.id === dev.id
-                  ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white/15 border border-[var(--accent)]/30 text-white'
+                  ? 'bg-[var(--accent)] text-white/15 border border-[var(--accent)]/30 text-white'
                   : 'hover:bg-slate-800 text-[var(--text-secondary)] hover:text-white border border-transparent'
               }`}
             >
@@ -2101,7 +2101,7 @@ export default function ProjectMapCanvas({
                       <span className="text-[var(--text-primary)] font-mono">{stats.ratio}% ({stats.complete}/{stats.total})</span>
                     </div>
                     <div className="w-full bg-[var(--surface-2)] rounded-full h-1">
-                      <div className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white h-1 rounded-full" style={{ width: `${stats.ratio}%` }} />
+                      <div className="bg-[var(--accent)] text-white h-1 rounded-full" style={{ width: `${stats.ratio}%` }} />
                     </div>
                     <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[9px] text-[var(--text-secondary)] font-mono mt-1 leading-snug">
                       <span>Open: <span className="text-white font-bold">{stats.open}</span></span>
@@ -2124,7 +2124,7 @@ export default function ProjectMapCanvas({
                       setHoveredCamera(null)
                       setHoverPosition(null)
                     }}
-                    className="flex-1 py-1.5 text-[10px] font-bold bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-white rounded-lg transition-colors"
+                    className="flex-1 py-1.5 text-[10px] font-bold bg-[var(--accent)] text-white hover:bg-[var(--accent)] text-white text-white rounded-lg transition-colors"
                   >
                     Edit Camera
                   </button>
@@ -2144,7 +2144,7 @@ export default function ProjectMapCanvas({
           })()}
 
           {(addCameraMode || addDeviceMode) && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white/90 backdrop-blur-md text-slate-950 text-xs px-4 py-2 rounded-full font-bold shadow-lg z-10 flex items-center gap-2 pointer-events-none">
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[var(--accent)] text-white/90 backdrop-blur-md text-slate-950 text-xs px-4 py-2 rounded-full font-bold shadow-lg z-10 flex items-center gap-2 pointer-events-none">
               <span className="w-2 h-2 rounded-full bg-[var(--surface-2)] animate-ping" />
               Click anywhere on the map to place a {addCameraMode ? 'Camera Node' : 'Network Switch'}
             </div>
@@ -2394,7 +2394,7 @@ export default function ProjectMapCanvas({
                             type="button"
                             onClick={handleInitializeChecklist}
                             disabled={isInitializingChecklist}
-                            className="py-1.5 px-3 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white disabled:bg-indigo-700 text-white rounded-lg text-[10px] font-semibold transition"
+                            className="py-1.5 px-3 bg-[var(--accent)] text-white hover:bg-[var(--accent)] text-white disabled:bg-indigo-700 text-white rounded-lg text-[10px] font-semibold transition"
                           >
                             {isInitializingChecklist ? 'Initializing...' : `Initialize Checklist`}
                           </button>
@@ -2404,7 +2404,7 @@ export default function ProjectMapCanvas({
                           {/* Progress Bar */}
                           <div className="w-full bg-[var(--surface-2)] rounded-full h-1.5">
                             <div
-                              className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white h-1.5 rounded-full transition-all duration-300"
+                              className="bg-[var(--accent)] text-white h-1.5 rounded-full transition-all duration-300"
                               style={{
                                 width: `${Math.round((completeCount / Math.max(totalCount, 1)) * 100)}%`
                               }}
@@ -2463,7 +2463,7 @@ export default function ProjectMapCanvas({
                                       className={`rounded px-1.5 py-0.5 text-[9px] font-extrabold focus:outline-none border border-[var(--border)] cursor-pointer ${
                                         task.priority === 'Critical' ? 'bg-red-500/10 text-red-400' :
                                         task.priority === 'High' ? 'bg-amber-500/10 text-amber-400' :
-                                        task.priority === 'Medium' ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white/10 text-[var(--accent-text)]' :
+                                        task.priority === 'Medium' ? 'bg-[var(--accent)] text-white/10 text-[var(--accent-text)]' :
                                         'bg-slate-500/10 text-[var(--text-secondary)]'
                                       }`}
                                     >
@@ -2493,7 +2493,7 @@ export default function ProjectMapCanvas({
                                 type="button"
                                 onClick={handleCreateTask}
                                 disabled={isCreatingTask || !newTaskTitle.trim()}
-                                className="px-2 py-1 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white disabled:bg-indigo-900 text-white text-xs font-semibold rounded-lg shrink-0"
+                                className="px-2 py-1 bg-[var(--accent)] text-white hover:bg-[var(--accent)] text-white disabled:bg-indigo-900 text-white text-xs font-semibold rounded-lg shrink-0"
                               >
                                 Add
                               </button>
@@ -2952,7 +2952,7 @@ export default function ProjectMapCanvas({
                 </button>
                 <button
                   type="submit" disabled={isPending}
-                  className="flex-[2] py-2.5 px-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white disabled:bg-indigo-700 text-white font-semibold rounded-xl text-xs shadow-md shadow-indigo-600/10 transition"
+                  className="flex-[2] py-2.5 px-4 bg-[var(--accent)] text-white hover:bg-[var(--accent)] text-white disabled:bg-indigo-700 text-white font-semibold rounded-xl text-xs shadow-md shadow-indigo-600/10 transition"
                 >
                   {isPending ? 'Saving...' : 'Save Specs'}
                 </button>
@@ -3132,7 +3132,7 @@ export default function ProjectMapCanvas({
               </button>
               <button
                 type="submit" disabled={isPending}
-                className="flex-[2] py-2.5 px-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white disabled:bg-indigo-700 text-white font-semibold rounded-xl text-xs shadow-md shadow-indigo-600/10"
+                className="flex-[2] py-2.5 px-4 bg-[var(--accent)] text-white hover:bg-[var(--accent)] text-white disabled:bg-indigo-700 text-white font-semibold rounded-xl text-xs shadow-md shadow-indigo-600/10"
               >
                 {isPending ? 'Saving...' : 'Save Settings'}
               </button>
@@ -3260,7 +3260,7 @@ export default function ProjectMapCanvas({
                 <button
                   onClick={handleBackfillConfirm}
                   disabled={isBackfilling}
-                  className="flex-[2] py-2 px-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white disabled:bg-indigo-700 text-white font-bold rounded-xl text-xs transition flex items-center justify-center gap-1.5"
+                  className="flex-[2] py-2 px-4 bg-[var(--accent)] text-white hover:bg-[var(--accent)] text-white disabled:bg-indigo-700 text-white font-bold rounded-xl text-xs transition flex items-center justify-center gap-1.5"
                 >
                   {isBackfilling ? 'Processing...' : 'Confirm Generate Missing Checklists'}
                 </button>
@@ -3271,7 +3271,7 @@ export default function ProjectMapCanvas({
                   setIsBackfillPreviewOpen(false)
                   window.location.reload()
                 }}
-                className="w-full py-2 px-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-white font-bold rounded-xl text-xs transition"
+                className="w-full py-2 px-4 bg-[var(--accent)] text-white hover:bg-[var(--accent)] text-white text-white font-bold rounded-xl text-xs transition"
               >
                 Reload Page & Apply
               </button>
@@ -3320,7 +3320,7 @@ export default function ProjectMapCanvas({
                       onClick={() => setActiveModalTaskId(task.id)}
                       className={`w-full flex items-center justify-between text-left p-3 rounded-xl border transition-all ${
                         isActive
-                          ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white/10 border-[var(--accent)]/40 text-white shadow-sm'
+                          ? 'bg-[var(--accent)] text-white/10 border-[var(--accent)]/40 text-white shadow-sm'
                           : 'bg-[var(--surface-1)] border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--border)] hover:text-[var(--text-primary)]'
                       }`}
                     >
@@ -3342,7 +3342,7 @@ export default function ProjectMapCanvas({
                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
                           task.priority === 'Critical' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
                           task.priority === 'High' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                          task.priority === 'Medium' ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white/10 text-[var(--accent-text)] border border-[var(--accent)]/20' :
+                          task.priority === 'Medium' ? 'bg-[var(--accent)] text-white/10 text-[var(--accent-text)] border border-[var(--accent)]/20' :
                           'bg-slate-500/10 text-[var(--text-secondary)] border border-[var(--border)]/30'
                         }`}>
                           {task.priority[0]}

@@ -103,7 +103,7 @@ function LoginForm() {
           <button
             type="submit"
             disabled={isPending}
-            className="w-full py-2.5 px-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold rounded-lg transition-all shadow-xs text-xs cursor-pointer disabled:opacity-50"
+            className="w-full py-2.5 px-4 bg-[var(--accent)] text-white font-bold rounded-lg transition-all shadow-xs text-xs cursor-pointer disabled:opacity-50"
           >
             {isPending ? 'Signing In...' : 'Sign In'}
           </button>

@@ -1772,7 +1772,7 @@ export default function FiberMapCanvas({
             <button
               onClick={() => { setToolMode('select'); setTempRoutePoints([]) }}
               className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
-                toolMode === 'select' ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] shadow-inner shadow-indigo-950/20' : 'bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                toolMode === 'select' ? 'bg-[var(--accent)] text-white text-[var(--text-primary)] shadow-inner shadow-indigo-950/20' : 'bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
               Select
@@ -1863,7 +1863,7 @@ export default function FiberMapCanvas({
               <>
                 <button
                   onClick={handleFinishRoute}
-                  className="px-2.5 py-1.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white border border-[var(--accent)]/20 text-[var(--text-primary)] rounded-lg text-[10px] font-bold uppercase"
+                  className="px-2.5 py-1.5 bg-[var(--accent)] text-white hover:bg-[var(--accent)] text-white border border-[var(--accent)]/20 text-[var(--text-primary)] rounded-lg text-[10px] font-bold uppercase"
                 >
                   Finish Route
                 </button>
@@ -1887,7 +1887,7 @@ export default function FiberMapCanvas({
                   onClick={() => handleLayerChange(layer)}
                   className={`px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider rounded-lg transition-all ${
                     activeLayer === layer || (layer === 'satellite' && activeLayer === 'hybrid')
-                      ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] font-bold'
+                      ? 'bg-[var(--accent)] text-white text-[var(--text-primary)] font-bold'
                       : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                 >
@@ -2237,7 +2237,7 @@ export default function FiberMapCanvas({
 
                       <button
                         onClick={handleSaveNodeDetails}
-                        className="w-full py-2.5.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-lg"
+                        className="w-full py-2.5.5 bg-[var(--accent)] text-white hover:bg-[var(--accent)] text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-lg"
                       >
                         Save Specifications
                       </button>
@@ -2669,7 +2669,7 @@ export default function FiberMapCanvas({
                     }}
                     className={`flex-1 py-2 rounded-lg text-center transition-all ${
                       techMode 
-                        ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] font-bold shadow-md' 
+                        ? 'bg-[var(--accent)] text-white text-[var(--text-primary)] font-bold shadow-md' 
                         : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                     }`}
                   >
@@ -2679,7 +2679,7 @@ export default function FiberMapCanvas({
                     onClick={() => setTechMode(false)}
                     className={`flex-1 py-2 rounded-lg text-center transition-all ${
                       !techMode 
-                        ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] font-bold shadow-md' 
+                        ? 'bg-[var(--accent)] text-white text-[var(--text-primary)] font-bold shadow-md' 
                         : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                     }`}
                   >
@@ -2820,7 +2820,7 @@ export default function FiberMapCanvas({
                                     <button
                                       onClick={() => handleCompleteSplices('mainhole')}
                                       disabled={techLoading}
-                                      className="px-2 py-1 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] rounded text-[10px] font-bold transition-all"
+                                      className="px-2 py-1 bg-[var(--accent)] text-white hover:bg-[var(--accent)] text-white text-[var(--text-primary)] rounded text-[10px] font-bold transition-all"
                                     >
                                       Complete
                                     </button>
@@ -2845,7 +2845,7 @@ export default function FiberMapCanvas({
                                     <button
                                       onClick={() => handleCompleteSplices('cabinet')}
                                       disabled={techLoading}
-                                      className="px-2 py-1 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] rounded text-[10px] font-bold transition-all"
+                                      className="px-2 py-1 bg-[var(--accent)] text-white hover:bg-[var(--accent)] text-white text-[var(--text-primary)] rounded text-[10px] font-bold transition-all"
                                     >
                                       Complete
                                     </button>
@@ -2889,7 +2889,7 @@ export default function FiberMapCanvas({
 
                         <div className="w-full bg-[var(--surface-2)] h-1.5 rounded-full overflow-hidden">
                           <div 
-                            className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white h-full transition-all duration-300" 
+                            className="bg-[var(--accent)] text-white h-full transition-all duration-300" 
                             style={{ width: `${(wizardStep / 8) * 100}%` }}
                           />
                         </div>
@@ -2918,7 +2918,7 @@ export default function FiberMapCanvas({
                                 }
                                 setWizardStep(2)
                               }}
-                              className="w-full py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-md"
+                              className="w-full py-2.5 bg-[var(--accent)] text-white hover:bg-[var(--accent)] text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-md"
                             >
                               Next Step: Source Node →
                             </button>
@@ -2965,7 +2965,7 @@ export default function FiberMapCanvas({
                                   }
                                   setWizardStep(3)
                                 }}
-                                className="flex-1 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-md"
+                                className="flex-1 py-2.5 bg-[var(--accent)] text-white hover:bg-[var(--accent)] text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-md"
                               >
                                 Next Step →
                               </button>
@@ -3009,7 +3009,7 @@ export default function FiberMapCanvas({
                                   }
                                   setWizardStep(4)
                                 }}
-                                className="flex-1 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-md"
+                                className="flex-1 py-2.5 bg-[var(--accent)] text-white hover:bg-[var(--accent)] text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-md"
                               >
                                 Next Step →
                               </button>
@@ -3055,7 +3055,7 @@ export default function FiberMapCanvas({
                                   }
                                   setWizardStep(5)
                                 }}
-                                className="flex-1 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-md"
+                                className="flex-1 py-2.5 bg-[var(--accent)] text-white hover:bg-[var(--accent)] text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-md"
                               >
                                 Next Step →
                               </button>
@@ -3116,7 +3116,7 @@ export default function FiberMapCanvas({
                                   }
                                   setWizardStep(6)
                                 }}
-                                className="flex-1 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-md"
+                                className="flex-1 py-2.5 bg-[var(--accent)] text-white hover:bg-[var(--accent)] text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-md"
                               >
                                 Next Step →
                               </button>
@@ -3196,7 +3196,7 @@ export default function FiberMapCanvas({
                                   }
                                   setWizardStep(7)
                                 }}
-                                className="flex-1 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-md"
+                                className="flex-1 py-2.5 bg-[var(--accent)] text-white hover:bg-[var(--accent)] text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-md"
                               >
                                 Next Step →
                               </button>
@@ -3235,7 +3235,7 @@ export default function FiberMapCanvas({
                                   }
                                   setWizardStep(8)
                                 }}
-                                className="flex-1 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-md"
+                                className="flex-1 py-2.5 bg-[var(--accent)] text-white hover:bg-[var(--accent)] text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-md"
                               >
                                 Next Step →
                               </button>
@@ -3403,7 +3403,7 @@ export default function FiberMapCanvas({
 
                       <button
                         onClick={handleAssignCameraFiber}
-                        className="w-full py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-md"
+                        className="w-full py-2.5 bg-[var(--accent)] text-white hover:bg-[var(--accent)] text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all shadow-md"
                       >
                         Patch Core Assignment
                       </button>

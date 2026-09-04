@@ -311,7 +311,7 @@ export default function LeafletMapContainer({
           onClick={() => handleSwitchTileLayer('dark')}
           className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
             activeTileLayer === 'dark'
-              ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-white shadow-md'
+              ? 'bg-[var(--accent)] text-white text-white shadow-md'
               : 'text-[var(--text-secondary)] hover:text-white hover:bg-slate-800'
           }`}
         >
@@ -321,7 +321,7 @@ export default function LeafletMapContainer({
           onClick={() => handleSwitchTileLayer('streets')}
           className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
             activeTileLayer === 'streets'
-              ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-white shadow-md'
+              ? 'bg-[var(--accent)] text-white text-white shadow-md'
               : 'text-[var(--text-secondary)] hover:text-white hover:bg-slate-800'
           }`}
         >
@@ -331,7 +331,7 @@ export default function LeafletMapContainer({
           onClick={() => handleSwitchTileLayer('satellite')}
           className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
             activeTileLayer === 'satellite'
-              ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-white shadow-md'
+              ? 'bg-[var(--accent)] text-white text-white shadow-md'
               : 'text-[var(--text-secondary)] hover:text-white hover:bg-slate-800'
           }`}
         >

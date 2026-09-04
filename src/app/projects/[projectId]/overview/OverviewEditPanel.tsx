@@ -161,7 +161,7 @@ export default function OverviewEditPanel({ project }: OverviewEditPanelProps) {
           className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-xs tracking-wide transition-all border ${
             isOpen
               ? 'bg-slate-100 dark:bg-[var(--surface-2)] border-slate-200 dark:border-[var(--border)] text-slate-600 dark:text-[var(--text-secondary)] hover:border-slate-300 dark:hover:border-slate-700 hover:text-slate-900 dark:hover:text-white'
-              : 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white border-[var(--accent)] hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-white shadow-md shadow-indigo-600/20'
+              : 'bg-[var(--accent)] text-white border-[var(--accent)] hover:bg-[var(--accent)] text-white text-white shadow-md shadow-indigo-600/20'
           }`}
         >
           {isOpen ? (
@@ -191,7 +191,7 @@ export default function OverviewEditPanel({ project }: OverviewEditPanelProps) {
         >
           {/* Panel header */}
           <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-[var(--border)]">
-            <div className="w-2 h-2 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white animate-pulse shrink-0" />
+            <div className="w-2 h-2 rounded-full bg-[var(--accent)] text-white animate-pulse shrink-0" />
             <h3 className="text-xs font-bold text-indigo-600 dark:text-[var(--accent-text)] uppercase tracking-wider">Edit Project Settings</h3>
           </div>
 
@@ -382,7 +382,7 @@ export default function OverviewEditPanel({ project }: OverviewEditPanelProps) {
                 type="button"
                 onClick={handleSave}
                 disabled={saving}
-                className="flex-[2] py-2.5 px-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white hover:bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white disabled:bg-indigo-800 disabled:text-[var(--accent-text)] text-white font-semibold rounded-xl text-xs shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2"
+                className="flex-[2] py-2.5 px-4 bg-[var(--accent)] text-white hover:bg-[var(--accent)] text-white disabled:bg-indigo-800 disabled:text-[var(--accent-text)] text-white font-semibold rounded-xl text-xs shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2"
               >
                 {saving ? (
                   <>
