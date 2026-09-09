@@ -38,8 +38,14 @@ import {
 import { getDetailedConnectivity, setDetailedConnectivityInNotes, getCameraReadiness } from '@/lib/workflow/projectWorkflowRegistry'
 import ContextSidebar from '@/components/layout/ContextSidebar'
 import PlanCanvas from '@/components/map/PlanCanvas'
-import { setCanvasMode as persistCanvasMode } from '../actions-floorplans'
+import { setCanvasMode as persistCanvasMode, getFloorPlans } from '../actions-floorplans'
 import { useRouter } from 'next/navigation'
+import {
+  getCameraStatusColor,
+  createCameraMarkerSvg,
+  CAMERA_ICON_SIZE,
+  CAMERA_ICON_OFFSET,
+} from '@/lib/cameraMarker'
 
 type CameraLocation = Database['public']['Tables']['camera_locations']['Row']
 type CameraModel = Database['public']['Tables']['camera_models']['Row']
@@ -90,6 +96,29 @@ export default function ProjectMapCanvas({
   
   // Elements states
   const router = useRouter()
+  // Camaras bloqueadas por defecto: evita moverlas sin querer al hacer clic.
+  const [camerasUnlocked, setCamerasUnlocked] = useState(false)
+  // Indice de planos: solo para etiquetar en que piso vive cada camara.
+  const [floorPlanIndex, setFloorPlanIndex] = useState<{ id: string; floor_label: string }[]>([])
+  // Los marcadores del mapa se reutilizan entre renders, asi que al cambiar el
+  // candado hay que actualizarlos en vivo y no solo al crearlos.
+  useEffect(() => {
+    let cancelled = false
+    getFloorPlans(projectId, 'cameras').then(rows => {
+      if (!cancelled) {
+        setFloorPlanIndex(
+          (rows as { id: string; floor_label: string }[]).map(r => ({ id: r.id, floor_label: r.floor_label }))
+        )
+      }
+    })
+    return () => { cancelled = true }
+  }, [projectId])
+
+  useEffect(() => {
+    camerasUnlockedRef.current = camerasUnlocked
+    Object.values(cameraMarkersRef.current).forEach(m => m.setDraggable(camerasUnlocked))
+    Object.values(deviceMarkersRef.current).forEach(m => m.setDraggable(camerasUnlocked))
+  }, [camerasUnlocked])
   const [cameras, setCameras] = useState<CameraLocation[]>(initialCameras)
   const [networkDevices, setNetworkDevices] = useState<NetworkDevice[]>(initialNetworkDevices)
   const [showCameras, setShowCameras] = useState(true)
@@ -237,6 +266,7 @@ export default function ProjectMapCanvas({
   const [devicePanelMessage, setDevicePanelMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   // Map markers dictionaries
+  const camerasUnlockedRef = useRef(false)
   const cameraMarkersRef = useRef<{ [id: string]: maplibregl.Marker }>({})
   const deviceMarkersRef = useRef<{ [id: string]: maplibregl.Marker }>({})
   const cameraMarkerStateRef = useRef<{ [id: string]: { isSelected: boolean; status: string; tag: string } }>({})
@@ -552,13 +582,6 @@ export default function ProjectMapCanvas({
 
   // ── Color helpers (no map-library dependency – safe to call in JSX render) ──
 
-  const getCameraStatusColor = (status: Database['public']['Enums']['camera_status']): string => {
-    if (status === 'in_progress') return '#3b82f6'   // Blue
-    if (status === 'complete') return '#22c55e'       // Green
-    if (status === 'issue') return '#ef4444'          // Red
-    return '#eab308'                                  // Yellow - planned (default)
-  }
-
   const getNetworkDeviceColor = (type: Database['public']['Enums']['device_type']): string => {
     if (type === 'nvr') return '#8b5cf6'
     if (type === 'router') return '#06b6d4'
@@ -575,44 +598,11 @@ export default function ProjectMapCanvas({
   // at svg-space (23,23)) is offset from the element's true center (23,30) because the
   // label pill extends below — the marker element is created with a matching pixel
   // offset so the circle (not the whole 46x60 box) sits on the coordinate.
-  const CAMERA_ICON_SIZE: [number, number] = [46, 60]
-  const CAMERA_ICON_OFFSET: [number, number] = [0, 7] // elementCenterY(30) - anchorY(23)
-
   const createCameraMarkerIcon = (
     status: Database['public']['Enums']['camera_status'],
     tag: string,
     isSelected = false
-  ) => {
-    const color = getCameraStatusColor(status)
-    const ringAttr = isSelected ? `stroke="white" stroke-width="3"` : ''
-    const shortTag = tag.length > 9 ? tag.substring(0, 9) : tag
-
-    const svg = [
-      `<svg xmlns="http://www.w3.org/2000/svg" width="46" height="60" viewBox="0 0 46 60">`,
-      `<defs><filter id="ds" x="-40%" y="-40%" width="180%" height="180%">`,
-      `<feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#000" flood-opacity="0.5"/></filter></defs>`,
-      // Outer circle (status color)
-      `<circle cx="23" cy="23" r="22" fill="${color}" filter="url(#ds)" ${ringAttr}/>`,
-      // Dark inner circle
-      `<circle cx="23" cy="23" r="16" fill="#0f172a"/>`,
-      // Camera body rectangle
-      `<rect x="10" y="17" width="14" height="11" rx="2.5" fill="${color}"/>`,
-      // Lens outer ring
-      `<circle cx="17" cy="22.5" r="4" fill="#0f172a"/>`,
-      // Lens inner (glint effect)
-      `<circle cx="17" cy="22.5" r="2" fill="${color}" opacity="0.32"/>`,
-      // Video feed module (right arrow)
-      `<path d="M25 18.5L34 15v15L25 26.5V18.5z" fill="${color}"/>`,
-      // Label pill
-      `<rect x="1" y="47" width="44" height="12" rx="6" fill="#0f172a" opacity="0.93"/>`,
-      // Label text
-      `<text x="23" y="57" text-anchor="middle" font-family="Courier New,monospace" `,
-      `font-size="8" font-weight="bold" fill="white" letter-spacing="0.4">${shortTag}</text>`,
-      `</svg>`,
-    ].join('')
-
-    return svg
-  }
+  ) => createCameraMarkerSvg(status, tag, isSelected)
 
   const buildMarkerElement = (svg: string, size: [number, number], cursor = 'pointer'): HTMLDivElement => {
     const el = document.createElement('div')
@@ -756,7 +746,7 @@ export default function ProjectMapCanvas({
         el.title = `${cam.camera_id_tag} (${cam.status})`
         const marker = new maplibregl.Marker({
           element: el,
-          draggable: true,
+          draggable: camerasUnlockedRef.current,
           anchor: 'center',
           offset: CAMERA_ICON_OFFSET
         })
@@ -857,7 +847,7 @@ export default function ProjectMapCanvas({
         el.title = `${dev.name} (${dev.device_type})`
         const marker = new maplibregl.Marker({
           element: el,
-          draggable: true,
+          draggable: camerasUnlockedRef.current,
           anchor: 'center'
         })
           .setLngLat([dev.longitude, dev.latitude])
@@ -1888,6 +1878,18 @@ export default function ProjectMapCanvas({
       </button>
 
       <button
+        onClick={() => setCamerasUnlocked(v => !v)}
+        title={camerasUnlocked ? 'Lock cameras in place' : 'Unlock cameras to drag them'}
+        className={`px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all border shrink-0 ${
+          camerasUnlocked
+            ? 'bg-emerald-600 border-emerald-500 text-white'
+            : 'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text-primary)]'
+        }`}
+      >
+        {camerasUnlocked ? 'Lock' : 'Move'}
+      </button>
+
+      <button
         onClick={handleRefresh}
         title="Reload data from the server"
         className="p-1.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-secondary)] shrink-0"
@@ -1934,14 +1936,45 @@ export default function ProjectMapCanvas({
               }`}
             >
               <span className="flex items-center gap-1.5 truncate">
-                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getCameraStatusColor(cam.status) }} />
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: getCameraStatusColor(cam.status) }} />
                 {cam.camera_id_tag}
               </span>
-              {cam.assigned_network_device_id && (
-                <span className="text-[9px] bg-[var(--surface-2)] border border-[var(--border)] text-[var(--accent-text)] px-1 py-0.25 rounded">
-                  Connected
-                </span>
-              )}
+              <span className="flex items-center gap-1 shrink-0">
+                {/* Donde vive la camara: sin esto, la lista mostraba todas y no
+                    se entendia por que el plano actual tenia menos marcadores. */}
+                {(() => {
+                  const planId = (cam as any).floor_plan_id as string | null
+                  const onPlan = floorPlanIndex.find(fp => fp.id === planId)
+                  if (onPlan) {
+                    return (
+                      <span className="text-[9px] bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-secondary)] px-1 py-0.25 rounded whitespace-nowrap">
+                        {onPlan.floor_label}
+                      </span>
+                    )
+                  }
+                  const hasGeo = Number(cam.latitude) !== 0 || Number(cam.longitude) !== 0
+                  if (hasGeo) {
+                    return (
+                      <span className="text-[9px] bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-secondary)] px-1 py-0.25 rounded">
+                        Map
+                      </span>
+                    )
+                  }
+                  return (
+                    <span
+                      className="text-[9px] bg-[var(--warn-soft)] border border-amber-300 text-[var(--warn)] px-1 py-0.25 rounded whitespace-nowrap"
+                      title="This camera is not on any plan or map position. Its plan was deleted."
+                    >
+                      Unplaced
+                    </span>
+                  )
+                })()}
+                {cam.assigned_network_device_id && (
+                  <span className="text-[9px] bg-[var(--surface-2)] border border-[var(--border)] text-[var(--accent-text)] px-1 py-0.25 rounded">
+                    Connected
+                  </span>
+                )}
+              </span>
             </button>
           ))
         }
@@ -2011,6 +2044,12 @@ export default function ProjectMapCanvas({
                 if (found) setSelectedCamera(found)
               }}
               toolsSlot={toolButtons}
+              camerasUnlocked={camerasUnlocked}
+              onCameraMoved={(id, x, y) => {
+                setCameras(prev => prev.map(c =>
+                  c.id === id ? ({ ...c, plan_x: x, plan_y: y } as CameraLocation) : c
+                ))
+              }}
               onCameraPlaced={(cam) => {
                 // Insercion optimista: antes se recargaba la pagina entera y
                 // el plano desaparecia y volvia a aparecer en cada clic.
@@ -3038,7 +3077,7 @@ export default function ProjectMapCanvas({
               <div className="pt-4 border-t border-[var(--border)] mt-4 flex gap-3 shrink-0">
                 <button
                   type="button" onClick={handleDeleteCameraClick} disabled={isPending}
-                  className="flex-1 py-2.5 px-4 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-900/50 text-rose-300 font-semibold rounded-xl text-xs transition"
+                  className="flex-1 py-2.5 px-4 bg-[var(--danger)] hover:opacity-90 border border-[var(--danger)] text-white font-semibold rounded-xl text-xs transition"
                 >
                   Delete
                 </button>
@@ -3218,7 +3257,7 @@ export default function ProjectMapCanvas({
             <div className="pt-4 border-t border-[var(--border)] mt-4 flex gap-3">
               <button
                 type="button" onClick={handleDeleteDeviceClick} disabled={isPending}
-                className="flex-1 py-2.5 px-4 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-900/50 text-rose-300 font-semibold rounded-xl text-xs"
+                className="flex-1 py-2.5 px-4 bg-[var(--danger)] hover:opacity-90 border border-[var(--danger)] text-white font-semibold rounded-xl text-xs"
               >
                 Delete
               </button>

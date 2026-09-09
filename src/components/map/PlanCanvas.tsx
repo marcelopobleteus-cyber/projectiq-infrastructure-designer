@@ -10,6 +10,7 @@ import {
   placeCameraOnPlan,
   updateCameraPlanPosition,
 } from '@/app/projects/actions-floorplans'
+import { createCameraMarkerSvg } from '@/lib/cameraMarker'
 
 interface FloorPlan {
   id: string
@@ -42,18 +43,10 @@ interface PlanCanvasProps {
   onCameraPlaced: (camera: unknown) => void
   /** Herramientas contextuales (Add Camera, etc.) renderizadas en esta barra. */
   toolsSlot?: React.ReactNode
-}
-
-const statusColor = (status: string) => {
-  switch (status) {
-    case 'installed':
-    case 'complete':
-      return 'var(--success)'
-    case 'in_progress':
-      return 'var(--accent)'
-    default:
-      return 'var(--pending)'
-  }
+  /** Cuando esta desbloqueado, las camaras se pueden arrastrar sobre el plano. */
+  camerasUnlocked?: boolean
+  /** Notifica la nueva posicion tras arrastrar, para actualizar el estado del padre. */
+  onCameraMoved?: (cameraId: string, planX: number, planY: number) => void
 }
 
 export default function PlanCanvas({
@@ -65,6 +58,8 @@ export default function PlanCanvas({
   onSelectCamera,
   onCameraPlaced,
   toolsSlot,
+  camerasUnlocked = false,
+  onCameraMoved,
 }: PlanCanvasProps) {
   const [plans, setPlans] = useState<FloorPlan[]>([])
   const [activePlanId, setActivePlanId] = useState<string | null>(null)
@@ -101,6 +96,10 @@ export default function PlanCanvas({
   const [pdfImportAll, setPdfImportAll] = useState(true)
   const [pdfPage, setPdfPage] = useState('1')
   const [placing, setPlacing] = useState(false) // guardando una camara
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+  // Ref ademas del estado: el handler de click lo consulta de forma sincrona
+  // para distinguir un arrastre de un clic sin depender de un re-render.
+  const draggingIdRef = useRef<string | null>(null)
 
   const activePlan = plans.find(p => p.id === activePlanId) || null
 
@@ -325,6 +324,57 @@ export default function PlanCanvas({
         setPlacing(false)
       }
     }
+  }
+
+  /**
+   * Arrastre de una camara sobre el plano. Se trabaja en px nativos de la
+   * imagen (igual que la colocacion y la calibracion), asi el zoom no afecta.
+   */
+  const beginDrag = (cameraId: string, startEvent: React.PointerEvent) => {
+    const img = imgRef.current
+    if (!img) return
+    setDraggingId(cameraId)
+    draggingIdRef.current = cameraId
+
+    const nativeW = img.naturalWidth || 1
+    const nativeH = img.naturalHeight || 1
+    let last: { x: number; y: number } | null = null
+
+    const toNative = (clientX: number, clientY: number) => {
+      const rect = img.getBoundingClientRect()
+      const xPct = Math.min(Math.max((clientX - rect.left) / rect.width, 0), 1)
+      const yPct = Math.min(Math.max((clientY - rect.top) / rect.height, 0), 1)
+      return { x: xPct * nativeW, y: yPct * nativeH }
+    }
+
+    const onMove = (ev: PointerEvent) => {
+      last = toNative(ev.clientX, ev.clientY)
+      // Movimiento inmediato en pantalla; el guardado va al soltar.
+      onCameraMoved?.(cameraId, last.x, last.y)
+    }
+
+    const onUp = async (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      const final = last ?? toNative(ev.clientX, ev.clientY)
+      setDraggingId(null)
+
+      const result = await updateCameraPlanPosition({
+        cameraId,
+        projectId,
+        planX: final.x,
+        planY: final.y,
+      })
+      if (result?.error) setErrorMsg(`Could not move camera: ${result.error}`)
+
+      // Se limpia despues del click que sigue al pointerup, para que ese
+      // click no se interprete como seleccion de la camara.
+      setTimeout(() => { draggingIdRef.current = null }, 0)
+    }
+
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    void startEvent
   }
 
   const saveCalibration = async () => {
@@ -668,26 +718,45 @@ export default function PlanCanvas({
               draggable={false}
             />
 
-            {/* Camera markers */}
+            {/* Marcadores de camara: mismo icono y colores que en el mapa. */}
             {planCameras.map(cam => (
               <button
                 key={cam.id}
                 onClick={(e) => {
                   e.stopPropagation()
+                  if (draggingIdRef.current === cam.id) return // fue un arrastre, no un clic
                   onSelectCamera(cam.id)
                 }}
-                title={cam.camera_id_tag}
-                className="absolute -translate-x-1/2 -translate-y-1/2 w-6 h-6 rounded-full border-2 border-white shadow flex items-center justify-center text-[8px] font-bold text-white"
+                onPointerDown={(e) => {
+                  if (!camerasUnlocked) return
+                  e.stopPropagation()
+                  e.preventDefault()
+                  beginDrag(cam.id, e)
+                }}
+                title={camerasUnlocked ? `${cam.camera_id_tag} — drag to move` : cam.camera_id_tag}
+                className="absolute select-none"
                 style={{
+                  // El ancla visual del icono es el centro del circulo, no el
+                  // centro de la caja: la pastilla de la etiqueta cuelga abajo.
                   left: `${pxToPct(cam.plan_x!, activePlan?.image_width_px || imgRef.current?.naturalWidth || 1)}%`,
                   top: `${pxToPct(cam.plan_y!, activePlan?.image_height_px || imgRef.current?.naturalHeight || 1)}%`,
-                  backgroundColor: statusColor(cam.status),
-                  outline: selectedCameraId === cam.id ? '2px solid var(--accent)' : 'none',
-                  outlineOffset: '2px',
+                  width: 46,
+                  height: 60,
+                  marginLeft: -23,
+                  marginTop: -23,
+                  cursor: camerasUnlocked ? (draggingId === cam.id ? 'grabbing' : 'grab') : 'pointer',
+                  zIndex: draggingId === cam.id ? 25 : selectedCameraId === cam.id ? 20 : 10,
+                  touchAction: 'none',
                 }}
-              >
-                📷
-              </button>
+                dangerouslySetInnerHTML={{
+                  __html: createCameraMarkerSvg(
+                    cam.status,
+                    cam.camera_id_tag,
+                    selectedCameraId === cam.id,
+                    cam.id.slice(0, 8),
+                  ),
+                }}
+              />
             ))}
 
             {/* Calibration points */}
