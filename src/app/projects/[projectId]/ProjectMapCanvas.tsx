@@ -39,6 +39,7 @@ import { getDetailedConnectivity, setDetailedConnectivityInNotes, getCameraReadi
 import ContextSidebar from '@/components/layout/ContextSidebar'
 import PlanCanvas from '@/components/map/PlanCanvas'
 import { setCanvasMode as persistCanvasMode } from '../actions-floorplans'
+import { useRouter } from 'next/navigation'
 
 type CameraLocation = Database['public']['Tables']['camera_locations']['Row']
 type CameraModel = Database['public']['Tables']['camera_models']['Row']
@@ -88,6 +89,7 @@ export default function ProjectMapCanvas({
   const [activeLayer, setActiveLayer] = useState<'hybrid' | 'roadmap' | 'satellite'>('roadmap')
   
   // Elements states
+  const router = useRouter()
   const [cameras, setCameras] = useState<CameraLocation[]>(initialCameras)
   const [networkDevices, setNetworkDevices] = useState<NetworkDevice[]>(initialNetworkDevices)
   const [showCameras, setShowCameras] = useState(true)
@@ -1272,8 +1274,11 @@ export default function ProjectMapCanvas({
   }, [addCameraMode, addDeviceMode, map, projectId])
 
   // Toolbar Actions
+  // router.refresh() vuelve a pedir los datos al servidor sin recargar la
+  // pagina: el mapa/plano no parpadea ni pierde el zoom. El efecto que
+  // sincroniza initialCameras se encarga de reflejar los datos nuevos.
   const handleRefresh = () => {
-    window.location.reload()
+    startTransition(() => { router.refresh() })
   }
 
   const handleFitToElements = () => {
@@ -1796,6 +1801,102 @@ export default function ProjectMapCanvas({
     return count
   }
 
+  // ── Controles reubicados ─────────────────────────────────────────────
+  // El selector de vista vive en el sidebar (define QUE se mira). Las
+  // herramientas viven sobre el lienzo (actuan SOBRE lo que se mira), y las
+  // que solo aplican al mapa GIS no se muestran con un plano subido.
+  const viewModeToggle = (
+    <div className="grid grid-cols-2 gap-1 p-1 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg">
+      <button
+        onClick={() => {
+          setCanvasMode('map')
+          startTransition(() => { persistCanvasMode({ projectId, module: 'cameras', mode: 'map' }) })
+        }}
+        className={`py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+          canvasMode === 'map'
+            ? 'bg-[var(--accent)] text-white shadow-xs'
+            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+        }`}
+      >
+        Map
+      </button>
+      <button
+        onClick={() => {
+          setCanvasMode('uploaded_plan')
+          startTransition(() => { persistCanvasMode({ projectId, module: 'cameras', mode: 'uploaded_plan' }) })
+        }}
+        className={`py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+          canvasMode === 'uploaded_plan'
+            ? 'bg-[var(--accent)] text-white shadow-xs'
+            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+        }`}
+      >
+        Plan
+      </button>
+    </div>
+  )
+
+  const toolButtons = (
+    <>
+      <button
+        onClick={() => {
+          setAddCameraMode(!addCameraMode)
+          setAddDeviceMode(false)
+        }}
+        className={`px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all border shrink-0 ${
+          addCameraMode
+            ? 'bg-amber-600 border-amber-500 text-white'
+            : 'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text-primary)]'
+        }`}
+      >
+        {addCameraMode ? 'Exit Add Camera' : '+ Camera'}
+      </button>
+
+      {/* Equipos de red y encuadre solo existen sobre el mapa GIS. */}
+      {canvasMode === 'map' && (
+        <>
+          <button
+            onClick={() => {
+              setAddDeviceMode(!addDeviceMode)
+              setAddCameraMode(false)
+            }}
+            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all border shrink-0 ${
+              addDeviceMode
+                ? 'bg-blue-600 border-blue-500 text-white'
+                : 'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text-primary)]'
+            }`}
+          >
+            {addDeviceMode ? 'Exit Add Device' : '+ Device'}
+          </button>
+
+          <button
+            onClick={handleFitToElements}
+            title="Fit map to all elements"
+            className="p-1.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-secondary)] shrink-0"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>
+          </button>
+        </>
+      )}
+
+      <button
+        onClick={handleBackfillPreview}
+        disabled={isBackfilling}
+        className="px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-primary)] disabled:opacity-50 shrink-0"
+      >
+        {isBackfilling ? 'Analyzing…' : 'Checklists'}
+      </button>
+
+      <button
+        onClick={handleRefresh}
+        title="Reload data from the server"
+        className="p-1.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-secondary)] shrink-0"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M16 3h5v5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 21H3v-5"/></svg>
+      </button>
+    </>
+  )
+
   const completeCount = cameraTasks.filter(t => t.status === 'Complete').length
   const totalCount = cameraTasks.length
   const isCompleteButTasksOpen = cameraStatus === 'complete' && (totalCount === 0 || completeCount < totalCount)
@@ -1811,6 +1912,7 @@ export default function ProjectMapCanvas({
         devicesCount={networkDevices.length}
         activeLayer={activeLayer}
         onLayerChange={handleLayerChange}
+        viewModeSlot={viewModeToggle}
         showCameras={showCameras}
         onToggleShowCameras={() => setShowCameras(!showCameras)}
         showDevices={showDevices}
@@ -1873,94 +1975,9 @@ export default function ProjectMapCanvas({
       {/* 2. Main Workspace Layout */}
       <div className="flex-1 flex flex-col overflow-hidden relative h-full">
         
-        {/* Map Toolbar */}
-        <div className="p-4 bg-[var(--surface-1)] border-b border-[var(--border)] flex items-center justify-between shrink-0 relative z-10 gap-4">
-          <div className="flex items-center gap-2">
-            <div className="flex items-center bg-[var(--surface-2)] border border-[var(--border)] rounded-xl p-0.5 mr-1">
-              <button
-                onClick={() => {
-                  setCanvasMode('map')
-                  startTransition(() => { persistCanvasMode({ projectId, module: 'cameras', mode: 'map' }) })
-                }}
-                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
-                  canvasMode === 'map' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-secondary)]'
-                }`}
-              >
-                Map
-              </button>
-              <button
-                onClick={() => {
-                  setCanvasMode('uploaded_plan')
-                  startTransition(() => { persistCanvasMode({ projectId, module: 'cameras', mode: 'uploaded_plan' }) })
-                }}
-                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
-                  canvasMode === 'uploaded_plan' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-secondary)]'
-                }`}
-              >
-                Uploaded Plan
-              </button>
-            </div>
-
-            <button
-              onClick={() => {
-                setAddCameraMode(!addCameraMode)
-                setAddDeviceMode(false)
-              }}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl font-semibold text-[11px] tracking-wide transition-all border ${
-                addCameraMode
-                  ? 'bg-amber-600 border-amber-500 hover:bg-amber-500 text-white'
-                  : 'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text-primary)] hover:border-slate-700 hover:text-white'
-              }`}
-            >
-              {addCameraMode ? 'Exit Add Camera' : 'Add Camera Mode'}
-            </button>
-
-            <button
-              onClick={() => {
-                setAddDeviceMode(!addDeviceMode)
-                setAddCameraMode(false)
-              }}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl font-semibold text-[11px] tracking-wide transition-all border ${
-                addDeviceMode
-                  ? 'bg-blue-600 border-blue-500 hover:bg-blue-500 text-white'
-                  : 'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text-primary)] hover:border-slate-700 hover:text-white'
-              }`}
-            >
-              {addDeviceMode ? 'Exit Add Device' : 'Add Network Device'}
-            </button>
-
-            <button
-              onClick={handleBackfillPreview}
-              disabled={isBackfilling}
-              className="flex items-center gap-2 px-3.5 py-2 bg-[var(--surface-2)] border border-[var(--border)] hover:border-[var(--accent)]/50 hover:text-[var(--accent-text)] disabled:opacity-50 text-[var(--text-primary)] rounded-xl font-semibold text-[11px] tracking-wide transition-all"
-            >
-              {isBackfilling ? 'Analyzing...' : 'Preview Missing Checklists'}
-            </button>
-
-            <button
-              onClick={handleRefresh}
-              className="flex items-center justify-center p-2 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-white hover:border-slate-700"
-              title="Refresh Layout"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M16 3h5v5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 21H3v-5"/></svg>
-            </button>
-
-            <button
-              onClick={handleFitToElements}
-              className="flex items-center justify-center p-2 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-white hover:border-slate-700"
-              title="Fit map to all elements"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>
-            </button>
-          </div>
-
-          {/* Info Badge */}
-          <div className="flex items-center gap-3 text-[10px] text-[var(--text-secondary)] bg-[var(--surface-2)] border border-[var(--border)] px-3 py-1.5 rounded-xl font-mono">
-            <span>Cameras: <span className="text-white font-bold">{cameras.length}</span></span>
-            <span className="w-1.5 h-1.5 rounded-full bg-slate-800" />
-            <span>Devices: <span className="text-white font-bold">{networkDevices.length}</span></span>
-          </div>
-        </div>
+        {/* La barra superior se elimino: sus controles se movieron al sidebar
+            (selector de vista) y sobre el lienzo (herramientas), para que lo
+            que se ve en pantalla corresponda a lo que se esta mirando. */}
 
         {/* Map Canvas Viewport */}
         <div className="flex-1 relative bg-[var(--surface-2)] flex items-center justify-center overflow-hidden">
@@ -1993,43 +2010,59 @@ export default function ProjectMapCanvas({
                 const found = cameras.find(c => c.id === id)
                 if (found) setSelectedCamera(found)
               }}
-              onCameraPlaced={handleRefresh}
+              toolsSlot={toolButtons}
+              onCameraPlaced={(cam) => {
+                // Insercion optimista: antes se recargaba la pagina entera y
+                // el plano desaparecia y volvia a aparecer en cada clic.
+                setCameras(prev => [...prev, cam as CameraLocation])
+              }}
             />
           )}
 
-          {/* Basemap Toggle: Street (OpenStreetMap) / Satellite (Esri World Imagery) */}
-          {/* Solo aplica al mapa GIS: en modo plano tapaba e interceptaba los clics de la barra del plano. */}
+          {/* Herramientas sobre el mapa. En modo plano van dentro de la barra
+              del propio plano (toolsSlot), para no taparla. */}
           {canvasMode === 'map' && (
-          <div className="absolute top-4 left-4 z-20 flex items-center gap-1 p-1 bg-[var(--surface-1)]/90 backdrop-blur-md border border-[var(--border)] rounded-xl shadow-xl">
-            <button
-              onClick={() => handleLayerChange('roadmap')}
-              className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                activeLayer === 'roadmap'
-                  ? 'bg-[var(--accent)] text-white shadow-xs'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-              title="Street basemap (OpenStreetMap)"
-            >
-              Street
-            </button>
-            <button
-              onClick={() => handleLayerChange('satellite')}
-              className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                activeLayer === 'satellite' || activeLayer === 'hybrid'
-                  ? 'bg-[var(--accent)] text-white shadow-xs'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-              title="Satellite basemap (Esri World Imagery)"
-            >
-              Satellite
-            </button>
+            <div className="absolute top-4 left-4 z-20 flex items-center gap-1.5 p-1.5 bg-[var(--surface-1)]/95 backdrop-blur-md border border-[var(--border)] rounded-xl shadow-xl">
+              {toolButtons}
+            </div>
+          )}
+
+          {/* Contador, siempre abajo a la derecha del lienzo */}
+          <div className="absolute bottom-4 right-4 z-20 flex items-center gap-3 text-[10px] text-[var(--text-secondary)] bg-[var(--surface-1)]/95 backdrop-blur-md border border-[var(--border)] px-3 py-1.5 rounded-xl font-mono shadow-lg">
+            <span>Cameras: <span className="text-[var(--text-primary)] font-bold">{cameras.length}</span></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--border-strong)]" />
+            <span>Devices: <span className="text-[var(--text-primary)] font-bold">{networkDevices.length}</span></span>
           </div>
+
+          {/* Capas base del mapa. Vivian en el sidebar, pero solo aplican al
+              mapa GIS: mostrarlas junto a un plano subido confundia. */}
+          {canvasMode === 'map' && (
+            <div className="absolute top-4 right-4 z-20 flex items-center gap-1 p-1 bg-[var(--surface-1)]/90 backdrop-blur-md border border-[var(--border)] rounded-xl shadow-xl">
+              {([
+                { key: 'roadmap', label: 'Road' },
+                { key: 'satellite', label: 'Sat' },
+                { key: 'hybrid', label: 'Hybrid' },
+              ] as const).map(opt => (
+                <button
+                  key={opt.key}
+                  onClick={() => handleLayerChange(opt.key)}
+                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                    activeLayer === opt.key
+                      ? 'bg-[var(--accent)] text-white shadow-xs'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                  }`}
+                  title={`${opt.label} basemap`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           )}
 
           {/* OSP Fiber Layer Overlay Checkboxes */}
           {/* Solo aplica al mapa GIS: en modo plano tapaba e interceptaba los clics de la barra del plano. */}
           {canvasMode === 'map' && (
-          <div className="absolute top-4 right-4 z-20 bg-[var(--surface-1)]/90 backdrop-blur-md border border-[var(--border)] p-2.5 rounded-xl shadow-xl flex flex-col gap-1.5 text-[10px] font-bold text-[var(--text-primary)] font-sans pointer-events-auto">
+          <div className="absolute top-[68px] right-4 z-20 bg-[var(--surface-1)]/90 backdrop-blur-md border border-[var(--border)] p-2.5 rounded-xl shadow-xl flex flex-col gap-1.5 text-[10px] font-bold text-[var(--text-primary)] font-sans pointer-events-auto">
             <div className="text-[9px] text-[var(--accent-text)] uppercase tracking-wider border-b border-[var(--border)] pb-1 mb-0.5">Fiber Layers</div>
             <label className="flex items-center gap-2 cursor-pointer hover:text-white transition-colors">
               <input
@@ -3328,7 +3361,7 @@ export default function ProjectMapCanvas({
               <button
                 onClick={() => {
                   setIsBackfillPreviewOpen(false)
-                  window.location.reload()
+                  handleRefresh()
                 }}
                 className="w-full py-2 px-4 bg-[var(--accent)] text-white hover:bg-[var(--accent)] text-white text-white font-bold rounded-xl text-xs transition"
               >

@@ -10,6 +10,9 @@ interface ContextSidebarProps {
   poeWarningsCount?: number
   
   // Map specific callbacks/controls
+  // Nota: la eleccion de capa base (hybrid/road/sat) se movio a un control
+  // sobre el mapa. Estas props quedan aceptadas por compatibilidad con
+  // llamadores existentes, pero el sidebar ya no las usa.
   activeLayer?: 'hybrid' | 'roadmap' | 'satellite'
   onLayerChange?: (layer: 'hybrid' | 'roadmap' | 'satellite') => void
   showCameras?: boolean
@@ -17,6 +20,12 @@ interface ContextSidebarProps {
   showDevices?: boolean
   onToggleShowDevices?: () => void
   
+  /**
+   * Selector de vista (Map / Uploaded Plan). Va en el sidebar porque define
+   * QUE se esta viendo; los controles del mapa viven sobre el mapa mismo.
+   */
+  viewModeSlot?: React.ReactNode
+
   // Custom sidebar contents/list slots
   cameraListSlot?: React.ReactNode
   deviceListSlot?: React.ReactNode
@@ -29,12 +38,11 @@ export default function ContextSidebar({
   camerasCount = 0,
   devicesCount = 0,
   poeWarningsCount = 0,
-  activeLayer = 'hybrid',
-  onLayerChange,
   showCameras = true,
   onToggleShowCameras,
   showDevices = true,
   onToggleShowDevices,
+  viewModeSlot,
   cameraListSlot,
   deviceListSlot,
   poeListSlot,
@@ -50,25 +58,13 @@ export default function ContextSidebar({
       <div className="flex-1 overflow-y-auto p-3.5 space-y-5 scrollbar-thin">
         {view === 'map' && (
           <>
-            {/* Map Layer Controls */}
-            <div className="space-y-2">
-              <h4 className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Map Layers</h4>
-              <div className="grid grid-cols-3 gap-1 p-1 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg">
-                {(['hybrid', 'roadmap', 'satellite'] as const).map((layer) => (
-                  <button
-                    key={layer}
-                    onClick={() => onLayerChange?.(layer)}
-                    className={`py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all capitalize cursor-pointer ${
-                      activeLayer === layer
-                        ? 'bg-[var(--accent)] text-white shadow-xs'
-                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                    }`}
-                  >
-                    {layer === 'roadmap' ? 'Road' : layer === 'hybrid' ? 'Hybrid' : 'Sat'}
-                  </button>
-                ))}
+            {/* Selector de vista: mapa GIS o plano subido */}
+            {viewModeSlot && (
+              <div className="space-y-2">
+                <h4 className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">View</h4>
+                {viewModeSlot}
               </div>
-            </div>
+            )}
 
             {/* Visibility Filters */}
             <div className="space-y-2">

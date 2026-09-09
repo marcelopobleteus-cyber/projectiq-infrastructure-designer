@@ -38,7 +38,10 @@ interface PlanCanvasProps {
   addCameraMode: boolean
   selectedCameraId: string | null
   onSelectCamera: (id: string) => void
-  onCameraPlaced: () => void
+  /** Recibe la camara recien creada para insertarla en el estado sin recargar. */
+  onCameraPlaced: (camera: unknown) => void
+  /** Herramientas contextuales (Add Camera, etc.) renderizadas en esta barra. */
+  toolsSlot?: React.ReactNode
 }
 
 const statusColor = (status: string) => {
@@ -61,6 +64,7 @@ export default function PlanCanvas({
   selectedCameraId,
   onSelectCamera,
   onCameraPlaced,
+  toolsSlot,
 }: PlanCanvasProps) {
   const [plans, setPlans] = useState<FloorPlan[]>([])
   const [activePlanId, setActivePlanId] = useState<string | null>(null)
@@ -84,13 +88,19 @@ export default function PlanCanvas({
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [pendingUpload, setPendingUpload] = useState<{
-    dataUrl: string
     fileName: string
     isPdf: boolean
+    dataUrl?: string // solo imagenes
     width?: number
     height?: number
+    pdfBuffer?: ArrayBuffer // solo PDF, se renderiza al confirmar
+    pageCount?: number
   } | null>(null)
   const [pendingLabel, setPendingLabel] = useState('')
+  const [preparing, setPreparing] = useState(false) // leyendo/analizando el PDF
+  const [pdfImportAll, setPdfImportAll] = useState(true)
+  const [pdfPage, setPdfPage] = useState('1')
+  const [placing, setPlacing] = useState(false) // guardando una camara
 
   const activePlan = plans.find(p => p.id === activePlanId) || null
 
@@ -121,36 +131,57 @@ export default function PlanCanvas({
   }, [activePlan?.file_path])
 
   // Paso 1: leer el archivo y abrir el dialogo propio para pedir la etiqueta.
+  // Un PDF se convierte a imagen (ver src/lib/pdfToImage.ts) para que la
+  // calibracion y la colocacion de camaras funcionen igual que con una imagen.
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     setErrorMsg(null)
 
     const isPdf = file.type === 'application/pdf'
+
+    if (isPdf) {
+      setPreparing(true)
+      try {
+        const buffer = await file.arrayBuffer()
+        const { getPdfPageCount } = await import('@/lib/pdfToImage')
+        const pageCount = await getPdfPageCount(buffer)
+        setPendingUpload({
+          fileName: file.name,
+          isPdf: true,
+          pdfBuffer: buffer,
+          pageCount,
+        })
+        setPendingLabel(`Floor ${plans.length + 1}`)
+        setPdfImportAll(pageCount > 1)
+        setPdfPage('1')
+      } catch (err) {
+        console.error('PDF read failed:', err)
+        setErrorMsg('That PDF could not be opened. If it is password-protected, export it as an image instead.')
+      } finally {
+        setPreparing(false)
+        if (fileInputRef.current) fileInputRef.current.value = ''
+      }
+      return
+    }
+
     const reader = new FileReader()
     reader.onerror = () => setErrorMsg('Could not read that file. Please try again.')
     reader.onload = async () => {
       const dataUrl = reader.result as string
-
-      let width: number | undefined
-      let height: number | undefined
-      if (!isPdf) {
-        const dims = await new Promise<{ w: number; h: number } | null>((resolve) => {
-          const img = new Image()
-          img.onload = () => resolve({ w: img.width, h: img.height })
-          img.onerror = () => resolve(null)
-          img.src = dataUrl
-        })
-        if (!dims) {
-          setErrorMsg('That image could not be opened. Try a PNG or JPG export of the plan.')
-          if (fileInputRef.current) fileInputRef.current.value = ''
-          return
-        }
-        width = dims.w
-        height = dims.h
+      const dims = await new Promise<{ w: number; h: number } | null>((resolve) => {
+        const img = new Image()
+        img.onload = () => resolve({ w: img.width, h: img.height })
+        img.onerror = () => resolve(null)
+        img.src = dataUrl
+      })
+      if (!dims) {
+        setErrorMsg('That image could not be opened. Try a PNG or JPG export of the plan.')
+        if (fileInputRef.current) fileInputRef.current.value = ''
+        return
       }
 
-      setPendingUpload({ dataUrl, fileName: file.name, isPdf, width, height })
+      setPendingUpload({ dataUrl, fileName: file.name, isPdf: false, width: dims.w, height: dims.h })
       setPendingLabel(`Floor ${plans.length + 1}`)
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
@@ -161,27 +192,87 @@ export default function PlanCanvas({
   const confirmUpload = async () => {
     if (!pendingUpload) return
     const fallback = `Floor ${plans.length + 1}`
+    const label = pendingLabel.trim() || fallback
     setUploading(true)
-    const result = await uploadFloorPlan({
-      projectId,
-      module,
-      floorLabel: pendingLabel.trim() || fallback,
-      fileType: pendingUpload.isPdf ? 'pdf' : 'image',
-      fileBase64: pendingUpload.dataUrl,
-      fileName: pendingUpload.fileName,
-      imageWidthPx: pendingUpload.width,
-      imageHeightPx: pendingUpload.height,
-    })
 
-    if (result.error) {
-      setErrorMsg(`Upload failed: ${result.error}`)
-    } else if (result.data) {
+    try {
+      // ── Imagen: un solo registro, camino directo ──
+      if (!pendingUpload.isPdf) {
+        const result = await uploadFloorPlan({
+          projectId,
+          module,
+          floorLabel: label,
+          fileType: 'image',
+          fileBase64: pendingUpload.dataUrl!,
+          fileName: pendingUpload.fileName,
+          imageWidthPx: pendingUpload.width,
+          imageHeightPx: pendingUpload.height,
+        })
+        if (result.error) {
+          setErrorMsg(`Upload failed: ${result.error}`)
+          return
+        }
+        await refreshPlans()
+        if (result.data) setActivePlanId(result.data.id)
+        setPendingUpload(null)
+        setPendingLabel('')
+        return
+      }
+
+      // ── PDF: renderizar la(s) pagina(s) elegida(s) y subir cada una ──
+      const total = pendingUpload.pageCount ?? 1
+      let wanted: number[]
+      if (pdfImportAll) {
+        wanted = Array.from({ length: total }, (_, i) => i + 1)
+      } else {
+        const n = parseInt(pdfPage, 10)
+        if (!n || n < 1 || n > total) {
+          setErrorMsg(`Enter a page between 1 and ${total}.`)
+          return
+        }
+        wanted = [n]
+      }
+
+      const { renderPdfPages } = await import('@/lib/pdfToImage')
+      const rendered = await renderPdfPages(pendingUpload.pdfBuffer!, wanted)
+      if (rendered.length === 0) {
+        setErrorMsg('No pages could be rendered from that PDF.')
+        return
+      }
+
+      const baseName = pendingUpload.fileName.replace(/\.pdf$/i, '')
+      let firstId: string | null = null
+      for (const pageImg of rendered) {
+        const pageLabel = rendered.length > 1 ? `${label} — p.${pageImg.pageNumber}` : label
+        const result = await uploadFloorPlan({
+          projectId,
+          module,
+          floorLabel: pageLabel,
+          // Se guarda como imagen: ya es un PNG/JPG renderizado.
+          fileType: 'image',
+          fileBase64: pageImg.dataUrl,
+          fileName: `${baseName}-p${pageImg.pageNumber}.png`,
+          imageWidthPx: pageImg.width,
+          imageHeightPx: pageImg.height,
+        })
+        if (result.error) {
+          setErrorMsg(`Upload failed on page ${pageImg.pageNumber}: ${result.error}`)
+          await refreshPlans()
+          return
+        }
+        if (!firstId && result.data) firstId = result.data.id
+      }
+
       await refreshPlans()
-      setActivePlanId(result.data.id)
+      if (firstId) setActivePlanId(firstId)
       setPendingUpload(null)
       setPendingLabel('')
+    } catch (err) {
+      console.error('Upload failed:', err)
+      setErrorMsg(err instanceof Error ? err.message : 'Upload failed. Please try again.')
+    } finally {
+      setUploading(false)
     }
-    setUploading(false)
   }
 
   const getRelativeCoords = (e: React.MouseEvent) => {
@@ -213,16 +304,25 @@ export default function PlanCanvas({
     }
 
     if (addCameraMode) {
-      const result = await placeCameraOnPlan({
-        projectId,
-        floorPlanId: activePlan.id,
-        planX: coords.x,
-        planY: coords.y,
-      })
-      if (result.error) {
-        setErrorMsg(`Could not place camera: ${result.error}`)
-      } else {
-        onCameraPlaced()
+      if (placing) return // evita duplicar si se hace doble clic
+      setPlacing(true)
+      try {
+        const result = await placeCameraOnPlan({
+          projectId,
+          floorPlanId: activePlan.id,
+          planX: coords.x,
+          planY: coords.y,
+        })
+        if (result.error) {
+          setErrorMsg(`Could not place camera: ${result.error}`)
+        } else if (result.data) {
+          // Se entrega la camara creada para insertarla en el estado del
+          // padre. Antes se recargaba la pagina entera, lo que hacia
+          // desaparecer y reaparecer el plano en cada clic.
+          onCameraPlaced(result.data)
+        }
+      } finally {
+        setPlacing(false)
       }
     }
   }
@@ -280,7 +380,49 @@ export default function PlanCanvas({
               placeholder="e.g. Floor 1, Basement, Warehouse"
               className="px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] text-xs text-[var(--text-primary)] w-full"
             />
+            {pendingUpload.isPdf && (pendingUpload.pageCount ?? 1) > 1 && (
+              <div className="flex flex-col gap-2 p-2.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border)]">
+                <p className="text-[11px] font-bold text-[var(--text-primary)]">
+                  This PDF has {pendingUpload.pageCount} pages
+                </p>
+                <label className="flex items-center gap-2 text-[11px] text-[var(--text-secondary)] cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={pdfImportAll}
+                    onChange={() => setPdfImportAll(true)}
+                    disabled={uploading}
+                  />
+                  Import every page as its own floor
+                </label>
+                <label className="flex items-center gap-2 text-[11px] text-[var(--text-secondary)] cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={!pdfImportAll}
+                    onChange={() => setPdfImportAll(false)}
+                    disabled={uploading}
+                  />
+                  Only page
+                  <input
+                    type="number"
+                    min={1}
+                    max={pendingUpload.pageCount}
+                    value={pdfPage}
+                    onChange={e => { setPdfImportAll(false); setPdfPage(e.target.value) }}
+                    disabled={uploading}
+                    className="w-16 px-2 py-1 rounded border border-[var(--border)] bg-[var(--surface-1)] text-[11px] text-[var(--text-primary)]"
+                  />
+                </label>
+              </div>
+            )}
+
             <p className="text-[10px] text-[var(--text-tertiary)] truncate">{pendingUpload.fileName}</p>
+
+            {pendingUpload.isPdf && (
+              <p className="text-[10px] text-[var(--text-tertiary)]">
+                The PDF is converted to an image so you can calibrate the scale and place cameras on it.
+              </p>
+            )}
+
             <div className="flex items-center justify-end gap-2 pt-1">
               <button
                 onClick={() => { setPendingUpload(null); setPendingLabel('') }}
@@ -294,7 +436,7 @@ export default function PlanCanvas({
                 disabled={uploading}
                 className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-[var(--accent)] text-white disabled:opacity-50"
               >
-                {uploading ? 'Uploading…' : 'Upload'}
+                {uploading ? (pendingUpload.isPdf ? 'Converting…' : 'Uploading…') : 'Upload'}
               </button>
             </div>
           </div>
@@ -357,10 +499,10 @@ export default function PlanCanvas({
         <input ref={fileInputRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={handleFileSelect} />
         <button
           onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
+          disabled={uploading || preparing}
           className="px-4 py-2 bg-[var(--accent)] text-white font-bold text-xs rounded-lg disabled:opacity-50"
         >
-          {uploading ? 'Uploading…' : 'Upload Floor Plan'}
+          {preparing ? 'Reading…' : uploading ? 'Uploading…' : 'Upload Floor Plan'}
         </button>
 
         {errorMsg && (
@@ -381,6 +523,13 @@ export default function PlanCanvas({
     <div className="absolute inset-0 flex flex-col">
       {/* Floor selector + upload + calibrate */}
       <div className="flex items-center gap-2 p-2 bg-[var(--surface-1)] border-b border-[var(--border)] shrink-0 overflow-x-auto">
+        {/* Herramientas del padre: viven junto al plano, no en una barra aparte. */}
+        {toolsSlot && (
+          <>
+            {toolsSlot}
+            <div className="w-px h-5 bg-[var(--border)] shrink-0" />
+          </>
+        )}
         {plans.map(p => (
           <button
             key={p.id}
@@ -397,10 +546,10 @@ export default function PlanCanvas({
         <input ref={fileInputRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={handleFileSelect} />
         <button
           onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
+          disabled={uploading || preparing}
           className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-primary)] whitespace-nowrap disabled:opacity-50"
         >
-          {uploading ? 'Uploading…' : '+ Add Floor'}
+          {preparing ? 'Reading…' : uploading ? 'Uploading…' : '+ Add Floor'}
         </button>
 
         <div className="flex-1" />
@@ -508,7 +657,7 @@ export default function PlanCanvas({
               ref={imgRef}
               src={imageUrl}
               alt={activePlan?.floor_label}
-              className={`block ${zoom === null ? 'max-w-full max-h-full' : 'max-w-none'} ${addCameraMode || calibrating ? 'cursor-crosshair' : ''}`}
+              className={`block ${zoom === null ? 'max-w-full max-h-full' : 'max-w-none'} ${placing ? 'cursor-wait' : addCameraMode || calibrating ? 'cursor-crosshair' : ''}`}
               style={zoom !== null && naturalSize ? { width: naturalSize.w * zoom, height: naturalSize.h * zoom } : undefined}
               onClick={handleImageClick}
               onLoad={(e) => {
@@ -556,6 +705,13 @@ export default function PlanCanvas({
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-[11px] text-[var(--text-tertiary)]">
             Loading plan…
+          </div>
+        )}
+
+        {placing && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-[var(--surface-1)] border border-[var(--border)] shadow-lg text-[11px] font-bold text-[var(--text-primary)] px-3 py-1.5 rounded-lg">
+            <span className="w-3 h-3 rounded-full border-2 border-[var(--accent)] border-t-transparent animate-spin" />
+            Saving camera…
           </div>
         )}
 
