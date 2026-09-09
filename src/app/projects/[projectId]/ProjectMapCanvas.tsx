@@ -104,6 +104,10 @@ export default function ProjectMapCanvas({
   const planCalibrateRef = useRef<(() => void) | null>(null)
   // Plano visible en PlanCanvas: lo necesita "Add camera here" del menu.
   const [activeFloorPlanId, setActiveFloorPlanId] = useState<string | null>(null)
+  // Pestanas del panel de camara. Antes era un solo scroll larguisimo que
+  // mezclaba CCTV, fibra, wireless y auditoria.
+  type CameraTab = 'camera' | 'checklist' | 'network' | 'fiber' | 'wireless' | 'history'
+  const [cameraTab, setCameraTab] = useState<CameraTab>('camera')
 
   // Confirmacion propia. El confirm() nativo se puede suprimir desde el
   // navegador ("impedir que esta pagina cree dialogos"), y cuando eso pasa
@@ -2031,6 +2035,22 @@ export default function ProjectMapCanvas({
     </>
   )
 
+  const cameraPanelTabs: { key: CameraTab; label: string }[] = [
+    { key: 'camera', label: 'Camera' },
+    { key: 'checklist', label: 'Checklist' },
+    { key: 'network', label: 'Network' },
+    ...(cameraCommType === 'fiber' ? [{ key: 'fiber' as CameraTab, label: 'Fiber' }] : []),
+    ...(cameraCommType === 'wireless' ? [{ key: 'wireless' as CameraTab, label: 'Wireless' }] : []),
+    { key: 'history', label: 'History' },
+  ]
+
+  // Si cambia el tipo de enlace y la pestana activa deja de existir (p.ej.
+  // estabas en Fiber y pasa a cobre), se vuelve a Camera.
+  const activeTabExists = cameraPanelTabs.some(t => t.key === cameraTab)
+  useEffect(() => {
+    if (!activeTabExists) setCameraTab('camera')
+  }, [activeTabExists])
+
   const completeCount = cameraTasks.filter(t => t.status === 'Complete').length
   const totalCount = cameraTasks.length
   const isCompleteButTasksOpen = cameraStatus === 'complete' && (totalCount === 0 || completeCount < totalCount)
@@ -2456,25 +2476,45 @@ export default function ProjectMapCanvas({
         return (
           <div className="absolute top-4 right-4 bottom-4 w-80 max-h-[calc(100%-2rem)] bg-[var(--surface-1)] border border-[var(--border-strong)] rounded-2xl flex flex-col justify-between p-6 z-30 overflow-hidden shadow-2xl">
             <form onSubmit={handleSaveCamera} className="flex flex-col h-full justify-between overflow-hidden">
-              <div className="space-y-4 overflow-y-auto pr-1 flex-1 scrollbar-thin pb-4">
-                
-                {/* Header Section */}
-                <div className="flex justify-between items-start border-b border-[var(--border)] pb-4 shrink-0">
-                  <div>
-                    <h3 className="font-bold text-white tracking-tight flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: getCameraStatusColor(cameraStatus) }} />
-                      {cameraTag || selectedCamera.camera_id_tag || 'Camera'} Specs
-                    </h3>
-                    <p className="text-[10px] text-[var(--text-secondary)] mt-0.5 font-mono">ID: {selectedCamera.id.substring(0, 8)}...</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedCamera(null)}
-                    className="p-1.5 rounded bg-[var(--surface-2)] hover:bg-slate-850 text-[var(--text-secondary)] hover:text-white transition-colors"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                  </button>
+              {/* Header FIJO: el cerrar no debe irse con el scroll. */}
+              <div className="flex justify-between items-start border-b border-[var(--border)] pb-3 shrink-0">
+                <div className="min-w-0">
+                  <h3 className="font-bold text-[var(--text-primary)] tracking-tight flex items-center gap-2 truncate">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: getCameraStatusColor(cameraStatus) }} />
+                    {cameraTag || selectedCamera.camera_id_tag || 'Camera'}
+                  </h3>
+                  <p className="text-[10px] text-[var(--text-secondary)] mt-0.5 font-mono">ID: {selectedCamera.id.substring(0, 8)}…</p>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCamera(null)}
+                  title="Close"
+                  className="shrink-0 p-1.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+
+              {/* Pestanas: solo se ofrecen las que aplican a esta camara. Las de
+                  otros modulos apareceran cuando esos modulos se conecten. */}
+              <div className="flex items-center gap-1 overflow-x-auto py-2 shrink-0 scrollbar-thin">
+                {cameraPanelTabs.map(tab => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setCameraTab(tab.key)}
+                    className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all ${
+                      cameraTab === tab.key
+                        ? 'bg-[var(--accent)] text-white'
+                        : 'bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-secondary)]'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="space-y-4 overflow-y-auto pr-1 flex-1 scrollbar-thin pb-4">
 
                 {cameraPanelMessage && (
                   <div className={`p-3 rounded-xl border text-[11px] ${
@@ -2487,6 +2527,7 @@ export default function ProjectMapCanvas({
                 )}
 
                 {/* 1. Connectivity Method Selector (Guided First) */}
+                {cameraTab === 'network' && (
                 <div className="space-y-1.5 bg-[var(--accent-soft)] border border-indigo-900/30 p-3.5 rounded-xl shadow-inner">
                   <label className="block text-[10px] font-black text-[var(--accent-text)] uppercase tracking-wider">Connectivity Backhaul</label>
                   <select
@@ -2504,8 +2545,10 @@ export default function ProjectMapCanvas({
                     <option value="Unknown">Unknown / TBD</option>
                   </select>
                 </div>
+                )}
 
                 {/* 2. Asset Readiness Checklist */}
+                {cameraTab === 'camera' && (
                 <div className="bg-[var(--surface-2)]/25 border border-[var(--border)] rounded-xl p-3.5 space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">Readiness Status</span>
@@ -2531,8 +2574,10 @@ export default function ProjectMapCanvas({
                     </div>
                   )}
                 </div>
+                )}
 
                 {/* 3. Accordion: Specs (Device & Local Details) */}
+                {cameraTab === 'camera' && (
                 <div className="border border-[var(--border)] rounded-xl overflow-hidden bg-[var(--surface-2)]/10">
                   <button
                     type="button"
@@ -2632,8 +2677,10 @@ export default function ProjectMapCanvas({
                     </div>
                   )}
                 </div>
+                )}
 
                 {/* 4. Accordion: Checklist (Camera Checklist) */}
+                {cameraTab === 'checklist' && (
                 <div className="border border-[var(--border)] rounded-xl overflow-hidden bg-[var(--surface-2)]/10">
                   <button
                     type="button"
@@ -2816,9 +2863,10 @@ export default function ProjectMapCanvas({
                     </div>
                   )}
                 </div>
+                )}
 
                 {/* Wireless Backhaul Specs Accordion */}
-                {['Wireless PTP', 'Wireless PTMP', 'Wi-Fi Bridge', 'LTE / 5G'].includes(cameraDetailedConn) && (
+                {cameraTab === 'wireless' && ['Wireless PTP', 'Wireless PTMP', 'Wi-Fi Bridge', 'LTE / 5G'].includes(cameraDetailedConn) && (
                   <div className="border border-[var(--border)] rounded-xl overflow-hidden bg-[var(--surface-2)]/10">
                     <button
                       type="button"
@@ -2957,6 +3005,7 @@ export default function ProjectMapCanvas({
                 )}
 
                 {/* 5. Accordion: Connectivity Chain */}
+                {((cameraTab === 'fiber' && cameraCommType === 'fiber') || (cameraTab === 'network' && cameraCommType !== 'fiber')) && (
                 <div className="border border-[var(--border)] rounded-xl overflow-hidden bg-[var(--surface-2)]/10">
                   <button
                     type="button"
@@ -3175,8 +3224,10 @@ export default function ProjectMapCanvas({
                     </div>
                   )}
                 </div>
+                )}
 
                 {/* 6. Accordion: History / Audit Log */}
+                {cameraTab === 'history' && (
                 <div className="border border-[var(--border)] rounded-xl overflow-hidden bg-[var(--surface-2)]/10">
                   <button
                     type="button"
@@ -3210,6 +3261,7 @@ export default function ProjectMapCanvas({
                     </div>
                   )}
                 </div>
+                )}
 
               </div>
 
