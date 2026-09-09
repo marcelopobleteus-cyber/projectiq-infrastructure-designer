@@ -707,7 +707,7 @@ export default function ProjectMapCanvas({
       },
       center: [defaultLongitude, defaultLatitude],
       zoom: defaultZoom,
-      attributionControl: { compact: true }
+      attributionControl: { compact: true, customAttribution: 'NextQ Designer' }
     })
 
     newMap.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
@@ -729,6 +729,10 @@ export default function ProjectMapCanvas({
 
     newMap.on('load', () => {
       setMap(newMap)
+      // Arranca plegada (solo el boton "i"): el credito sigue disponible a un
+      // clic, que es lo que exigen las licencias, sin ocupar la esquina.
+      const attrib = newMap.getContainer().querySelector('.maplibregl-ctrl-attrib')
+      attrib?.classList.remove('maplibregl-compact-show')
     })
 
     return () => {
@@ -2145,7 +2149,9 @@ export default function ProjectMapCanvas({
           <div
             ref={mapRef}
             className="absolute inset-0 w-full h-full"
-            style={canvasMode === 'uploaded_plan' ? { visibility: 'hidden', pointerEvents: 'none' } : undefined}
+            style={canvasMode === 'uploaded_plan'
+              ? { visibility: 'hidden', opacity: 0, pointerEvents: 'none' }
+              : undefined}
             onMouseEnter={() => {
               if (mapRef.current) {
                 mapRectRef.current = mapRef.current.getBoundingClientRect()
