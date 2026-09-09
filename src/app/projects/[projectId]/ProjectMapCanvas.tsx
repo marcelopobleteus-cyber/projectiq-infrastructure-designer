@@ -1998,6 +1998,8 @@ export default function ProjectMapCanvas({
           )}
 
           {/* Basemap Toggle: Street (OpenStreetMap) / Satellite (Esri World Imagery) */}
+          {/* Solo aplica al mapa GIS: en modo plano tapaba e interceptaba los clics de la barra del plano. */}
+          {canvasMode === 'map' && (
           <div className="absolute top-4 left-4 z-20 flex items-center gap-1 p-1 bg-[var(--surface-1)]/90 backdrop-blur-md border border-[var(--border)] rounded-xl shadow-xl">
             <button
               onClick={() => handleLayerChange('roadmap')}
@@ -2022,8 +2024,11 @@ export default function ProjectMapCanvas({
               Satellite
             </button>
           </div>
+          )}
 
           {/* OSP Fiber Layer Overlay Checkboxes */}
+          {/* Solo aplica al mapa GIS: en modo plano tapaba e interceptaba los clics de la barra del plano. */}
+          {canvasMode === 'map' && (
           <div className="absolute top-4 right-4 z-20 bg-[var(--surface-1)]/90 backdrop-blur-md border border-[var(--border)] p-2.5 rounded-xl shadow-xl flex flex-col gap-1.5 text-[10px] font-bold text-[var(--text-primary)] font-sans pointer-events-auto">
             <div className="text-[9px] text-[var(--accent-text)] uppercase tracking-wider border-b border-[var(--border)] pb-1 mb-0.5">Fiber Layers</div>
             <label className="flex items-center gap-2 cursor-pointer hover:text-white transition-colors">
@@ -2045,6 +2050,7 @@ export default function ProjectMapCanvas({
               Conduit & Drops
             </label>
           </div>
+          )}
 
           {/* ── Camera Hover Info Card ── */}
           {hoveredCamera && hoverPosition && (() => {

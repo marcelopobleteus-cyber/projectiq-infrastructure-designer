@@ -74,6 +74,11 @@ export default function PlanCanvas({
   const imgRef = useRef<HTMLImageElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [imgLoaded, setImgLoaded] = useState(false)
+  // zoom === null => ajustar a pantalla. Un numero es el factor sobre el
+  // tamano nativo. Las coordenadas se guardan en px nativos, asi que el zoom
+  // no afecta ni la calibracion ni la posicion de las camaras.
+  const [zoom, setZoom] = useState<number | null>(null)
+  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null)
 
   const activePlan = plans.find(p => p.id === activePlanId) || null
 
@@ -98,6 +103,8 @@ export default function PlanCanvas({
       return
     }
     setImgLoaded(false)
+    setNaturalSize(null)
+    setZoom(null) // cada plano arranca ajustado a pantalla
     getFloorPlanFileUrl(activePlan.file_path).then(setImageUrl)
   }, [activePlan?.file_path])
 
@@ -279,6 +286,36 @@ export default function PlanCanvas({
         <div className="flex-1" />
 
         {activePlan?.file_type === 'image' && (
+          <div className="flex items-center gap-1 mr-1 shrink-0">
+            <button
+              onClick={() => setZoom(z => Math.max(0.1, (z ?? 1) - 0.25))}
+              title="Zoom out"
+              className="w-7 h-7 rounded-lg text-[13px] font-bold bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-primary)]"
+            >
+              −
+            </button>
+            <button
+              onClick={() => setZoom(null)}
+              title="Fit plan to screen"
+              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap ${
+                zoom === null
+                  ? 'bg-[var(--accent)] text-white'
+                  : 'bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-primary)]'
+              }`}
+            >
+              {zoom === null ? 'Fit' : `${Math.round(zoom * 100)}%`}
+            </button>
+            <button
+              onClick={() => setZoom(z => Math.min(8, (z ?? 1) + 0.25))}
+              title="Zoom in"
+              className="w-7 h-7 rounded-lg text-[13px] font-bold bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-primary)]"
+            >
+              +
+            </button>
+          </div>
+        )}
+
+        {activePlan?.file_type === 'image' && (
           <button
             onClick={() => {
               setCalibrating(!calibrating)
@@ -332,18 +369,26 @@ export default function PlanCanvas({
       )}
 
       {/* Plan viewport */}
-      <div ref={containerRef} className="flex-1 relative overflow-auto bg-[var(--surface-3)]">
+      <div ref={containerRef} className="flex-1 relative overflow-auto bg-[var(--surface-3)] flex items-start justify-center">
         {activePlan?.file_type === 'pdf' ? (
           <iframe src={imageUrl ?? undefined} className="w-full h-full border-0" title="Floor plan PDF" />
         ) : imageUrl ? (
-          <div className="relative inline-block min-w-full">
+          // shrink-wrap exacto a la imagen: si el wrapper fuera mas ancho que
+          // la imagen (p.ej. min-w-full con un plano angosto), los marcadores
+          // se posicionan en % del wrapper y quedan corridos.
+          <div className="relative shrink-0" style={{ lineHeight: 0 }}>
             <img
               ref={imgRef}
               src={imageUrl}
               alt={activePlan?.floor_label}
-              className={`block max-w-none ${addCameraMode || calibrating ? 'cursor-crosshair' : ''}`}
+              className={`block ${zoom === null ? 'max-w-full max-h-full' : 'max-w-none'} ${addCameraMode || calibrating ? 'cursor-crosshair' : ''}`}
+              style={zoom !== null && naturalSize ? { width: naturalSize.w * zoom, height: naturalSize.h * zoom } : undefined}
               onClick={handleImageClick}
-              onLoad={() => setImgLoaded(true)}
+              onLoad={(e) => {
+                const el = e.currentTarget
+                setNaturalSize({ w: el.naturalWidth, h: el.naturalHeight })
+                setImgLoaded(true)
+              }}
               draggable={false}
             />
 

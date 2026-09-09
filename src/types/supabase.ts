@@ -610,6 +610,7 @@ export type Database = {
           condition_source: string | null
           created_at: string
           drop_cable_ft: number | null
+          floor_plan_id: string | null
           id: string
           latitude: number
           longitude: number
@@ -618,6 +619,8 @@ export type Database = {
           mount_hardware: string | null
           notes: string | null
           owner_of_record: string | null
+          plan_x: number | null
+          plan_y: number | null
           power_type: Database["public"]["Enums"]["power_type"]
           project_id: string
           served_by_cabinet_id: string | null
@@ -641,6 +644,7 @@ export type Database = {
           condition_source?: string | null
           created_at?: string
           drop_cable_ft?: number | null
+          floor_plan_id?: string | null
           id?: string
           latitude: number
           longitude: number
@@ -649,6 +653,8 @@ export type Database = {
           mount_hardware?: string | null
           notes?: string | null
           owner_of_record?: string | null
+          plan_x?: number | null
+          plan_y?: number | null
           power_type?: Database["public"]["Enums"]["power_type"]
           project_id: string
           served_by_cabinet_id?: string | null
@@ -672,6 +678,7 @@ export type Database = {
           condition_source?: string | null
           created_at?: string
           drop_cable_ft?: number | null
+          floor_plan_id?: string | null
           id?: string
           latitude?: number
           longitude?: number
@@ -680,6 +687,8 @@ export type Database = {
           mount_hardware?: string | null
           notes?: string | null
           owner_of_record?: string | null
+          plan_x?: number | null
+          plan_y?: number | null
           power_type?: Database["public"]["Enums"]["power_type"]
           project_id?: string
           served_by_cabinet_id?: string | null
@@ -710,6 +719,13 @@ export type Database = {
             columns: ["camera_model_id"]
             isOneToOne: false
             referencedRelation: "camera_models"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camera_locations_floor_plan_id_fkey"
+            columns: ["floor_plan_id"]
+            isOneToOne: false
+            referencedRelation: "project_floor_plans"
             referencedColumns: ["id"]
           },
           {
@@ -3205,14 +3221,75 @@ export type Database = {
         }
         Relationships: []
       }
+      project_floor_plans: {
+        Row: {
+          created_at: string
+          file_path: string
+          file_type: string
+          floor_label: string
+          id: string
+          image_height_px: number | null
+          image_width_px: number | null
+          module: string
+          page_number: number
+          project_id: string
+          scale_calibration: Json | null
+          sort_order: number
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          file_path: string
+          file_type: string
+          floor_label?: string
+          id?: string
+          image_height_px?: number | null
+          image_width_px?: number | null
+          module: string
+          page_number?: number
+          project_id: string
+          scale_calibration?: Json | null
+          sort_order?: number
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          file_path?: string
+          file_type?: string
+          floor_label?: string
+          id?: string
+          image_height_px?: number | null
+          image_width_px?: number | null
+          module?: string
+          page_number?: number
+          project_id?: string
+          scale_calibration?: Json | null
+          sort_order?: number
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_floor_plans_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
+          camera_canvas_mode: string
           created_at: string
           default_latitude: number
           default_longitude: number
           default_zoom: number
           description: string | null
           disciplines: string[]
+          fiber_canvas_mode: string
           id: string
           name: string
           organization_id: string
@@ -3221,12 +3298,14 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          camera_canvas_mode?: string
           created_at?: string
           default_latitude?: number
           default_longitude?: number
           default_zoom?: number
           description?: string | null
           disciplines?: string[]
+          fiber_canvas_mode?: string
           id?: string
           name: string
           organization_id: string
@@ -3235,12 +3314,14 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          camera_canvas_mode?: string
           created_at?: string
           default_latitude?: number
           default_longitude?: number
           default_zoom?: number
           description?: string | null
           disciplines?: string[]
+          fiber_canvas_mode?: string
           id?: string
           name?: string
           organization_id?: string

@@ -201,10 +201,16 @@ export async function setCanvasMode(params: {
   const access = await assertProjectAccess(supabase, params.projectId)
   if (!access.ok) return { error: access.error }
 
-  const column = params.module === 'cameras' ? 'camera_canvas_mode' : 'fiber_canvas_mode'
+  // Objeto explicito por rama: una clave computada { [column]: ... } pierde el
+  // tipo literal y el update de Supabase la rechaza por exceso de propiedades.
+  const payload =
+    params.module === 'cameras'
+      ? { camera_canvas_mode: params.mode }
+      : { fiber_canvas_mode: params.mode }
+
   const { error } = await supabase
     .from('projects')
-    .update({ [column]: params.mode })
+    .update(payload)
     .eq('id', params.projectId)
 
   if (error) {

@@ -31,15 +31,15 @@ export default async function ProjectMapsPage({ params }: PageProps) {
   }
 
   // Load project details
-  let { data: project } = await supabase
+  const { data: projectData } = await supabase
     .from('projects')
     .select('*')
     .eq('id', projectId)
     .single()
 
-  if (!project) {
-    project = { ...DEMO_PROJECT, id: projectId } as any
-  }
+  // Reasignar sobre la variable destructurada dejaba el tipo en "posiblemente
+  // null" para TS; con una const aparte el fallback queda garantizado.
+  const project = (projectData ?? { ...DEMO_PROJECT, id: projectId }) as any
 
   // Fetch camera models, locations, and network devices
   let cameraModels: CameraModel[] = []
