@@ -1,0 +1,398 @@
+'use client'
+
+import React, { useEffect, useRef, useState, useCallback } from 'react'
+import {
+  getFloorPlans,
+  getFloorPlanFileUrl,
+  uploadFloorPlan,
+  updateFloorPlanCalibration,
+  deleteFloorPlan,
+  placeCameraOnPlan,
+  updateCameraPlanPosition,
+} from '@/app/projects/actions-floorplans'
+
+interface FloorPlan {
+  id: string
+  floor_label: string
+  sort_order: number
+  file_path: string
+  file_type: 'pdf' | 'image'
+  image_width_px: number | null
+  image_height_px: number | null
+  scale_calibration: { point_a: { x: number; y: number }; point_b: { x: number; y: number }; real_distance_m: number } | null
+}
+
+interface PlanCameraMarker {
+  id: string
+  camera_id_tag: string
+  plan_x: number | null
+  plan_y: number | null
+  status: string
+  floor_plan_id: string | null
+}
+
+interface PlanCanvasProps {
+  projectId: string
+  module: 'cameras' | 'fiber'
+  cameras: PlanCameraMarker[]
+  addCameraMode: boolean
+  selectedCameraId: string | null
+  onSelectCamera: (id: string) => void
+  onCameraPlaced: () => void
+}
+
+const statusColor = (status: string) => {
+  switch (status) {
+    case 'installed':
+    case 'complete':
+      return 'var(--success)'
+    case 'in_progress':
+      return 'var(--accent)'
+    default:
+      return 'var(--pending)'
+  }
+}
+
+export default function PlanCanvas({
+  projectId,
+  module,
+  cameras,
+  addCameraMode,
+  selectedCameraId,
+  onSelectCamera,
+  onCameraPlaced,
+}: PlanCanvasProps) {
+  const [plans, setPlans] = useState<FloorPlan[]>([])
+  const [activePlanId, setActivePlanId] = useState<string | null>(null)
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState(false)
+  const [calibrating, setCalibrating] = useState(false)
+  const [calibPoints, setCalibPoints] = useState<{ x: number; y: number }[]>([])
+  const [calibDistance, setCalibDistance] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const imgRef = useRef<HTMLImageElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [imgLoaded, setImgLoaded] = useState(false)
+
+  const activePlan = plans.find(p => p.id === activePlanId) || null
+
+  const refreshPlans = useCallback(async () => {
+    setLoading(true)
+    const data = await getFloorPlans(projectId, module)
+    setPlans(data as FloorPlan[])
+    if (data.length > 0 && !activePlanId) {
+      setActivePlanId(data[0].id)
+    }
+    setLoading(false)
+  }, [projectId, module, activePlanId])
+
+  useEffect(() => {
+    refreshPlans()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, module])
+
+  useEffect(() => {
+    if (!activePlan) {
+      setImageUrl(null)
+      return
+    }
+    setImgLoaded(false)
+    getFloorPlanFileUrl(activePlan.file_path).then(setImageUrl)
+  }, [activePlan?.file_path])
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+
+    const isPdf = file.type === 'application/pdf'
+    const reader = new FileReader()
+    reader.onload = async () => {
+      const dataUrl = reader.result as string
+
+      let width: number | undefined
+      let height: number | undefined
+      if (!isPdf) {
+        const dims = await new Promise<{ w: number; h: number }>((resolve) => {
+          const img = new Image()
+          img.onload = () => resolve({ w: img.width, h: img.height })
+          img.src = dataUrl
+        })
+        width = dims.w
+        height = dims.h
+      }
+
+      const floorLabel = window.prompt('Label for this floor/plan (e.g. "Floor 1", "Basement"):', `Floor ${plans.length + 1}`)
+      if (floorLabel === null) {
+        setUploading(false)
+        return
+      }
+
+      const result = await uploadFloorPlan({
+        projectId,
+        module,
+        floorLabel: floorLabel || `Floor ${plans.length + 1}`,
+        fileType: isPdf ? 'pdf' : 'image',
+        fileBase64: dataUrl,
+        fileName: file.name,
+        imageWidthPx: width,
+        imageHeightPx: height,
+      })
+
+      if (result.error) {
+        alert(`Upload failed: ${result.error}`)
+      } else if (result.data) {
+        await refreshPlans()
+        setActivePlanId(result.data.id)
+      }
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const getRelativeCoords = (e: React.MouseEvent) => {
+    if (!imgRef.current) return null
+    const rect = imgRef.current.getBoundingClientRect()
+    const xPct = (e.clientX - rect.left) / rect.width
+    const yPct = (e.clientY - rect.top) / rect.height
+    // Guardamos en coordenadas nativas de la imagen (0..width, 0..height)
+    // para que la calibración de escala sea consistente sin importar el zoom.
+    const nativeW = imgRef.current.naturalWidth || rect.width
+    const nativeH = imgRef.current.naturalHeight || rect.height
+    return { x: xPct * nativeW, y: yPct * nativeH }
+  }
+
+  const handleImageClick = async (e: React.MouseEvent) => {
+    if (!imgLoaded) return // evita coordenadas mal calculadas antes de que la imagen termine de cargar
+    const coords = getRelativeCoords(e)
+    if (!coords || !activePlan) return
+
+    if (calibrating) {
+      // Un tercer clic reinicia la calibración con ese punto como el nuevo
+      // primer punto, en vez de acumular un tercer punto que rompe el flujo
+      // de "elegí 2 puntos" (el input de distancia solo se muestra con
+      // exactamente 2).
+      const next = calibPoints.length >= 2 ? [coords] : [...calibPoints, coords]
+      setCalibPoints(next)
+      setCalibDistance('')
+      return
+    }
+
+    if (addCameraMode) {
+      const result = await placeCameraOnPlan({
+        projectId,
+        floorPlanId: activePlan.id,
+        planX: coords.x,
+        planY: coords.y,
+      })
+      if (result.error) {
+        alert(`Could not place camera: ${result.error}`)
+      } else {
+        onCameraPlaced()
+      }
+    }
+  }
+
+  const saveCalibration = async () => {
+    if (!activePlan || calibPoints.length !== 2 || !calibDistance) return
+    const dist = parseFloat(calibDistance)
+    if (!dist || dist <= 0) {
+      alert('Enter a valid distance in meters.')
+      return
+    }
+    const result = await updateFloorPlanCalibration({
+      floorPlanId: activePlan.id,
+      projectId,
+      pointA: calibPoints[0],
+      pointB: calibPoints[1],
+      realDistanceM: dist,
+    })
+    if (result.error) {
+      alert(`Calibration failed: ${result.error}`)
+    } else {
+      await refreshPlans()
+      setCalibrating(false)
+      setCalibPoints([])
+      setCalibDistance('')
+    }
+  }
+
+  const pxToPct = (px: number, dim: number) => (dim ? (px / dim) * 100 : 0)
+
+  const planCameras = cameras.filter(c => c.floor_plan_id === activePlanId && c.plan_x != null && c.plan_y != null)
+
+  if (loading) {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center text-[11px] text-[var(--text-tertiary)]">
+        Loading floor plans…
+      </div>
+    )
+  }
+
+  if (plans.length === 0) {
+    return (
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center px-6">
+        <p className="text-sm font-bold text-[var(--text-primary)]">No floor plan uploaded yet</p>
+        <p className="text-[11px] text-[var(--text-secondary)] max-w-xs">
+          Upload a PDF or image of the building floor plan to place cameras on it instead of the map.
+        </p>
+        <input ref={fileInputRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={handleFileSelect} />
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          className="px-4 py-2 bg-[var(--accent)] text-white font-bold text-xs rounded-lg disabled:opacity-50"
+        >
+          {uploading ? 'Uploading…' : 'Upload Floor Plan'}
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="absolute inset-0 flex flex-col">
+      {/* Floor selector + upload + calibrate */}
+      <div className="flex items-center gap-2 p-2 bg-[var(--surface-1)] border-b border-[var(--border)] shrink-0 overflow-x-auto">
+        {plans.map(p => (
+          <button
+            key={p.id}
+            onClick={() => setActivePlanId(p.id)}
+            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition ${
+              activePlanId === p.id
+                ? 'bg-[var(--accent)] text-white'
+                : 'bg-[var(--surface-2)] text-[var(--text-secondary)] border border-[var(--border)]'
+            }`}
+          >
+            {p.floor_label}
+          </button>
+        ))}
+        <input ref={fileInputRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={handleFileSelect} />
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-primary)] whitespace-nowrap disabled:opacity-50"
+        >
+          {uploading ? 'Uploading…' : '+ Add Floor'}
+        </button>
+
+        <div className="flex-1" />
+
+        {activePlan?.file_type === 'image' && (
+          <button
+            onClick={() => {
+              setCalibrating(!calibrating)
+              setCalibPoints([])
+            }}
+            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition ${
+              calibrating ? 'bg-amber-600 text-white' : 'bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-primary)]'
+            }`}
+          >
+            {calibrating ? 'Cancel Calibration' : activePlan.scale_calibration ? 'Re-calibrate Scale' : 'Calibrate Scale'}
+          </button>
+        )}
+
+        {activePlan && (
+          <button
+            onClick={async () => {
+              if (!window.confirm(`Delete "${activePlan.floor_label}"? Cameras placed on it will be unlinked.`)) return
+              await deleteFloorPlan(activePlan.id, projectId)
+              setActivePlanId(null)
+              await refreshPlans()
+            }}
+            className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-[var(--surface-2)] border border-[var(--border)] text-[var(--danger)] whitespace-nowrap"
+          >
+            Delete
+          </button>
+        )}
+      </div>
+
+      {calibrating && (
+        <div className="p-2 bg-[var(--warn-soft)] border-b border-amber-200 text-[11px] text-[var(--text-primary)] flex items-center gap-3 shrink-0">
+          <span>
+            {calibPoints.length === 0 && 'Click two points on the plan a known distance apart.'}
+            {calibPoints.length === 1 && 'Click the second point.'}
+            {calibPoints.length === 2 && 'Enter the real-world distance between those two points:'}
+          </span>
+          {calibPoints.length === 2 && (
+            <>
+              <input
+                type="number"
+                value={calibDistance}
+                onChange={e => setCalibDistance(e.target.value)}
+                placeholder="meters"
+                className="w-20 px-2 py-1 rounded border border-[var(--border)] text-xs"
+              />
+              <button onClick={saveCalibration} className="px-3 py-1 bg-[var(--accent)] text-white rounded font-bold">
+                Save
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Plan viewport */}
+      <div ref={containerRef} className="flex-1 relative overflow-auto bg-[var(--surface-3)]">
+        {activePlan?.file_type === 'pdf' ? (
+          <iframe src={imageUrl ?? undefined} className="w-full h-full border-0" title="Floor plan PDF" />
+        ) : imageUrl ? (
+          <div className="relative inline-block min-w-full">
+            <img
+              ref={imgRef}
+              src={imageUrl}
+              alt={activePlan?.floor_label}
+              className={`block max-w-none ${addCameraMode || calibrating ? 'cursor-crosshair' : ''}`}
+              onClick={handleImageClick}
+              onLoad={() => setImgLoaded(true)}
+              draggable={false}
+            />
+
+            {/* Camera markers */}
+            {planCameras.map(cam => (
+              <button
+                key={cam.id}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onSelectCamera(cam.id)
+                }}
+                title={cam.camera_id_tag}
+                className="absolute -translate-x-1/2 -translate-y-1/2 w-6 h-6 rounded-full border-2 border-white shadow flex items-center justify-center text-[8px] font-bold text-white"
+                style={{
+                  left: `${pxToPct(cam.plan_x!, activePlan?.image_width_px || imgRef.current?.naturalWidth || 1)}%`,
+                  top: `${pxToPct(cam.plan_y!, activePlan?.image_height_px || imgRef.current?.naturalHeight || 1)}%`,
+                  backgroundColor: statusColor(cam.status),
+                  outline: selectedCameraId === cam.id ? '2px solid var(--accent)' : 'none',
+                  outlineOffset: '2px',
+                }}
+              >
+                📷
+              </button>
+            ))}
+
+            {/* Calibration points */}
+            {calibPoints.map((p, i) => (
+              <div
+                key={i}
+                className="absolute -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-amber-500 border-2 border-white"
+                style={{
+                  left: `${pxToPct(p.x, activePlan?.image_width_px || imgRef.current?.naturalWidth || 1)}%`,
+                  top: `${pxToPct(p.y, activePlan?.image_height_px || imgRef.current?.naturalHeight || 1)}%`,
+                }}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-[11px] text-[var(--text-tertiary)]">
+            Loading plan…
+          </div>
+        )}
+
+        {!activePlan?.scale_calibration && activePlan?.file_type === 'image' && !calibrating && (
+          <div className="absolute bottom-3 left-3 bg-[var(--warn-soft)] border border-amber-200 text-[var(--warn)] text-[10px] font-bold px-3 py-1.5 rounded-lg">
+            ⚠️ Not calibrated — distances/cable measurements on this plan won&apos;t be accurate until you set the scale.
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

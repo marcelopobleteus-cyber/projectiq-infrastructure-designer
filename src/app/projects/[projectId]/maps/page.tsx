@@ -155,6 +155,7 @@ export default async function ProjectMapsPage({ params }: PageProps) {
           defaultLatitude={Number(project.default_latitude)}
           defaultLongitude={Number(project.default_longitude)}
           defaultZoom={project.default_zoom}
+          initialCanvasMode={(project as any).camera_canvas_mode ?? 'map'}
         />
       </div>
     </div>

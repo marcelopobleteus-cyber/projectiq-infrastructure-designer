@@ -37,6 +37,8 @@ import {
 } from '../actions-fiber'
 import { getDetailedConnectivity, setDetailedConnectivityInNotes, getCameraReadiness } from '@/lib/workflow/projectWorkflowRegistry'
 import ContextSidebar from '@/components/layout/ContextSidebar'
+import PlanCanvas from '@/components/map/PlanCanvas'
+import { setCanvasMode as persistCanvasMode } from '../actions-floorplans'
 
 type CameraLocation = Database['public']['Tables']['camera_locations']['Row']
 type CameraModel = Database['public']['Tables']['camera_models']['Row']
@@ -66,6 +68,7 @@ interface ProjectMapCanvasProps {
   defaultLatitude: number
   defaultLongitude: number
   defaultZoom: number
+  initialCanvasMode?: 'map' | 'uploaded_plan'
 }
 
 export default function ProjectMapCanvas({
@@ -75,8 +78,10 @@ export default function ProjectMapCanvas({
   cameraModels,
   defaultLatitude,
   defaultLongitude,
-  defaultZoom
+  defaultZoom,
+  initialCanvasMode
 }: ProjectMapCanvasProps) {
+  const [canvasMode, setCanvasMode] = useState<'map' | 'uploaded_plan'>(initialCanvasMode ?? 'map')
   const mapRef = useRef<HTMLDivElement>(null)
   const mapRectRef = useRef<DOMRect | null>(null)
   const [map, setMap] = useState<maplibregl.Map | null>(null)
@@ -1871,6 +1876,31 @@ export default function ProjectMapCanvas({
         {/* Map Toolbar */}
         <div className="p-4 bg-[var(--surface-1)] border-b border-[var(--border)] flex items-center justify-between shrink-0 relative z-10 gap-4">
           <div className="flex items-center gap-2">
+            <div className="flex items-center bg-[var(--surface-2)] border border-[var(--border)] rounded-xl p-0.5 mr-1">
+              <button
+                onClick={() => {
+                  setCanvasMode('map')
+                  startTransition(() => { persistCanvasMode({ projectId, module: 'cameras', mode: 'map' }) })
+                }}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
+                  canvasMode === 'map' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-secondary)]'
+                }`}
+              >
+                Map
+              </button>
+              <button
+                onClick={() => {
+                  setCanvasMode('uploaded_plan')
+                  startTransition(() => { persistCanvasMode({ projectId, module: 'cameras', mode: 'uploaded_plan' }) })
+                }}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
+                  canvasMode === 'uploaded_plan' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-secondary)]'
+                }`}
+              >
+                Uploaded Plan
+              </button>
+            </div>
+
             <button
               onClick={() => {
                 setAddCameraMode(!addCameraMode)
@@ -1937,12 +1967,35 @@ export default function ProjectMapCanvas({
           <div
             ref={mapRef}
             className="absolute inset-0 w-full h-full"
+            style={canvasMode === 'uploaded_plan' ? { visibility: 'hidden', pointerEvents: 'none' } : undefined}
             onMouseEnter={() => {
               if (mapRef.current) {
                 mapRectRef.current = mapRef.current.getBoundingClientRect()
               }
             }}
           />
+
+          {canvasMode === 'uploaded_plan' && (
+            <PlanCanvas
+              projectId={projectId}
+              module="cameras"
+              cameras={cameras.map(c => ({
+                id: c.id,
+                camera_id_tag: c.camera_id_tag,
+                plan_x: (c as any).plan_x ?? null,
+                plan_y: (c as any).plan_y ?? null,
+                status: c.status,
+                floor_plan_id: (c as any).floor_plan_id ?? null,
+              }))}
+              addCameraMode={addCameraMode}
+              selectedCameraId={selectedCamera?.id ?? null}
+              onSelectCamera={(id) => {
+                const found = cameras.find(c => c.id === id)
+                if (found) setSelectedCamera(found)
+              }}
+              onCameraPlaced={handleRefresh}
+            />
+          )}
 
           {/* Basemap Toggle: Street (OpenStreetMap) / Satellite (Esri World Imagery) */}
           <div className="absolute top-4 left-4 z-20 flex items-center gap-1 p-1 bg-[var(--surface-1)]/90 backdrop-blur-md border border-[var(--border)] rounded-xl shadow-xl">
