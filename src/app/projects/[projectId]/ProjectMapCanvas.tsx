@@ -38,7 +38,7 @@ import {
 import { getDetailedConnectivity, setDetailedConnectivityInNotes, getCameraReadiness } from '@/lib/workflow/projectWorkflowRegistry'
 import ContextSidebar from '@/components/layout/ContextSidebar'
 import PlanCanvas from '@/components/map/PlanCanvas'
-import { setCanvasMode as persistCanvasMode, getFloorPlans } from '../actions-floorplans'
+import { setCanvasMode as persistCanvasMode, getFloorPlans, placeCameraOnPlan } from '../actions-floorplans'
 import { useRouter } from 'next/navigation'
 import {
   getCameraStatusColor,
@@ -96,8 +96,30 @@ export default function ProjectMapCanvas({
   
   // Elements states
   const router = useRouter()
-  // Camaras bloqueadas por defecto: evita moverlas sin querer al hacer clic.
-  const [camerasUnlocked, setCamerasUnlocked] = useState(false)
+  // Se libera UNA camara a la vez desde el menu contextual, en vez de un modo
+  // global: mover la que se quiere sin arriesgar el resto.
+  const [unlockedCameraId, setUnlockedCameraId] = useState<string | null>(null)
+  const unlockedCameraIdRef = useRef<string | null>(null)
+  // Permite que el menu contextual dispare la calibracion, que vive en PlanCanvas.
+  const planCalibrateRef = useRef<(() => void) | null>(null)
+  // Plano visible en PlanCanvas: lo necesita "Add camera here" del menu.
+  const [activeFloorPlanId, setActiveFloorPlanId] = useState<string | null>(null)
+
+  // Confirmacion propia. El confirm() nativo se puede suprimir desde el
+  // navegador ("impedir que esta pagina cree dialogos"), y cuando eso pasa
+  // devuelve false en silencio: el borrado no ocurria y no se avisaba nada.
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string
+    message: string
+    confirmLabel: string
+    onConfirm: () => void
+  } | null>(null)
+
+  const [contextMenu, setContextMenu] = useState<{
+    x: number
+    y: number
+    target: { kind: 'camera'; id: string } | { kind: 'canvas'; planX?: number; planY?: number; lng?: number; lat?: number }
+  } | null>(null)
   // Indice de planos: solo para etiquetar en que piso vive cada camara.
   const [floorPlanIndex, setFloorPlanIndex] = useState<{ id: string; floor_label: string }[]>([])
   // Los marcadores del mapa se reutilizan entre renders, asi que al cambiar el
@@ -115,10 +137,11 @@ export default function ProjectMapCanvas({
   }, [projectId])
 
   useEffect(() => {
-    camerasUnlockedRef.current = camerasUnlocked
-    Object.values(cameraMarkersRef.current).forEach(m => m.setDraggable(camerasUnlocked))
-    Object.values(deviceMarkersRef.current).forEach(m => m.setDraggable(camerasUnlocked))
-  }, [camerasUnlocked])
+    unlockedCameraIdRef.current = unlockedCameraId
+    Object.entries(cameraMarkersRef.current).forEach(([id, m]) => m.setDraggable(id === unlockedCameraId))
+    // Los equipos de red vuelven a su comportamiento previo: siempre movibles.
+    Object.values(deviceMarkersRef.current).forEach(m => m.setDraggable(true))
+  }, [unlockedCameraId])
   const [cameras, setCameras] = useState<CameraLocation[]>(initialCameras)
   const [networkDevices, setNetworkDevices] = useState<NetworkDevice[]>(initialNetworkDevices)
   const [showCameras, setShowCameras] = useState(true)
@@ -266,7 +289,6 @@ export default function ProjectMapCanvas({
   const [devicePanelMessage, setDevicePanelMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   // Map markers dictionaries
-  const camerasUnlockedRef = useRef(false)
   const cameraMarkersRef = useRef<{ [id: string]: maplibregl.Marker }>({})
   const deviceMarkersRef = useRef<{ [id: string]: maplibregl.Marker }>({})
   const cameraMarkerStateRef = useRef<{ [id: string]: { isSelected: boolean; status: string; tag: string } }>({})
@@ -692,6 +714,17 @@ export default function ProjectMapCanvas({
 
     newMap.on('click', () => {
       if (popupRef.current) popupRef.current.remove()
+      setContextMenu(null)
+    })
+
+    // Clic derecho sobre el mapa vacio: acciones rapidas en ese punto exacto.
+    newMap.on('contextmenu', (e: maplibregl.MapMouseEvent) => {
+      e.preventDefault()
+      setContextMenu({
+        x: e.originalEvent.clientX,
+        y: e.originalEvent.clientY,
+        target: { kind: 'canvas', lng: e.lngLat.lng, lat: e.lngLat.lat },
+      })
     })
 
     newMap.on('load', () => {
@@ -744,9 +777,14 @@ export default function ProjectMapCanvas({
         const svg = createCameraMarkerIcon(cam.status, cam.camera_id_tag, isSelected)
         const el = buildMarkerElement(svg, CAMERA_ICON_SIZE)
         el.title = `${cam.camera_id_tag} (${cam.status})`
+        el.addEventListener('contextmenu', (ev) => {
+          ev.preventDefault()
+          ev.stopPropagation()
+          setContextMenu({ x: ev.clientX, y: ev.clientY, target: { kind: 'camera', id: cam.id } })
+        })
         const marker = new maplibregl.Marker({
           element: el,
-          draggable: camerasUnlockedRef.current,
+          draggable: unlockedCameraIdRef.current === cam.id,
           anchor: 'center',
           offset: CAMERA_ICON_OFFSET
         })
@@ -847,7 +885,7 @@ export default function ProjectMapCanvas({
         el.title = `${dev.name} (${dev.device_type})`
         const marker = new maplibregl.Marker({
           element: el,
-          draggable: camerasUnlockedRef.current,
+          draggable: true,
           anchor: 'center'
         })
           .setLngLat([dev.longitude, dev.latitude])
@@ -1450,10 +1488,94 @@ export default function ProjectMapCanvas({
   }
 
   // Camera delete handler
-  const handleDeleteCameraClick = async () => {
-    if (!selectedCamera) return
-    if (!confirm(`Are you sure you want to delete ${selectedCamera.camera_id_tag}?`)) return
+  // ── Acciones del menu contextual ───────────────────────────────────────
+  /** Cambia el estado sin abrir el panel: el color del icono responde al toque. */
+  const handleQuickStatusChange = async (
+    cam: CameraLocation,
+    status: Database['public']['Enums']['camera_status'],
+  ) => {
+    if (cam.status === status) return
+    const previous = cam.status
+    setCameras(prev => prev.map(c => (c.id === cam.id ? { ...c, status } : c)))
+    if (selectedCamera?.id === cam.id) setSelectedCamera({ ...cam, status })
 
+    // updateCameraDetails espera el objeto completo: se reenvian los valores
+    // actuales y solo cambia el estado.
+    const result = await updateCameraDetails({
+      id: cam.id,
+      projectId,
+      details: {
+        camera_id_tag: cam.camera_id_tag,
+        camera_model_id: cam.camera_model_id,
+        status,
+        communication_type: cam.communication_type,
+        power_type: cam.power_type,
+        address_reference: cam.address_reference,
+        structure_reference: cam.structure_reference,
+        notes: cam.notes,
+      },
+    })
+    if (result?.error) {
+      // Revertir: el icono no debe mostrar un estado que no se guardo.
+      setCameras(prev => prev.map(c => (c.id === cam.id ? { ...c, status: previous } : c)))
+      setCameraPanelMessage({ type: 'error', text: result.error })
+    }
+  }
+
+  /** Crea una camara justo donde se hizo clic derecho. */
+  const handleAddCameraHere = async (t: { planX?: number; planY?: number; lng?: number; lat?: number }) => {
+    if (canvasMode === 'uploaded_plan') {
+      if (t.planX == null || t.planY == null || !activeFloorPlanId) return
+      const result = await placeCameraOnPlan({
+        projectId,
+        floorPlanId: activeFloorPlanId,
+        planX: t.planX,
+        planY: t.planY,
+      })
+      if (result.error) setCameraPanelMessage({ type: 'error', text: result.error })
+      else if (result.data) setCameras(prev => [...prev, result.data as CameraLocation])
+      return
+    }
+
+    if (t.lng == null || t.lat == null) return
+    const result = await createCameraLocation({ projectId, latitude: t.lat, longitude: t.lng })
+    if (result.error) setCameraPanelMessage({ type: 'error', text: result.error })
+    else if (result.data) {
+      setCameras(prev => [...prev, result.data as CameraLocation])
+      setSelectedCamera(result.data as CameraLocation)
+    }
+  }
+
+  /** Crea un equipo de red donde se hizo clic derecho (solo mapa). */
+  const handleAddDeviceHere = async (t: { lng?: number; lat?: number }) => {
+    if (t.lng == null || t.lat == null) return
+    const result = await createNetworkDevice({
+      projectId,
+      deviceType: 'switch',
+      totalPorts: 8,
+      poeBudgetWatts: 120,
+      latitude: t.lat,
+      longitude: t.lng,
+    })
+    if (result.error) setCameraPanelMessage({ type: 'error', text: result.error })
+    else if (result.data) {
+      setNetworkDevices(prev => [...prev, result.data as NetworkDevice])
+      setSelectedDevice(result.data as NetworkDevice)
+    }
+  }
+
+  const handleDeleteCameraClick = () => {
+    if (!selectedCamera) return
+    const cam = selectedCamera
+    setConfirmDialog({
+      title: `Delete ${cam.camera_id_tag}?`,
+      message: 'The camera and its checklist tasks will be removed. This cannot be undone.',
+      confirmLabel: 'Delete camera',
+      onConfirm: () => runDeleteCamera(cam),
+    })
+  }
+
+  const runDeleteCamera = async (selectedCamera: CameraLocation) => {
     startTransition(async () => {
       // Clear assignment first to update local ports if needed
       await unassignCameraFromPort({ cameraLocationId: selectedCamera.id, projectId })
@@ -1489,7 +1611,7 @@ export default function ProjectMapCanvas({
         setNewTaskTitle('')
         await loadCameraTasksAndHistory(selectedCamera.id)
       } else if (res.error) {
-        alert(res.error)
+        setCameraPanelMessage({ type: 'error', text: res.error })
       }
     } catch (err) {
       console.error('Error creating task:', err)
@@ -1553,9 +1675,17 @@ export default function ProjectMapCanvas({
     }
   }
 
-  const handleDeleteTask = async (taskId: string) => {
+  const handleDeleteTask = (taskId: string) => {
+    setConfirmDialog({
+      title: 'Delete this task?',
+      message: 'The checklist task will be removed from this camera.',
+      confirmLabel: 'Delete task',
+      onConfirm: () => runDeleteTask(taskId),
+    })
+  }
+
+  const runDeleteTask = async (taskId: string) => {
     if (!selectedCamera) return
-    if (!confirm('Are you sure you want to delete this task?')) return
     try {
       const res = await deleteCameraTask({
         projectId,
@@ -1740,9 +1870,19 @@ export default function ProjectMapCanvas({
   }
 
   // Network device delete handler
-  const handleDeleteDeviceClick = async () => {
+  const handleDeleteDeviceClick = () => {
     if (!selectedDevice) return
-    if (!confirm(`Are you sure you want to delete ${selectedDevice.name}?`)) return
+    const dev = selectedDevice
+    setConfirmDialog({
+      title: `Delete ${dev.name}?`,
+      message: 'This network device will be removed from the project.',
+      confirmLabel: 'Delete device',
+      onConfirm: () => runDeleteDevice(),
+    })
+  }
+
+  const runDeleteDevice = async () => {
+    if (!selectedDevice) return
 
     startTransition(async () => {
       const result = await deleteNetworkDevice({
@@ -1875,18 +2015,6 @@ export default function ProjectMapCanvas({
         className="px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-primary)] disabled:opacity-50 shrink-0"
       >
         {isBackfilling ? 'Analyzing…' : 'Checklists'}
-      </button>
-
-      <button
-        onClick={() => setCamerasUnlocked(v => !v)}
-        title={camerasUnlocked ? 'Lock cameras in place' : 'Unlock cameras to drag them'}
-        className={`px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all border shrink-0 ${
-          camerasUnlocked
-            ? 'bg-emerald-600 border-emerald-500 text-white'
-            : 'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text-primary)]'
-        }`}
-      >
-        {camerasUnlocked ? 'Lock' : 'Move'}
       </button>
 
       <button
@@ -2044,7 +2172,13 @@ export default function ProjectMapCanvas({
                 if (found) setSelectedCamera(found)
               }}
               toolsSlot={toolButtons}
-              camerasUnlocked={camerasUnlocked}
+              unlockedCameraId={unlockedCameraId}
+              onCameraContextMenu={(id, x, y) => setContextMenu({ x, y, target: { kind: 'camera', id } })}
+              onCanvasContextMenu={(planX, planY, x, y) =>
+                setContextMenu({ x, y, target: { kind: 'canvas', planX, planY } })
+              }
+              onActivePlanChange={setActiveFloorPlanId}
+              registerCalibrate={(fn) => { planCalibrateRef.current = fn }}
               onCameraMoved={(id, x, y) => {
                 setCameras(prev => prev.map(c =>
                   c.id === id ? ({ ...c, plan_x: x, plan_y: y } as CameraLocation) : c
@@ -3662,6 +3796,149 @@ export default function ProjectMapCanvas({
         </div>
       </div>
     )}
+
+      {/* ── Menu contextual (clic derecho) ── */}
+      {contextMenu && (
+        <>
+          {/* Capa para cerrar al hacer clic fuera */}
+          <div className="fixed inset-0 z-[90]" onClick={() => setContextMenu(null)} onContextMenu={(e) => { e.preventDefault(); setContextMenu(null) }} />
+          <div
+            className="fixed z-[91] min-w-[190px] bg-[var(--surface-1)] border border-[var(--border)] rounded-xl shadow-2xl py-1.5 text-[11px] font-sans"
+            style={{
+              // Se corre el menu si no cabe, para que no quede fuera de pantalla.
+              left: Math.min(contextMenu.x, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 210),
+              top: Math.min(contextMenu.y, (typeof window !== 'undefined' ? window.innerHeight : 800) - 260),
+            }}
+          >
+            {contextMenu.target.kind === 'camera' ? (() => {
+              const camId = contextMenu.target.kind === 'camera' ? contextMenu.target.id : ''
+              const cam = cameras.find(c => c.id === camId)
+              if (!cam) return null
+              const isUnlocked = unlockedCameraId === cam.id
+              return (
+                <>
+                  <div className="px-3 py-1.5 text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider border-b border-[var(--border)] mb-1">
+                    {cam.camera_id_tag}
+                  </div>
+
+                  <button
+                    className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-2)] text-[var(--text-primary)] font-semibold"
+                    onClick={() => {
+                      setUnlockedCameraId(isUnlocked ? null : cam.id)
+                      setContextMenu(null)
+                    }}
+                  >
+                    {isUnlocked ? 'Lock in place' : 'Move camera'}
+                  </button>
+
+                  <button
+                    className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-2)] text-[var(--text-primary)]"
+                    onClick={() => { setSelectedCamera(cam); setContextMenu(null) }}
+                  >
+                    Open details
+                  </button>
+
+                  <div className="px-3 pt-2 pb-1 text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">
+                    Status
+                  </div>
+                  {([
+                    { key: 'planned', label: 'Planned' },
+                    { key: 'in_progress', label: 'In Progress' },
+                    { key: 'complete', label: 'Complete' },
+                    { key: 'issue', label: 'Issue' },
+                  ] as const).map(opt => (
+                    <button
+                      key={opt.key}
+                      className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-2)] text-[var(--text-primary)] flex items-center gap-2"
+                      onClick={() => { void handleQuickStatusChange(cam, opt.key); setContextMenu(null) }}
+                    >
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: getCameraStatusColor(opt.key) }} />
+                      {opt.label}
+                      {cam.status === opt.key && <span className="ml-auto text-[var(--accent-text)]">✓</span>}
+                    </button>
+                  ))}
+
+                  <div className="border-t border-[var(--border)] mt-1 pt-1">
+                    <button
+                      className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-2)] text-[var(--danger)] font-semibold"
+                      onClick={() => {
+                        setContextMenu(null)
+                        setConfirmDialog({
+                          title: `Delete ${cam.camera_id_tag}?`,
+                          message: 'The camera and its checklist tasks will be removed. This cannot be undone.',
+                          confirmLabel: 'Delete camera',
+                          onConfirm: () => runDeleteCamera(cam),
+                        })
+                      }}
+                    >
+                      Delete camera
+                    </button>
+                  </div>
+                </>
+              )
+            })() : (
+              <>
+                <button
+                  className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-2)] text-[var(--text-primary)] font-semibold"
+                  onClick={() => {
+                    const t = contextMenu.target
+                    setContextMenu(null)
+                    if (t.kind === 'canvas') void handleAddCameraHere(t)
+                  }}
+                >
+                  Add camera here
+                </button>
+
+                {canvasMode === 'map' && (
+                  <button
+                    className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-2)] text-[var(--text-primary)]"
+                    onClick={() => {
+                      const t = contextMenu.target
+                      setContextMenu(null)
+                      if (t.kind === 'canvas') void handleAddDeviceHere(t)
+                    }}
+                  >
+                    Add network device here
+                  </button>
+                )}
+
+                {canvasMode === 'uploaded_plan' && (
+                  <button
+                    className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-2)] text-[var(--text-primary)]"
+                    onClick={() => { planCalibrateRef.current?.(); setContextMenu(null) }}
+                  >
+                    Calibrate scale
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ── Confirmacion propia (reemplaza al confirm() nativo) ── */}
+      {confirmDialog && (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/40 p-6">
+          <div className="w-full max-w-sm bg-[var(--surface-1)] border border-[var(--border)] rounded-xl shadow-2xl p-4 flex flex-col gap-3 font-sans">
+            <p className="text-sm font-bold text-[var(--text-primary)]">{confirmDialog.title}</p>
+            <p className="text-[11px] text-[var(--text-secondary)]">{confirmDialog.message}</p>
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-secondary)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { const fn = confirmDialog.onConfirm; setConfirmDialog(null); fn() }}
+                className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-[var(--danger)] text-white"
+              >
+                {confirmDialog.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

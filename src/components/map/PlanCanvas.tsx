@@ -43,8 +43,16 @@ interface PlanCanvasProps {
   onCameraPlaced: (camera: unknown) => void
   /** Herramientas contextuales (Add Camera, etc.) renderizadas en esta barra. */
   toolsSlot?: React.ReactNode
-  /** Cuando esta desbloqueado, las camaras se pueden arrastrar sobre el plano. */
-  camerasUnlocked?: boolean
+  /** Id de la unica camara liberada para arrastrar (desde el menu contextual). */
+  unlockedCameraId?: string | null
+  /** Clic derecho sobre una camara. */
+  onCameraContextMenu?: (cameraId: string, clientX: number, clientY: number) => void
+  /** Clic derecho sobre el plano vacio; entrega px nativos y la posicion en pantalla. */
+  onCanvasContextMenu?: (planX: number, planY: number, clientX: number, clientY: number) => void
+  /** Expone al padre la accion de calibrar, para dispararla desde el menu. */
+  registerCalibrate?: (fn: () => void) => void
+  /** Informa que plano esta visible, para "Add camera here". */
+  onActivePlanChange?: (planId: string | null) => void
   /** Notifica la nueva posicion tras arrastrar, para actualizar el estado del padre. */
   onCameraMoved?: (cameraId: string, planX: number, planY: number) => void
 }
@@ -58,8 +66,12 @@ export default function PlanCanvas({
   onSelectCamera,
   onCameraPlaced,
   toolsSlot,
-  camerasUnlocked = false,
+  unlockedCameraId = null,
   onCameraMoved,
+  onCameraContextMenu,
+  onCanvasContextMenu,
+  registerCalibrate,
+  onActivePlanChange,
 }: PlanCanvasProps) {
   const [plans, setPlans] = useState<FloorPlan[]>([])
   const [activePlanId, setActivePlanId] = useState<string | null>(null)
@@ -376,6 +388,17 @@ export default function PlanCanvas({
     window.addEventListener('pointerup', onUp)
     void startEvent
   }
+
+  useEffect(() => { onActivePlanChange?.(activePlanId) }, [activePlanId, onActivePlanChange])
+
+  // El menu contextual necesita poder arrancar la calibracion desde afuera.
+  useEffect(() => {
+    registerCalibrate?.(() => {
+      setCalibrating(true)
+      setCalibPoints([])
+      setCalibDistance('')
+    })
+  }, [registerCalibrate])
 
   const saveCalibration = async () => {
     if (!activePlan || calibPoints.length !== 2 || !calibDistance) return
@@ -710,6 +733,13 @@ export default function PlanCanvas({
               className={`block ${zoom === null ? 'max-w-full max-h-full' : 'max-w-none'} ${placing ? 'cursor-wait' : addCameraMode || calibrating ? 'cursor-crosshair' : ''}`}
               style={zoom !== null && naturalSize ? { width: naturalSize.w * zoom, height: naturalSize.h * zoom } : undefined}
               onClick={handleImageClick}
+              onContextMenu={(e) => {
+                if (!imgLoaded) return
+                const coords = getRelativeCoords(e)
+                if (!coords) return
+                e.preventDefault()
+                onCanvasContextMenu?.(coords.x, coords.y, e.clientX, e.clientY)
+              }}
               onLoad={(e) => {
                 const el = e.currentTarget
                 setNaturalSize({ w: el.naturalWidth, h: el.naturalHeight })
@@ -728,12 +758,17 @@ export default function PlanCanvas({
                   onSelectCamera(cam.id)
                 }}
                 onPointerDown={(e) => {
-                  if (!camerasUnlocked) return
+                  if (unlockedCameraId !== cam.id) return
                   e.stopPropagation()
                   e.preventDefault()
                   beginDrag(cam.id, e)
                 }}
-                title={camerasUnlocked ? `${cam.camera_id_tag} — drag to move` : cam.camera_id_tag}
+                onContextMenu={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onCameraContextMenu?.(cam.id, e.clientX, e.clientY)
+                }}
+                title={unlockedCameraId === cam.id ? `${cam.camera_id_tag} — drag to move` : cam.camera_id_tag}
                 className="absolute select-none"
                 style={{
                   // El ancla visual del icono es el centro del circulo, no el
@@ -744,7 +779,7 @@ export default function PlanCanvas({
                   height: 60,
                   marginLeft: -23,
                   marginTop: -23,
-                  cursor: camerasUnlocked ? (draggingId === cam.id ? 'grabbing' : 'grab') : 'pointer',
+                  cursor: unlockedCameraId === cam.id ? (draggingId === cam.id ? 'grabbing' : 'grab') : 'pointer',
                   zIndex: draggingId === cam.id ? 25 : selectedCameraId === cam.id ? 20 : 10,
                   touchAction: 'none',
                 }}
