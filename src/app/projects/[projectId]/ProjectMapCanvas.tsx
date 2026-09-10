@@ -43,11 +43,15 @@ import {
   coneGeoJsonPolygon,
   resolveFovDegrees,
   resolveRangeFt,
+  resolveHeadingDegrees,
   resolveHorizontalPixels,
   doriBands,
   DEFAULT_RANGE_FT,
   normalizeHeading,
   DORI_THRESHOLDS,
+  bearingBetween,
+  distanceFeetBetween,
+  destinationPoint,
 } from '@/lib/fov'
 import { useRouter } from 'next/navigation'
 import {
@@ -322,6 +326,12 @@ export default function ProjectMapCanvas({
   const [devicePoeBudget, setDevicePoeBudget] = useState(120)
   const [deviceLocRef, setDeviceLocRef] = useState('')
   const [devicePanelMessage, setDevicePanelMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // Espejo de `cameras` para leer el valor mas reciente desde callbacks que no
+  // pueden depender de el sin re-crear cosas (el guardado del cono, disparado
+  // tanto desde el mapa GIS como desde el plano).
+  const camerasRef = useRef<CameraLocation[]>(cameras)
+  useEffect(() => { camerasRef.current = cameras }, [cameras])
 
   // Map markers dictionaries
   const cameraMarkersRef = useRef<{ [id: string]: maplibregl.Marker }>({})
@@ -911,10 +921,12 @@ export default function ProjectMapCanvas({
     const features: GeoJSON.Feature[] = []
 
     for (const cam of cameras) {
-      // Sin heading no hay hacia donde apuntar, y una camara en el plano no
-      // tiene coordenadas reales: en ambos casos no se dibuja nada en vez de
-      // inventar una direccion.
-      if (cam.heading_degrees === null || cam.heading_degrees === undefined) continue
+      // Una camara en el plano no tiene coordenadas reales de mapa, asi que
+      // ahi no hay nada que dibujar. Pero SIN heading guardado el cono se
+      // dibuja igual apuntando al norte (default) en vez de desaparecer: antes
+      // esto dejaba a casi todas las camaras sin cono hasta que alguien
+      // entraba a tocar el heading a mano, y el usuario corrige la direccion
+      // arrastrando el cono en el mapa, no partiendo de un lienzo vacio.
       if (cam.show_fov === false) continue
       if (cam.floor_plan_id) continue
       if (!cam.latitude || !cam.longitude) continue
@@ -922,7 +934,7 @@ export default function ProjectMapCanvas({
       const model = cameraModels.find(m => m.id === cam.camera_model_id)
       const fovDeg = resolveFovDegrees(cam.fov_degrees, model?.lens_type)
       const dayRangeFt = resolveRangeFt(cam.fov_range_ft)
-      const heading = normalizeHeading(Number(cam.heading_degrees))
+      const heading = resolveHeadingDegrees(cam.heading_degrees)
       const isSelected = selectedCamera?.id === cam.id
 
       // De noche manda el iluminador: mas alla de su alcance la camara ve
@@ -1002,6 +1014,240 @@ export default function ProjectMapCanvas({
 
     return cleanup
   }, [cameras, cameraModels, map, selectedCamera, showCameras, showFovCones, showDori, showNightIr, canvasMode])
+
+  /**
+   * Aplica un patch de cono (heading/fov/alcance) solo en memoria — para el
+   * feedback visual mientras se arrastra un handle, tanto en el mapa GIS como
+   * en el plano. No toca la base de datos.
+   */
+  const applyLiveFovPatch = (
+    cameraId: string,
+    patch: { heading_degrees?: number; fov_degrees?: number; fov_range_ft?: number },
+  ) => {
+    setCameras(prev => prev.map(c => c.id === cameraId ? { ...c, ...patch } : c))
+    setSelectedCamera(prev => (prev && prev.id === cameraId ? { ...prev, ...patch } : prev))
+    if (selectedCamera?.id === cameraId) {
+      if (patch.heading_degrees !== undefined) setCameraHeading(String(Math.round(patch.heading_degrees)))
+      if (patch.fov_range_ft !== undefined) setCameraFovRange(String(Math.round(patch.fov_range_ft)))
+      if (patch.fov_degrees !== undefined) setCameraFov(String(Math.round(patch.fov_degrees)))
+    }
+  }
+
+  /**
+   * Guarda un patch de cono en la base de datos. Se llama una sola vez, al
+   * soltar el handle — no en cada frame del arrastre. Manda el objeto
+   * `details` completo porque updateCameraDetails hace un reemplazo, no un
+   * PATCH parcial: el resto de los campos se rellenan con los valores
+   * actuales de la camara (via camerasRef, para no depender de un closure
+   * viejo si el usuario arrastro justo despues de otro cambio).
+   */
+  const persistCameraFov = async (
+    cameraId: string,
+    patch: { heading_degrees?: number; fov_degrees?: number; fov_range_ft?: number },
+  ) => {
+    applyLiveFovPatch(cameraId, patch)
+    const cam = camerasRef.current.find(c => c.id === cameraId)
+    if (!cam) return
+
+    const details = {
+      camera_id_tag: cam.camera_id_tag,
+      camera_model_id: cam.camera_model_id,
+      status: cam.status,
+      communication_type: cam.communication_type,
+      power_type: cam.power_type,
+      address_reference: cam.address_reference,
+      structure_reference: cam.structure_reference,
+      notes: cam.notes,
+      lens: cam.lens,
+      mounting_height_ft: cam.mounting_height_ft,
+      ip_address: cam.ip_address,
+      resolution: cam.resolution,
+      fov_degrees: patch.fov_degrees ?? cam.fov_degrees,
+      heading_degrees: patch.heading_degrees ?? cam.heading_degrees,
+      fov_range_ft: patch.fov_range_ft ?? cam.fov_range_ft,
+      show_fov: cam.show_fov !== false,
+      ir_range_ft: cam.ir_range_ft,
+    }
+    const result = await updateCameraDetails({ id: cameraId, projectId, details })
+    if (result.error) {
+      setCameraPanelMessage({ type: 'error', text: result.error })
+    }
+  }
+
+  // ── Handles interactivos del cono, solo para la camara seleccionada ──────
+  // Con 35 camaras no tiene sentido poner handles arrastrables en todas a la
+  // vez — serian puntitos por todo el mapa sin poder agarrar el correcto. Se
+  // muestran nada mas para la que esta abierta en el panel, tres puntos:
+  //  - "aim": en la punta del cono. Arrastrarlo rota Y estira/acorta el
+  //    alcance al mismo tiempo — es la forma natural de "mover el cono".
+  //  - "edgeLeft"/"edgeRight": en los dos bordes del arco. Arrastrar uno abre
+  //    o cierra el angulo de apertura (FOV) sin tocar hacia donde apunta.
+  // Durante el arrastre se actualiza el poligono directo en la fuente del
+  // mapa (no via setState) para que no salte ni se recreen los marcadores en
+  // cada pixel de movimiento; recien al soltar se guarda en la base de datos
+  // y se sincroniza el estado de React.
+  const fovHandleMarkersRef = useRef<{
+    aim?: maplibregl.Marker
+    edgeLeft?: maplibregl.Marker
+    edgeRight?: maplibregl.Marker
+  }>({})
+
+  useEffect(() => {
+    if (!map) return
+
+    const cleanupHandles = () => {
+      Object.values(fovHandleMarkersRef.current).forEach(m => m?.remove())
+      fovHandleMarkersRef.current = {}
+    }
+
+    const cam = selectedCamera
+    if (
+      !cam || !showFovCones || canvasMode !== 'map' || cam.floor_plan_id ||
+      cam.latitude == null || cam.longitude == null
+    ) {
+      cleanupHandles()
+      return
+    }
+
+    const camLat = cam.latitude
+    const camLng = cam.longitude
+    const model = cameraModels.find(m => m.id === cam.camera_model_id)
+    let liveHeading = resolveHeadingDegrees(cam.heading_degrees)
+    let liveFov = resolveFovDegrees(cam.fov_degrees, model?.lens_type)
+    let liveRange = resolveRangeFt(cam.fov_range_ft)
+
+    const buildHandleEl = (glyph: string) => {
+      const el = document.createElement('div')
+      el.style.width = '18px'
+      el.style.height = '18px'
+      el.style.borderRadius = '50%'
+      el.style.background = '#0ea5e9'
+      el.style.border = '2px solid white'
+      el.style.boxShadow = '0 1px 5px rgba(0,0,0,0.55)'
+      el.style.cursor = 'grab'
+      el.style.display = 'flex'
+      el.style.alignItems = 'center'
+      el.style.justifyContent = 'center'
+      el.style.fontSize = '9px'
+      el.style.color = 'white'
+      el.style.fontWeight = '700'
+      el.textContent = glyph
+      el.title = glyph === '↻' ? 'Drag to aim and set range' : 'Drag to widen or narrow the cone'
+      return el
+    }
+
+    // Actualiza SOLO el feature de esta camara dentro de la fuente del cono,
+    // dejando intactos los de las otras 34. Simplificado a un cono simple
+    // durante el arrastre (sin bandas DORI ni IR nocturno): esas variantes se
+    // vuelven a calcular solas al soltar, cuando el efecto principal del cono
+    // corre de nuevo con los valores ya guardados.
+    const updateLiveCone = () => {
+      const src = map.getSource('camera-fov-fill') as maplibregl.GeoJSONSource | undefined
+      if (!src) return
+      const current = (src as unknown as { _data?: GeoJSON.FeatureCollection })._data
+      const others = (current?.features || []).filter(ft => (ft.properties as any)?.cameraId !== cam.id)
+      others.push({
+        type: 'Feature',
+        properties: { color: '#0ea5e9', opacity: 0.4, cameraId: cam.id },
+        geometry: {
+          type: 'Polygon',
+          coordinates: [coneGeoJsonPolygon(camLat, camLng, liveHeading, liveFov, liveRange)],
+        },
+      })
+      src.setData({ type: 'FeatureCollection', features: others })
+    }
+
+    const repositionEdges = () => {
+      const half = Math.min(liveFov, 360) / 2
+      const [llng, llat] = destinationPoint(camLat, camLng, liveHeading - half, liveRange)
+      const [rlng, rlat] = destinationPoint(camLat, camLng, liveHeading + half, liveRange)
+      fovHandleMarkersRef.current.edgeLeft?.setLngLat([llng, llat])
+      fovHandleMarkersRef.current.edgeRight?.setLngLat([rlng, rlat])
+    }
+
+    const repositionAim = () => {
+      const [alng, alat] = destinationPoint(camLat, camLng, liveHeading, liveRange)
+      fovHandleMarkersRef.current.aim?.setLngLat([alng, alat])
+    }
+
+    // -- Handle "aim": punta del cono, en la bisectriz. Rota y ajusta alcance. --
+    const [aimLng, aimLat] = destinationPoint(camLat, camLng, liveHeading, liveRange)
+    const aimMarker = new maplibregl.Marker({ element: buildHandleEl('↻'), draggable: true, anchor: 'center' })
+      .setLngLat([aimLng, aimLat])
+      .addTo(map)
+
+    aimMarker.on('drag', () => {
+      const pos = aimMarker.getLngLat()
+      liveHeading = normalizeHeading(bearingBetween(camLat, camLng, pos.lat, pos.lng))
+      liveRange = Math.max(10, Math.min(3000, distanceFeetBetween(camLat, camLng, pos.lat, pos.lng)))
+      updateLiveCone()
+      repositionEdges()
+    })
+    aimMarker.on('dragend', () => {
+      persistCameraFov(cam.id, { heading_degrees: liveHeading, fov_range_ft: liveRange })
+    })
+
+    // -- Handles de borde: abren/cierran el angulo del cono. --
+    const makeEdgeMarker = (sign: 1 | -1) => {
+      const half0 = Math.min(liveFov, 360) / 2
+      const [elng, elat] = destinationPoint(camLat, camLng, liveHeading + sign * half0, liveRange)
+      const marker = new maplibregl.Marker({ element: buildHandleEl(sign < 0 ? '⟨' : '⟩'), draggable: true, anchor: 'center' })
+        .setLngLat([elng, elat])
+        .addTo(map)
+
+      const computeFov = (pos: maplibregl.LngLat) => {
+        const bearing = bearingBetween(camLat, camLng, pos.lat, pos.lng)
+        // Diferencia angular mas corta contra el heading actual: si arrastran
+        // el handle "cruzando" el eje, da un numero razonable en vez de saltar
+        // a algo como 360 - epsilon.
+        let diff = normalizeHeading(bearing - liveHeading)
+        if (diff > 180) diff = 360 - diff
+        return Math.max(5, Math.min(179.9, diff * 2))
+      }
+
+      marker.on('drag', () => {
+        liveFov = computeFov(marker.getLngLat())
+        updateLiveCone()
+        repositionAim()
+        // El otro borde se re-posiciona con el mismo angulo, simetrico al heading.
+        const half = liveFov / 2
+        const otherSign = sign === 1 ? -1 : 1
+        const [olng, olat] = destinationPoint(camLat, camLng, liveHeading + otherSign * half, liveRange)
+        const other = sign === 1 ? fovHandleMarkersRef.current.edgeLeft : fovHandleMarkersRef.current.edgeRight
+        other?.setLngLat([olng, olat])
+      })
+      marker.on('dragend', () => {
+        persistCameraFov(cam.id, { fov_degrees: liveFov })
+      })
+      return marker
+    }
+
+    const edgeLeft = makeEdgeMarker(-1)
+    const edgeRight = makeEdgeMarker(1)
+
+    fovHandleMarkersRef.current = { aim: aimMarker, edgeLeft, edgeRight }
+
+    return cleanupHandles
+    // Deliberadamente NO depende de `cameras` completo (solo de estos pocos
+    // campos primitivos de la camara seleccionada): durante el arrastre no se
+    // toca React state hasta soltar, asi que esto no se re-dispara a medio
+    // arrastre. Se re-dispara despues de un dragend (persist llama a
+    // setSelectedCamera) o tras guardar manualmente desde el panel, que es
+    // justo cuando conviene recalcular la posicion de los handles.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    map,
+    selectedCamera?.id,
+    selectedCamera?.heading_degrees,
+    selectedCamera?.fov_degrees,
+    selectedCamera?.fov_range_ft,
+    selectedCamera?.show_fov,
+    selectedCamera?.latitude,
+    selectedCamera?.longitude,
+    cameraModels,
+    showFovCones,
+    canvasMode,
+  ])
 
   // Synchronize Network Device Markers
   useEffect(() => {
@@ -2394,8 +2640,10 @@ export default function ProjectMapCanvas({
                 status: c.status,
                 floor_plan_id: (c as any).floor_plan_id ?? null,
                 // Cono de vision: se resuelve aqui y no dentro de PlanCanvas
-                // porque el catalogo de modelos vive en este componente.
-                heading_degrees: (c as any).heading_degrees ?? null,
+                // porque el catalogo de modelos vive en este componente. Sin
+                // heading guardado apunta al norte por default (igual que en
+                // el mapa GIS), en vez de no dibujar nada.
+                heading_degrees: resolveHeadingDegrees((c as any).heading_degrees),
                 show_fov: (c as any).show_fov !== false,
                 fov_degrees: resolveFovDegrees(
                   (c as any).fov_degrees,
@@ -2410,6 +2658,8 @@ export default function ProjectMapCanvas({
               showFov={showFovCones}
               showDori={showDori}
               showNightIr={showNightIr}
+              onCameraFovLiveChange={applyLiveFovPatch}
+              onCameraFovCommit={persistCameraFov}
               addCameraMode={addCameraMode}
               selectedCameraId={selectedCamera?.id ?? null}
               onSelectCamera={(id) => {
@@ -3011,9 +3261,12 @@ export default function ProjectMapCanvas({
                         </div>
 
                         {/* ── Cono de vision ──
-                            Heading vacio = no se dibuja nada. Es deliberado:
-                            una camara con direccion inventada dibuja cobertura
-                            que nadie verifico en terreno. */}
+                            Heading vacio = se dibuja apuntando al norte por
+                            default (ver resolveHeadingDegrees). El cono
+                            tambien se puede arrastrar directo sobre el mapa,
+                            con la camara seleccionada: el handle del extremo
+                            rota y estira/acorta el alcance, los dos handles
+                            del arco abren y cierran el angulo. */}
                         <div className="grid grid-cols-2 gap-3 mt-3">
                           <div>
                             <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Aim / Heading (°)</label>
@@ -3055,7 +3308,7 @@ export default function ProjectMapCanvas({
                             Show coverage cone
                           </label>
                           {cameraHeading.trim() === '' && (
-                            <span className="text-[10px] text-[var(--text-tertiary)]">Set a heading to draw it</span>
+                            <span className="text-[10px] text-[var(--text-tertiary)]">Pointing North by default — drag the cone on the map to aim it</span>
                           )}
                         </div>
 

@@ -24,9 +24,13 @@ export function getCameraStatusColor(status: CameraStatus): string {
   }
 }
 
-export const CAMERA_ICON_SIZE: [number, number] = [46, 60]
+// 30% mas chico que el original (46x60): con el cono de FOV activo el icono
+// tapaba demasiado plano/mapa alrededor de la camara. El SVG interno sigue
+// usando el viewBox 0 0 46 60 sin tocar, asi que reducir estos dos numeros
+// alcanza para achicarlo en todas las vistas que lo usan (mapa y plano).
+export const CAMERA_ICON_SIZE: [number, number] = [32, 42]
 /** El ancla visual es el centro del circulo (23,23), no el centro de la caja. */
-export const CAMERA_ICON_OFFSET: [number, number] = [0, 7]
+export const CAMERA_ICON_OFFSET: [number, number] = [0, 5]
 
 /**
  * SVG del marcador: cuerpo de camara bullet, lente, modulo de video y una

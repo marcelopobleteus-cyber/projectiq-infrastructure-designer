@@ -10,8 +10,14 @@ import {
   placeCameraOnPlan,
   updateCameraPlanPosition,
 } from '@/app/projects/actions-floorplans'
-import { createCameraMarkerSvg } from '@/lib/cameraMarker'
-import { conePlanPath, doriBands, FEET_PER_METER } from '@/lib/fov'
+import { createCameraMarkerSvg, CAMERA_ICON_SIZE } from '@/lib/cameraMarker'
+import {
+  conePlanPath,
+  conePointsPlanar,
+  doriBands,
+  FEET_PER_METER,
+  normalizeHeading,
+} from '@/lib/fov'
 
 interface FloorPlan {
   id: string
@@ -70,6 +76,20 @@ interface PlanCanvasProps {
   showDori?: boolean
   /** Modo noche: el alcance lo manda el iluminador IR. */
   showNightIr?: boolean
+  /**
+   * Arrastre en vivo de los handles del cono (rotar/alcance, abrir/cerrar).
+   * Se llama en cada movimiento, sin guardar todavia — el padre solo
+   * actualiza su estado local para que el cono se vea moverse.
+   */
+  onCameraFovLiveChange?: (
+    cameraId: string,
+    patch: { heading_degrees?: number; fov_degrees?: number; fov_range_ft?: number },
+  ) => void
+  /** Se llama una vez al soltar el handle: aqui es cuando el padre guarda en la base. */
+  onCameraFovCommit?: (
+    cameraId: string,
+    patch: { heading_degrees?: number; fov_degrees?: number; fov_range_ft?: number },
+  ) => void
 }
 
 export default function PlanCanvas({
@@ -90,6 +110,8 @@ export default function PlanCanvas({
   showFov = true,
   showDori = false,
   showNightIr = false,
+  onCameraFovLiveChange,
+  onCameraFovCommit,
 }: PlanCanvasProps) {
   const [plans, setPlans] = useState<FloorPlan[]>([])
   const [activePlanId, setActivePlanId] = useState<string | null>(null)
@@ -402,6 +424,78 @@ export default function PlanCanvas({
       setTimeout(() => { draggingIdRef.current = null }, 0)
     }
 
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    void startEvent
+  }
+
+  /**
+   * Arrastre de un handle del cono (aim = rota + alcance; edgeLeft/edgeRight
+   * = abre/cierra el angulo). Mismo patron que beginDrag: se trabaja en px
+   * nativos de la imagen para que el zoom no afecte, y el guardado en la
+   * base va solo al soltar — mientras se arrastra, solo se avisa al padre
+   * para que el cono se vea moverse.
+   */
+  const beginFovDrag = (
+    cam: PlanCameraMarker,
+    kind: 'aim' | 'edgeLeft' | 'edgeRight',
+    headingDeg: number,
+    fovDeg: number,
+    rangeFt: number,
+    startEvent: React.PointerEvent,
+  ) => {
+    const img = imgRef.current
+    if (!img || !pxPerFoot || cam.plan_x == null || cam.plan_y == null) return
+    const cx = cam.plan_x
+    const cy = cam.plan_y
+    let liveHeading = headingDeg
+    let liveFov = fovDeg
+    let liveRange = rangeFt
+
+    const toNative = (clientX: number, clientY: number) => {
+      const rect = img.getBoundingClientRect()
+      const xPct = (clientX - rect.left) / rect.width
+      const yPct = (clientY - rect.top) / rect.height
+      return { x: xPct * (img.naturalWidth || 1), y: yPct * (img.naturalHeight || 1) }
+    }
+
+    // Rumbo (0=norte, sentido horario) desde la camara hacia un punto en px
+    // nativos — mismo criterio que conePointsPlanar (x a la derecha, y hacia
+    // abajo, 0 grados apunta hacia arriba).
+    const bearingTo = (px: number, py: number) => {
+      const dx = px - cx
+      const dy = cy - py // y de imagen crece hacia abajo; invertido para que "arriba" sea 0
+      return normalizeHeading((Math.atan2(dx, dy) * 180) / Math.PI)
+    }
+    const distanceTo = (px: number, py: number) => Math.hypot(px - cx, py - cy) / pxPerFoot!
+
+    const onMove = (ev: PointerEvent) => {
+      const p = toNative(ev.clientX, ev.clientY)
+      if (kind === 'aim') {
+        liveHeading = bearingTo(p.x, p.y)
+        liveRange = Math.max(10, Math.min(3000, distanceTo(p.x, p.y)))
+        onCameraFovLiveChange?.(cam.id, { heading_degrees: liveHeading, fov_range_ft: liveRange })
+      } else {
+        const bearing = bearingTo(p.x, p.y)
+        let diff = normalizeHeading(bearing - liveHeading)
+        if (diff > 180) diff = 360 - diff
+        liveFov = Math.max(5, Math.min(179.9, diff * 2))
+        onCameraFovLiveChange?.(cam.id, { fov_degrees: liveFov })
+      }
+    }
+
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      if (kind === 'aim') {
+        onCameraFovCommit?.(cam.id, { heading_degrees: liveHeading, fov_range_ft: liveRange })
+      } else {
+        onCameraFovCommit?.(cam.id, { fov_degrees: liveFov })
+      }
+      setTimeout(() => { draggingIdRef.current = null }, 0)
+    }
+
+    draggingIdRef.current = cam.id // reusa el mismo guard que beginDrag: evita que el pointerup dispare una seleccion
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
     void startEvent
@@ -790,7 +884,10 @@ export default function PlanCanvas({
               >
                 {planCameras.map(cam => {
                   if (cam.show_fov === false) return null
-                  if (cam.heading_degrees === null || cam.heading_degrees === undefined) return null
+                  // Sin heading guardado apunta al norte por default (el
+                  // padre ya lo resuelve asi, esto es solo un respaldo por si
+                  // el componente se usa con otro padre que no lo haga).
+                  const headingDeg = cam.heading_degrees ?? 0
 
                   const fovDeg = cam.fov_degrees ?? 90
                   const dayRangeFt = cam.fov_range_ft ?? 75
@@ -813,6 +910,19 @@ export default function PlanCanvas({
                     ? bands.map(b => ({ radiusFt: b.maxDistanceFt, color: b.color }))
                     : [{ radiusFt: rangeFt, color: flatColor }]
 
+                  // Handles del cono: solo para la camara seleccionada, para
+                  // no llenar el plano de puntitos arrastrables. Mismo trio
+                  // que en el mapa GIS — "aim" en la punta (rota + alcance) y
+                  // dos en el arco (abren/cierran el angulo) — pero en
+                  // coordenadas de pixel nativas en vez de lat/lng.
+                  const handleR = Math.max(6, naturalSize.w / 130)
+                  const handlePts = selected
+                    ? conePointsPlanar(cam.plan_x!, cam.plan_y!, headingDeg, fovDeg, rangeFt * pxPerFoot)
+                    : null
+                  const aimPt = handlePts ? handlePts[Math.floor((handlePts.length - 1) / 2) + 1] : null
+                  const edgeLeftPt = handlePts ? handlePts[1] : null
+                  const edgeRightPt = handlePts ? handlePts[handlePts.length - 1] : null
+
                   return (
                     <g key={`fov-${cam.id}`}>
                       {shapes.map((shape, i) => (
@@ -821,7 +931,7 @@ export default function PlanCanvas({
                           d={conePlanPath(
                             cam.plan_x!,
                             cam.plan_y!,
-                            Number(cam.heading_degrees),
+                            headingDeg,
                             fovDeg,
                             shape.radiusFt * pxPerFoot,
                           )}
@@ -832,6 +942,48 @@ export default function PlanCanvas({
                           strokeWidth={Math.max(1, naturalSize.w / 900)}
                         />
                       ))}
+                      {selected && aimPt && (
+                        <circle
+                          cx={aimPt.x} cy={aimPt.y} r={handleR}
+                          fill="#0ea5e9" stroke="white" strokeWidth={handleR / 4}
+                          style={{ cursor: 'grab', pointerEvents: 'auto' }}
+                          onPointerDown={(e) => {
+                            e.stopPropagation()
+                            e.preventDefault()
+                            beginFovDrag(cam, 'aim', headingDeg, fovDeg, rangeFt, e)
+                          }}
+                        >
+                          <title>Drag to aim and set range</title>
+                        </circle>
+                      )}
+                      {selected && edgeLeftPt && (
+                        <circle
+                          cx={edgeLeftPt.x} cy={edgeLeftPt.y} r={handleR}
+                          fill="#facc15" stroke="white" strokeWidth={handleR / 4}
+                          style={{ cursor: 'grab', pointerEvents: 'auto' }}
+                          onPointerDown={(e) => {
+                            e.stopPropagation()
+                            e.preventDefault()
+                            beginFovDrag(cam, 'edgeLeft', headingDeg, fovDeg, rangeFt, e)
+                          }}
+                        >
+                          <title>Drag to widen or narrow the cone</title>
+                        </circle>
+                      )}
+                      {selected && edgeRightPt && (
+                        <circle
+                          cx={edgeRightPt.x} cy={edgeRightPt.y} r={handleR}
+                          fill="#facc15" stroke="white" strokeWidth={handleR / 4}
+                          style={{ cursor: 'grab', pointerEvents: 'auto' }}
+                          onPointerDown={(e) => {
+                            e.stopPropagation()
+                            e.preventDefault()
+                            beginFovDrag(cam, 'edgeRight', headingDeg, fovDeg, rangeFt, e)
+                          }}
+                        >
+                          <title>Drag to widen or narrow the cone</title>
+                        </circle>
+                      )}
                     </g>
                   )
                 })}
@@ -865,10 +1017,13 @@ export default function PlanCanvas({
                   // centro de la caja: la pastilla de la etiqueta cuelga abajo.
                   left: `${pxToPct(cam.plan_x!, activePlan?.image_width_px || imgRef.current?.naturalWidth || 1)}%`,
                   top: `${pxToPct(cam.plan_y!, activePlan?.image_height_px || imgRef.current?.naturalHeight || 1)}%`,
-                  width: 46,
-                  height: 60,
-                  marginLeft: -23,
-                  marginTop: -23,
+                  width: CAMERA_ICON_SIZE[0],
+                  height: CAMERA_ICON_SIZE[1],
+                  // El circulo del icono esta en (23,23) del viewBox 46x60
+                  // original — se escala proporcional al tamano real del icono
+                  // para que el ancla siga cayendo justo en el centro visual.
+                  marginLeft: -CAMERA_ICON_SIZE[0] / 2,
+                  marginTop: -(23 * CAMERA_ICON_SIZE[1]) / 60,
                   cursor: unlockedCameraId === cam.id ? (draggingId === cam.id ? 'grabbing' : 'grab') : 'pointer',
                   zIndex: draggingId === cam.id ? 25 : selectedCameraId === cam.id ? 20 : 10,
                   touchAction: 'none',

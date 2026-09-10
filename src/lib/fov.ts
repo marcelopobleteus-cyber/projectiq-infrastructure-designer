@@ -12,6 +12,7 @@
 export const FEET_PER_METER = 3.280839895
 export const DEFAULT_FOV_DEGREES = 90
 export const DEFAULT_RANGE_FT = 75
+export const DEFAULT_HEADING_DEGREES = 0
 
 /** Cuantos lados tiene el arco. 24 se ve curvo sin inflar el GeoJSON. */
 const ARC_SEGMENTS = 24
@@ -55,10 +56,83 @@ export function resolveRangeFt(rangeFt: number | null | undefined): number {
   return DEFAULT_RANGE_FT
 }
 
+/**
+ * Hacia donde apunta la camara, si no se cargo un heading explicito.
+ *
+ * Antes una camara sin heading simplemente no dibujaba cono (bug: con 35
+ * camaras solo la 1 que alguien habia tocado a mano mostraba algo). El resto
+ * de los campos del cono (FOV, alcance) ya tenian default — a este le faltaba
+ * el suyo. Norte (0°) es una direccion arbitraria pero visible: el usuario la
+ * corrige arrastrando el cono, no quedandose sin nada que arrastrar.
+ */
+export function resolveHeadingDegrees(headingDegrees: number | null | undefined): number {
+  if (typeof headingDegrees === 'number' && Number.isFinite(headingDegrees)) {
+    return normalizeHeading(headingDegrees)
+  }
+  return DEFAULT_HEADING_DEGREES
+}
+
 /** Normaliza cualquier angulo a [0, 360). */
 export function normalizeHeading(deg: number): number {
   const v = deg % 360
   return v < 0 ? v + 360 : v
+}
+
+/**
+ * Rumbo (0=norte, 90=este, sentido horario) desde un punto lat/lng hacia otro,
+ * usando la misma aproximacion plana con correccion de coseno que
+ * coneGeoJsonPolygon — para que el handle que se arrastra en el mapa calce
+ * exactamente con el cono que ese mismo heading dibuja.
+ */
+export function bearingBetween(
+  fromLat: number,
+  fromLng: number,
+  toLat: number,
+  toLng: number,
+): number {
+  const metersPerDegLat = 111_320
+  const cosLat = Math.cos((fromLat * Math.PI) / 180)
+  const metersPerDegLng = metersPerDegLat * (Math.abs(cosLat) < 1e-6 ? 1e-6 : cosLat)
+  const north = (toLat - fromLat) * metersPerDegLat
+  const east = (toLng - fromLng) * metersPerDegLng
+  if (Math.abs(north) < 1e-9 && Math.abs(east) < 1e-9) return 0
+  return normalizeHeading((Math.atan2(east, north) * 180) / Math.PI)
+}
+
+/**
+ * Distancia en pies entre dos lat/lng, con la misma aproximacion plana.
+ * Coherente con bearingBetween: sirve para que arrastrar el handle de alcance
+ * calcule el mismo numero de pies que despues dibuja coneGeoJsonPolygon.
+ */
+export function distanceFeetBetween(
+  fromLat: number,
+  fromLng: number,
+  toLat: number,
+  toLng: number,
+): number {
+  const metersPerDegLat = 111_320
+  const cosLat = Math.cos((fromLat * Math.PI) / 180)
+  const metersPerDegLng = metersPerDegLat * (Math.abs(cosLat) < 1e-6 ? 1e-6 : cosLat)
+  const north = (toLat - fromLat) * metersPerDegLat
+  const east = (toLng - fromLng) * metersPerDegLng
+  return Math.sqrt(north * north + east * east) * FEET_PER_METER
+}
+
+/** Punto lat/lng a una distancia (pies) y rumbo dados desde un origen. */
+export function destinationPoint(
+  fromLat: number,
+  fromLng: number,
+  bearingDegrees: number,
+  distanceFt: number,
+): [number, number] {
+  const metersPerDegLat = 111_320
+  const cosLat = Math.cos((fromLat * Math.PI) / 180)
+  const metersPerDegLng = metersPerDegLat * (Math.abs(cosLat) < 1e-6 ? 1e-6 : cosLat)
+  const rad = (normalizeHeading(bearingDegrees) * Math.PI) / 180
+  const meters = distanceFt / FEET_PER_METER
+  const north = meters * Math.cos(rad)
+  const east = meters * Math.sin(rad)
+  return [fromLng + east / metersPerDegLng, fromLat + north / metersPerDegLat]
 }
 
 /**
