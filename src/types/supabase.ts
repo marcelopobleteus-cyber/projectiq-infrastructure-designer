@@ -985,6 +985,41 @@ export type Database = {
           },
         ]
       }
+      checklist_templates: {
+        Row: {
+          communication_type: string
+          created_at: string
+          id: string
+          items: Json
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          communication_type: string
+          created_at?: string
+          id?: string
+          items?: Json
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          communication_type?: string
+          created_at?: string
+          id?: string
+          items?: Json
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_templates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conduit_runs: {
         Row: {
           asset_condition: Database["public"]["Enums"]["asset_condition"]

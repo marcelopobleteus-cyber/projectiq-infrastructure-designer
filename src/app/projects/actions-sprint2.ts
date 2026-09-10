@@ -6,6 +6,11 @@ import { Database } from '@/types/supabase'
 import { BYPASS_AUTH } from '@/config/auth'
 import { DEMO_CAMERAS, DEMO_TASKS } from '@/lib/demoData'
 import { syncProjectStatusFromTasks } from './actions'
+import {
+  DEFAULT_CHECKLIST_TEMPLATES,
+  normalizeCommunicationType,
+  type ChecklistTemplateItem,
+} from '@/lib/checklistTemplates'
 
 type CameraLocationInsert = Database['public']['Tables']['camera_locations']['Insert']
 type CameraLocationUpdate = Database['public']['Tables']['camera_locations']['Update']
@@ -498,72 +503,28 @@ export async function generateScopeTemplateTasks(params: {
     if (!membership && !BYPASS_AUTH) return { error: 'Access denied' }
   }
 
-  // 1. Define checklists based on communication type
-  let templates: { title: string; taskType: string; templateKey: string }[] = []
+  // 1. Plantilla de checklist: la propia de la organizacion si la guardo en
+  // Settings, y si no la lista por defecto del sistema. Antes esto eran cinco
+  // listas escritas a mano aqui; cada organizacion trabaja distinto y no podia
+  // ajustarlas sin tocar el codigo.
+  const comm = normalizeCommunicationType(params.communicationType)
 
-  const comm = (params.communicationType || '').toLowerCase()
+  let templates: ChecklistTemplateItem[] = DEFAULT_CHECKLIST_TEMPLATES[comm]
 
-  if (comm === 'copper') {
-    templates = [
-      { title: 'Verify camera location', taskType: 'Site Survey', templateKey: 'copper_verify_location' },
-      { title: 'Install camera mount', taskType: 'Mounting', templateKey: 'copper_install_mount' },
-      { title: 'Pull Cat6 cable', taskType: 'Cabling', templateKey: 'copper_pull_cat6' },
-      { title: 'Terminate Cat6', taskType: 'Cabling', templateKey: 'copper_terminate_cat6' },
-      { title: 'Label Cat6', taskType: 'Documentation', templateKey: 'copper_label_cat6' },
-      { title: 'Connect to switch', taskType: 'Switch Assignment', templateKey: 'copper_connect_switch' },
-      { title: 'Assign switch port', taskType: 'Switch Assignment', templateKey: 'copper_assign_port' },
-      { title: 'Verify PoE', taskType: 'Power', templateKey: 'copper_verify_poe' },
-      { title: 'Configure IP address', taskType: 'IP Addressing', templateKey: 'copper_configure_ip' },
-      { title: 'Verify live video', taskType: 'Testing', templateKey: 'copper_verify_video' },
-      { title: 'Verify recording', taskType: 'Testing', templateKey: 'copper_verify_recording' },
-      { title: 'Take completion photos', taskType: 'Photos', templateKey: 'copper_completion_photos' },
-      { title: 'Mark camera as tested', taskType: 'Closeout', templateKey: 'copper_mark_tested' }
-    ]
-  } else if (comm === 'fiber') {
-    templates = [
-      { title: 'Verify camera location', taskType: 'Site Survey', templateKey: 'fiber_verify_location' },
-      { title: 'Install camera mount', taskType: 'Mounting', templateKey: 'fiber_install_mount' },
-      { title: 'Install fiber drop', taskType: 'Fiber', templateKey: 'fiber_install_drop' },
-      { title: 'Install enclosure if required', taskType: 'Fiber', templateKey: 'fiber_install_enclosure' },
-      { title: 'Splice fiber', taskType: 'Fiber', templateKey: 'fiber_splice_fiber' },
-      { title: 'Test fiber', taskType: 'Testing', templateKey: 'fiber_test_fiber' },
-      { title: 'Install media converter or fiber switch', taskType: 'Power', templateKey: 'fiber_install_converter_switch' },
-      { title: 'Connect camera', taskType: 'Cabling', templateKey: 'fiber_connect_camera' },
-      { title: 'Configure IP address', taskType: 'IP Addressing', templateKey: 'fiber_configure_ip' },
-      { title: 'Verify live video', taskType: 'Testing', templateKey: 'fiber_verify_video' },
-      { title: 'Upload fiber test results', taskType: 'Documentation', templateKey: 'fiber_upload_results' },
-      { title: 'Take completion photos', taskType: 'Photos', templateKey: 'fiber_completion_photos' },
-      { title: 'Mark camera as tested', taskType: 'Closeout', templateKey: 'fiber_mark_tested' }
-    ]
-  } else if (comm === 'wireless') {
-    templates = [
-      { title: 'Verify line of sight', taskType: 'Site Survey', templateKey: 'wireless_verify_los' },
-      { title: 'Confirm mounting height', taskType: 'Site Survey', templateKey: 'wireless_confirm_height' },
-      { title: 'Install wireless radio placeholder', taskType: 'Wireless', templateKey: 'wireless_install_radio' },
-      { title: 'Assign wireless source/destination placeholder', taskType: 'Wireless', templateKey: 'wireless_assign_endpoints' },
-      { title: 'Field survey required', taskType: 'Site Survey', templateKey: 'wireless_field_survey' },
-      { title: 'Verify wireless path design later', taskType: 'Wireless', templateKey: 'wireless_verify_path' }
-    ]
-  } else if (comm === 'existing') {
-    templates = [
-      { title: 'Verify network source', taskType: 'Site Survey', templateKey: 'existing_verify_source' },
-      { title: 'Confirm available switch port', taskType: 'Switch Assignment', templateKey: 'existing_confirm_port' },
-      { title: 'Confirm VLAN/network access', taskType: 'Configuration', templateKey: 'existing_confirm_vlan' },
-      { title: 'Connect camera', taskType: 'Cabling', templateKey: 'existing_connect_camera' },
-      { title: 'Configure IP address', taskType: 'IP Addressing', templateKey: 'existing_configure_ip' },
-      { title: 'Verify live video', taskType: 'Testing', templateKey: 'existing_verify_video' },
-      { title: 'Verify recording', taskType: 'Testing', templateKey: 'existing_verify_recording' },
-      { title: 'Take completion photos', taskType: 'Photos', templateKey: 'existing_completion_photos' }
-    ]
-  } else {
-    // Unknown/TBD
-    templates = [
-      { title: 'Verify camera location', taskType: 'Site Survey', templateKey: 'unknown_verify_location' },
-      { title: 'Complete field survey', taskType: 'Site Survey', templateKey: 'unknown_field_survey' },
-      { title: 'Confirm connectivity method', taskType: 'Site Survey', templateKey: 'unknown_confirm_connectivity' },
-      { title: 'Confirm power source', taskType: 'Site Survey', templateKey: 'unknown_confirm_power' },
-      { title: 'Confirm network source', taskType: 'Site Survey', templateKey: 'unknown_confirm_network' }
-    ]
+  const { data: orgTemplate } = await supabase
+    .from('checklist_templates')
+    .select('items')
+    .eq('organization_id', project.organization_id)
+    .eq('communication_type', comm)
+    .maybeSingle()
+
+  if (orgTemplate && Array.isArray(orgTemplate.items) && orgTemplate.items.length > 0) {
+    // Se filtra lo invalido en vez de confiar: una fila corrupta no debe
+    // dejar a la camara sin checklist ni insertar filas sin titulo.
+    const custom = (orgTemplate.items as unknown as ChecklistTemplateItem[]).filter(
+      t => t && typeof t.title === 'string' && t.title.trim() && typeof t.templateKey === 'string' && t.templateKey.trim()
+    )
+    if (custom.length > 0) templates = custom
   }
 
   // Fetch existing tasks to prevent duplicates
@@ -718,73 +679,29 @@ export async function generateMissingProjectChecklists(projectId: string, dryRun
   let syncRepaired = 0
   let errors: string[] = []
 
+  // Plantillas de la organizacion, una sola consulta para todas las camaras.
+  // Si no hay fila guardada para un tipo, se usa la del sistema.
+  const orgTemplatesByType = new Map<string, ChecklistTemplateItem[]>()
+  const { data: orgTemplateRows } = await supabase
+    .from('checklist_templates')
+    .select('communication_type, items')
+    .eq('organization_id', project.organization_id)
+
+  for (const row of orgTemplateRows ?? []) {
+    if (Array.isArray(row.items)) {
+      const custom = (row.items as unknown as ChecklistTemplateItem[]).filter(
+        t => t && typeof t.title === 'string' && t.title.trim() && typeof t.templateKey === 'string' && t.templateKey.trim()
+      )
+      if (custom.length > 0) orgTemplatesByType.set(row.communication_type, custom)
+    }
+  }
+
   // Loop through cameras to identify missing tasks and unlinked tasks
   for (const cam of cameras) {
     // 1. Determine templates list based on comm_type
-    let templates: { title: string; taskType: string; templateKey: string }[] = []
-    const comm = (cam.communication_type || '').toLowerCase()
-
-    if (comm === 'copper') {
-      templates = [
-        { title: 'Verify camera location', taskType: 'Site Survey', templateKey: 'copper_verify_location' },
-        { title: 'Install camera mount', taskType: 'Mounting', templateKey: 'copper_install_mount' },
-        { title: 'Pull Cat6 cable', taskType: 'Cabling', templateKey: 'copper_pull_cat6' },
-        { title: 'Terminate Cat6', taskType: 'Cabling', templateKey: 'copper_terminate_cat6' },
-        { title: 'Label Cat6', taskType: 'Documentation', templateKey: 'copper_label_cat6' },
-        { title: 'Connect to switch', taskType: 'Switch Assignment', templateKey: 'copper_connect_switch' },
-        { title: 'Assign switch port', taskType: 'Switch Assignment', templateKey: 'copper_assign_port' },
-        { title: 'Verify PoE', taskType: 'Power', templateKey: 'copper_verify_poe' },
-        { title: 'Configure IP address', taskType: 'IP Addressing', templateKey: 'copper_configure_ip' },
-        { title: 'Verify live video', taskType: 'Testing', templateKey: 'copper_verify_video' },
-        { title: 'Verify recording', taskType: 'Testing', templateKey: 'copper_verify_recording' },
-        { title: 'Take completion photos', taskType: 'Photos', templateKey: 'copper_completion_photos' },
-        { title: 'Mark camera as tested', taskType: 'Closeout', templateKey: 'copper_mark_tested' }
-      ]
-    } else if (comm === 'fiber') {
-      templates = [
-        { title: 'Verify camera location', taskType: 'Site Survey', templateKey: 'fiber_verify_location' },
-        { title: 'Install camera mount', taskType: 'Mounting', templateKey: 'fiber_install_mount' },
-        { title: 'Install fiber drop', taskType: 'Fiber', templateKey: 'fiber_install_drop' },
-        { title: 'Install enclosure if required', taskType: 'Fiber', templateKey: 'fiber_install_enclosure' },
-        { title: 'Splice fiber', taskType: 'Fiber', templateKey: 'fiber_splice_fiber' },
-        { title: 'Test fiber', taskType: 'Testing', templateKey: 'fiber_test_fiber' },
-        { title: 'Install media converter or fiber switch', taskType: 'Power', templateKey: 'fiber_install_converter_switch' },
-        { title: 'Connect camera', taskType: 'Cabling', templateKey: 'fiber_connect_camera' },
-        { title: 'Configure IP address', taskType: 'IP Addressing', templateKey: 'fiber_configure_ip' },
-        { title: 'Verify live video', taskType: 'Testing', templateKey: 'fiber_verify_video' },
-        { title: 'Upload fiber test results', taskType: 'Documentation', templateKey: 'fiber_upload_results' },
-        { title: 'Take completion photos', taskType: 'Photos', templateKey: 'fiber_completion_photos' },
-        { title: 'Mark camera as tested', taskType: 'Closeout', templateKey: 'fiber_mark_tested' }
-      ]
-    } else if (comm === 'wireless') {
-      templates = [
-        { title: 'Verify line of sight', taskType: 'Site Survey', templateKey: 'wireless_verify_los' },
-        { title: 'Confirm mounting height', taskType: 'Site Survey', templateKey: 'wireless_confirm_height' },
-        { title: 'Install wireless radio placeholder', taskType: 'Wireless', templateKey: 'wireless_install_radio' },
-        { title: 'Assign wireless source/destination placeholder', taskType: 'Wireless', templateKey: 'wireless_assign_endpoints' },
-        { title: 'Field survey required', taskType: 'Site Survey', templateKey: 'wireless_field_survey' },
-        { title: 'Verify wireless path design later', taskType: 'Wireless', templateKey: 'wireless_verify_path' }
-      ]
-    } else if (comm === 'existing') {
-      templates = [
-        { title: 'Verify network source', taskType: 'Site Survey', templateKey: 'existing_verify_source' },
-        { title: 'Confirm available switch port', taskType: 'Switch Assignment', templateKey: 'existing_confirm_port' },
-        { title: 'Confirm VLAN/network access', taskType: 'Configuration', templateKey: 'existing_confirm_vlan' },
-        { title: 'Connect camera', taskType: 'Cabling', templateKey: 'existing_connect_camera' },
-        { title: 'Configure IP address', taskType: 'IP Addressing', templateKey: 'existing_configure_ip' },
-        { title: 'Verify live video', taskType: 'Testing', templateKey: 'existing_verify_video' },
-        { title: 'Verify recording', taskType: 'Testing', templateKey: 'existing_verify_recording' },
-        { title: 'Take completion photos', taskType: 'Photos', templateKey: 'existing_completion_photos' }
-      ]
-    } else {
-      templates = [
-        { title: 'Verify camera location', taskType: 'Site Survey', templateKey: 'unknown_verify_location' },
-        { title: 'Complete field survey', taskType: 'Site Survey', templateKey: 'unknown_field_survey' },
-        { title: 'Confirm connectivity method', taskType: 'Site Survey', templateKey: 'unknown_confirm_connectivity' },
-        { title: 'Confirm power source', taskType: 'Site Survey', templateKey: 'unknown_confirm_power' },
-        { title: 'Confirm network source', taskType: 'Site Survey', templateKey: 'unknown_confirm_network' }
-      ]
-    }
+    const comm = normalizeCommunicationType(cam.communication_type)
+    const templates: ChecklistTemplateItem[] =
+      orgTemplatesByType.get(comm) || DEFAULT_CHECKLIST_TEMPLATES[comm]
 
     const currentTasks = cameraTaskMap.get(cam.id) || []
     if (currentTasks.length === 0) {

@@ -16,9 +16,10 @@ import {
   LaborRateItem,
 } from './actions'
 import ConfirmModal from '@/components/ui/ConfirmModal'
+import ChecklistTemplatesPanel from '@/components/settings/ChecklistTemplatesPanel'
 
 export default function SettingsClient({ initialTeamData }: { initialTeamData: OrganizationTeamData }) {
-  const [activeTab, setActiveTab] = useState<'general' | 'profile' | 'company' | 'branding' | 'team' | 'rates' | 'preferences' | 'integrations' | 'security'>('general')
+  const [activeTab, setActiveTab] = useState<'general' | 'profile' | 'company' | 'branding' | 'team' | 'rates' | 'checklists' | 'preferences' | 'integrations' | 'security'>('general')
 
   // Notification Toast state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null)
@@ -239,6 +240,7 @@ export default function SettingsClient({ initialTeamData }: { initialTeamData: O
     { id: 'general', label: 'General', built: true },
     { id: 'team', label: 'Users & Permissions', built: true },
     { id: 'rates', label: 'Labor Rates', built: true },
+    { id: 'checklists', label: 'Camera Checklists', built: true },
     { id: 'profile', label: 'Profile', built: false },
     { id: 'company', label: 'Company / Organization', built: false },
     { id: 'branding', label: 'Branding', built: false },
@@ -348,6 +350,11 @@ export default function SettingsClient({ initialTeamData }: { initialTeamData: O
               )}
             </div>
           </div>
+        )}
+
+        {/* Camera Checklists Tab */}
+        {activeTab === 'checklists' && (
+          <ChecklistTemplatesPanel active={activeTab === 'checklists'} showToast={showToast} />
         )}
 
         {/* Labor Rates Tab */}

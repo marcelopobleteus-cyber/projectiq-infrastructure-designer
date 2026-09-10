@@ -2,9 +2,17 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
+import type { Json } from '@/types/supabase'
 import { sendInviteEmail } from '@/utils/supabase/admin'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { BYPASS_AUTH } from '@/config/auth'
+import {
+  COMMUNICATION_TYPES,
+  DEFAULT_CHECKLIST_TEMPLATES,
+  validateChecklistTemplate,
+  type ChecklistTemplateItem,
+  type CommunicationType,
+} from '@/lib/checklistTemplates'
 
 export interface TeamMemberItem {
   id: string
@@ -618,6 +626,127 @@ export async function setLaborRate(params: {
       },
       { onConflict: 'organization_id,code' }
     )
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/settings')
+  return { success: true }
+}
+
+// ---------------------------------------------------------------------------
+// Plantillas de checklist por organizacion
+// ---------------------------------------------------------------------------
+
+export interface ChecklistTemplateResult {
+  communicationType: CommunicationType
+  items: ChecklistTemplateItem[]
+  /** true = todavia se esta usando la lista por defecto del sistema */
+  isSystemDefault: boolean
+}
+
+/**
+ * Devuelve las cinco plantillas: la propia de la organizacion si existe, y
+ * la del sistema para las que todavia no fueron personalizadas.
+ */
+export async function getChecklistTemplates(): Promise<{
+  templates: ChecklistTemplateResult[]
+  canEdit: boolean
+  error?: string
+}> {
+  const caller = await resolveCallerOrg()
+  if ('error' in caller) return { templates: [], canEdit: false, error: caller.error }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('checklist_templates')
+    .select('communication_type, items')
+    .eq('organization_id', caller.orgId)
+
+  if (error) return { templates: [], canEdit: false, error: error.message }
+
+  const byType = new Map<string, ChecklistTemplateItem[]>()
+  for (const row of data ?? []) {
+    if (Array.isArray(row.items)) {
+      byType.set(row.communication_type, row.items as unknown as ChecklistTemplateItem[])
+    }
+  }
+
+  const templates = COMMUNICATION_TYPES.map(t => {
+    const custom = byType.get(t.value)
+    return {
+      communicationType: t.value,
+      items: custom && custom.length > 0 ? custom : DEFAULT_CHECKLIST_TEMPLATES[t.value],
+      isSystemDefault: !custom || custom.length === 0,
+    }
+  })
+
+  return {
+    templates,
+    canEdit: caller.role === 'owner' || caller.role === 'admin',
+  }
+}
+
+/**
+ * Guarda la plantilla de la organizacion. No toca las tareas ya creadas: los
+ * cambios se aplican a las camaras cuyo checklist se genere de aqui en mas.
+ */
+export async function saveChecklistTemplate(params: {
+  communicationType: CommunicationType
+  items: ChecklistTemplateItem[]
+}): Promise<{ success?: boolean; error?: string }> {
+  const caller = await resolveCallerOrg()
+  if ('error' in caller) return { error: caller.error }
+  if (caller.role !== 'owner' && caller.role !== 'admin' && !BYPASS_AUTH) {
+    return { error: 'Only owners and admins can change checklist templates.' }
+  }
+  if (!COMMUNICATION_TYPES.some(t => t.value === params.communicationType)) {
+    return { error: 'Unknown connectivity type.' }
+  }
+
+  const cleaned: ChecklistTemplateItem[] = (params.items || []).map(i => ({
+    title: (i.title || '').trim(),
+    taskType: (i.taskType || '').trim(),
+    templateKey: (i.templateKey || '').trim(),
+  }))
+
+  const valid = validateChecklistTemplate(cleaned)
+  if (!valid.ok) return { error: valid.error }
+
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('checklist_templates')
+    .upsert(
+      {
+        organization_id: caller.orgId,
+        communication_type: params.communicationType,
+        items: cleaned as unknown as Json,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'organization_id,communication_type' }
+    )
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/settings')
+  return { success: true }
+}
+
+/** Vuelve a la plantilla del sistema borrando la fila propia. */
+export async function resetChecklistTemplate(
+  communicationType: CommunicationType
+): Promise<{ success?: boolean; error?: string }> {
+  const caller = await resolveCallerOrg()
+  if ('error' in caller) return { error: caller.error }
+  if (caller.role !== 'owner' && caller.role !== 'admin' && !BYPASS_AUTH) {
+    return { error: 'Only owners and admins can change checklist templates.' }
+  }
+
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('checklist_templates')
+    .delete()
+    .eq('organization_id', caller.orgId)
+    .eq('communication_type', communicationType)
 
   if (error) return { error: error.message }
 
