@@ -108,6 +108,10 @@ export default function ProjectMapCanvas({
   // mezclaba CCTV, fibra, wireless y auditoria.
   type CameraTab = 'camera' | 'specs' | 'checklist' | 'network' | 'fiber' | 'wireless' | 'history'
   const [cameraTab, setCameraTab] = useState<CameraTab>('camera')
+  // Cerrar el panel descartaba en silencio lo editado. Se marca el formulario
+  // como sucio ante cualquier cambio y se pregunta antes de perderlo.
+  const [cameraFormDirty, setCameraFormDirty] = useState(false)
+  const [unsavedPrompt, setUnsavedPrompt] = useState<null | { onDiscard: () => void }>(null)
 
   // Confirmacion propia. El confirm() nativo se puede suprimir desde el
   // navegador ("impedir que esta pagina cree dialogos"), y cuando eso pasa
@@ -488,6 +492,7 @@ export default function ProjectMapCanvas({
       setCameraAddressRef(selectedCamera.address_reference || '')
       setCameraStructureRef(selectedCamera.structure_reference || '')
       setCameraNotes(selectedCamera.notes || '')
+      setCameraFormDirty(false)
       setCameraLens((selectedCamera as any).lens ?? '')
       setCameraMountHeight((selectedCamera as any).mounting_height_ft?.toString() ?? '')
       setCameraIpAddress((selectedCamera as any).ip_address ?? '')
@@ -814,7 +819,7 @@ export default function ProjectMapCanvas({
 
         el.addEventListener('click', (e: MouseEvent) => {
           e.stopPropagation()
-          setSelectedCamera(cam)
+          requestSelectCamera(cam)
 
           let rect = mapRectRef.current
           if (!rect && mapRef.current) {
@@ -1355,9 +1360,32 @@ export default function ProjectMapCanvas({
   }
 
   // Camera settings form save
+  // Resultado del ultimo guardado: el dialogo de cambios sin guardar necesita
+  // saber si cerrar o dejar el panel abierto con el error a la vista.
+  const saveOkRef = useRef(false)
+
+  /**
+   * Cambia la camara seleccionada protegiendo lo editado: si hay cambios
+   * pendientes pregunta antes, igual que al cerrar el panel.
+   */
+  const requestSelectCamera = (cam: CameraLocation) => {
+    if (cameraFormDirty && selectedCamera && selectedCamera.id !== cam.id) {
+      setUnsavedPrompt({ onDiscard: () => setSelectedCamera(cam) })
+      return
+    }
+    setSelectedCamera(cam)
+  }
+
+  /** Guarda y devuelve si tuvo exito. */
+  const saveCameraNow = async (): Promise<boolean> => {
+    await handleSaveCamera({ preventDefault: () => {} } as React.FormEvent)
+    return saveOkRef.current
+  }
+
   const handleSaveCamera = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedCamera) return
+    saveOkRef.current = false
     setCameraPanelMessage(null)
 
     const updatedNotesObj = setDetailedConnectivityInNotes(cameraDetailedConn, cameraNotes)
@@ -1512,6 +1540,8 @@ export default function ProjectMapCanvas({
         assigned_network_device_id: assignedSwitchId || null 
       } : null)
       setCameraPanelMessage({ type: 'success', text: 'Camera details and fiber/port assignments updated!' })
+      setCameraFormDirty(false)
+      saveOkRef.current = true
     })
   }
 
@@ -1649,6 +1679,8 @@ export default function ProjectMapCanvas({
   }
 
   const handleToggleTaskStatus = async (task: any) => {
+    // Se guarda al instante: no cuenta como cambio pendiente del formulario.
+    setCameraFormDirty(false)
     if (!selectedCamera) return
     const newStatus = task.status === 'Complete' ? 'Not Started' : 'Complete'
     try {
@@ -1713,6 +1745,8 @@ export default function ProjectMapCanvas({
   }
 
   const runDeleteTask = async (taskId: string) => {
+    // Se guarda al instante: no cuenta como cambio pendiente del formulario.
+    setCameraFormDirty(false)
     if (!selectedCamera) return
     try {
       const res = await deleteCameraTask({
@@ -2099,7 +2133,7 @@ export default function ProjectMapCanvas({
             <button
               key={cam.id}
               onClick={() => {
-                setSelectedCamera(cam)
+                requestSelectCamera(cam)
                 if (map) map.panTo([cam.longitude, cam.latitude])
               }}
               className={`w-full flex items-center justify-between text-left px-2 py-1.5 rounded-lg text-xs transition-colors ${
@@ -2216,7 +2250,7 @@ export default function ProjectMapCanvas({
               selectedCameraId={selectedCamera?.id ?? null}
               onSelectCamera={(id) => {
                 const found = cameras.find(c => c.id === id)
-                if (found) setSelectedCamera(found)
+                if (found) requestSelectCamera(found)
               }}
               toolsSlot={toolButtons}
               unlockedCameraId={unlockedCameraId}
@@ -2432,7 +2466,7 @@ export default function ProjectMapCanvas({
                   <button
                     id="hover-card-edit-btn"
                     onClick={() => {
-                      setSelectedCamera(displayCam)
+                      requestSelectCamera(displayCam)
                       setHoveredCamera(null)
                       setHoverPosition(null)
                     }}
@@ -2497,7 +2531,7 @@ export default function ProjectMapCanvas({
 
         return (
           <div className="absolute top-4 right-4 bottom-4 w-[27rem] max-w-[calc(100%-2rem)] max-h-[calc(100%-2rem)] bg-[var(--surface-1)] border border-[var(--border-strong)] rounded-2xl flex flex-col justify-between p-5 z-30 overflow-hidden shadow-2xl">
-            <form onSubmit={handleSaveCamera} className="flex flex-col h-full justify-between overflow-hidden">
+            <form onSubmit={handleSaveCamera} onChange={() => setCameraFormDirty(true)} className="flex flex-col h-full justify-between overflow-hidden">
               {/* Header FIJO: el cerrar no debe irse con el scroll. */}
               <div className="flex justify-between items-start border-b border-[var(--border)] pb-3 shrink-0">
                 <div className="min-w-0">
@@ -2509,7 +2543,10 @@ export default function ProjectMapCanvas({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setSelectedCamera(null)}
+                  onClick={() => {
+                    if (cameraFormDirty) setUnsavedPrompt({ onDiscard: () => setSelectedCamera(null) })
+                    else setSelectedCamera(null)
+                  }}
                   title="Close"
                   className="shrink-0 p-1.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
                 >
@@ -4066,6 +4103,51 @@ export default function ProjectMapCanvas({
             )}
           </div>
         </>
+      )}
+
+      {/* ── Cambios sin guardar ── */}
+      {unsavedPrompt && (
+        <div className="fixed inset-0 z-[96] flex items-center justify-center bg-black/40 p-6">
+          <div className="w-full max-w-sm bg-[var(--surface-1)] border border-[var(--border)] rounded-xl shadow-2xl p-4 flex flex-col gap-3 font-sans">
+            <p className="text-sm font-bold text-[var(--text-primary)]">Unsaved changes</p>
+            <p className="text-[11px] text-[var(--text-secondary)]">
+              You edited this camera but haven&apos;t saved. What would you like to do?
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setUnsavedPrompt(null)}
+                className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-secondary)]"
+              >
+                Keep editing
+              </button>
+              <button
+                type="button"
+                onClick={() => { const fn = unsavedPrompt.onDiscard; setUnsavedPrompt(null); setCameraFormDirty(false); fn() }}
+                className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-[var(--surface-2)] border border-[var(--danger)] text-[var(--danger)]"
+              >
+                Discard
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const fn = unsavedPrompt.onDiscard
+                  setUnsavedPrompt(null)
+                  // Se guarda y recien despues se cierra, para no perder el cambio
+                  // si el guardado falla.
+                  void (async () => {
+                    const ok = await saveCameraNow()
+                    if (ok) fn()
+                  })()
+                }}
+                disabled={isPending}
+                className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-[var(--accent)] text-white disabled:opacity-50"
+              >
+                Save changes
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Confirmacion propia (reemplaza al confirm() nativo) ── */}
