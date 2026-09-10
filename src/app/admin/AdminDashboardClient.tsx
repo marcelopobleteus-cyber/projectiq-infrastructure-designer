@@ -1320,7 +1320,7 @@ export default function AdminDashboardClient({ initialData }: AdminDashboardClie
                       type="file"
                       accept="image/png, image/jpeg, image/webp, image/svg+xml"
                       onChange={handleLogoFileChange}
-                      className="block w-full text-[11px] text-[var(--text-secondary)] file:mr-2.5 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-[var(--accent)] file:text-white hover:file:bg-[var(--accent-hover)] file:cursor-pointer"
+                      className="block w-full text-[11px] text-[var(--text-secondary)] file:mr-2.5 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-[var(--accent)] file:text-[var(--text-primary)] hover:file:bg-[var(--accent-hover)] file:cursor-pointer"
                     />
                     <div className="flex items-center justify-between text-[10px] text-[var(--text-tertiary)]">
                       <span>Max size: 2MB (PNG, JPG, WebP, SVG)</span>

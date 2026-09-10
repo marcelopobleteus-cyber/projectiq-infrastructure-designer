@@ -573,7 +573,7 @@ export default function PlanCanvas({
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading || preparing}
-          className="px-4 py-2 bg-[var(--accent)] text-white font-bold text-xs rounded-lg disabled:opacity-50"
+          className="px-4 py-2 bg-[var(--accent)] text-[var(--text-primary)] font-bold text-xs rounded-lg disabled:opacity-50"
         >
           {preparing ? 'Reading…' : uploading ? 'Uploading…' : 'Upload Floor Plan'}
         </button>

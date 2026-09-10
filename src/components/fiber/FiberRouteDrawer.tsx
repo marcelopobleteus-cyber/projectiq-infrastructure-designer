@@ -339,7 +339,7 @@ export default function FiberRouteDrawer({
             value={installationType}
             onChange={e => setInstallationType(e.target.value as InstallationType)}
             disabled={!isCreating}
-            className="w-full px-3 py-2 bg-[var(--surface-2)] border border-slate-700 text-white text-[12px] rounded-lg
+            className="w-full px-3 py-2 bg-[var(--surface-2)] border border-slate-700 text-[var(--text-primary)] text-[12px] rounded-lg
               focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-[var(--accent)]
               disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -359,7 +359,7 @@ export default function FiberRouteDrawer({
             value={routePurpose}
             onChange={e => setRoutePurpose(e.target.value as RoutePurpose)}
             disabled={!isCreating}
-            className="w-full px-3 py-2 bg-[var(--surface-2)] border border-slate-700 text-white text-[12px] rounded-lg
+            className="w-full px-3 py-2 bg-[var(--surface-2)] border border-slate-700 text-[var(--text-primary)] text-[12px] rounded-lg
               focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-[var(--accent)]
               disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -426,7 +426,7 @@ export default function FiberRouteDrawer({
                   id="fiber-route-drawer-catalog"
                   value={cableCatalogId}
                   onChange={e => setCableCatalogId(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--surface-2)] border border-slate-700 text-white text-[12px] rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 bg-[var(--surface-2)] border border-slate-700 text-[var(--text-primary)] text-[12px] rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 >
                   <option value="none">No Cable Assigned (Route Only)</option>
                   {fiberCatalog.map(item => (

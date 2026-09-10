@@ -2484,6 +2484,7 @@ export default function ProjectMapCanvas({
             power_type: cameraPowerType,
             notes: cameraNotes,
             assigned_network_device_id: assignedSwitchId,
+            floor_plan_id: (selectedCamera as any).floor_plan_id ?? null,
           },
           fiberAssignments,
           allSwitchPorts,
@@ -2553,7 +2554,7 @@ export default function ProjectMapCanvas({
                   <select
                     value={cameraDetailedConn}
                     onChange={e => handleDetailedConnChange(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-white text-xs focus:outline-none focus:border-[var(--accent)] font-semibold cursor-pointer hover:border-slate-700 transition"
+                    className="w-full px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)] font-semibold cursor-pointer hover:border-slate-700 transition"
                   >
                     <option value="Fiber">Fiber (Spliced Drop)</option>
                     <option value="Ethernet / Copper">Ethernet / Copper (Local PoE)</option>
@@ -2617,7 +2618,7 @@ export default function ProjectMapCanvas({
                         <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Camera Tag</label>
                         <input
                           type="text" required value={cameraTag} onChange={e => setCameraTag(e.target.value)}
-                          className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)]"
+                          className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)]"
                         />
                       </div>
 
@@ -2625,7 +2626,7 @@ export default function ProjectMapCanvas({
                         <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Camera Model</label>
                         <select
                           value={cameraModelId} onChange={e => setCameraModelId(e.target.value)}
-                          className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
+                          className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                         >
                           <option value="">Select Model...</option>
                           {cameraModels.map(model => (
@@ -2641,7 +2642,7 @@ export default function ProjectMapCanvas({
                           <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Status</label>
                           <select
                             value={cameraStatus} onChange={e => setCameraStatus(e.target.value as any)}
-                            className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
+                            className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                           >
                             <option value="planned">Planned</option>
                             <option value="in_progress">In Progress</option>
@@ -2654,7 +2655,7 @@ export default function ProjectMapCanvas({
                           <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Power Type</label>
                           <select
                             value={cameraPowerType} onChange={e => setCameraPowerType(e.target.value as any)}
-                            className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
+                            className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                           >
                             <option value="poe">PoE (Standard)</option>
                             <option value="poe_plus">PoE+ (30W)</option>
@@ -2672,7 +2673,7 @@ export default function ProjectMapCanvas({
                         <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Address Reference</label>
                         <input
                           type="text" value={cameraAddressRef} onChange={e => setCameraAddressRef(e.target.value)}
-                          className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)]"
+                          className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)]"
                           placeholder="e.g., 100 Main St Pole 4"
                         />
                       </div>
@@ -2681,7 +2682,7 @@ export default function ProjectMapCanvas({
                         <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Structure Reference</label>
                         <input
                           type="text" value={cameraStructureRef} onChange={e => setCameraStructureRef(e.target.value)}
-                          className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)]"
+                          className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)]"
                           placeholder="e.g., Pole 4B, Wall Mount"
                         />
                       </div>
@@ -2744,7 +2745,7 @@ export default function ProjectMapCanvas({
                         <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Notes</label>
                         <textarea
                           value={cameraNotes} onChange={e => setCameraNotes(e.target.value)}
-                          className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] min-h-[50px] resize-y"
+                          className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)] min-h-[50px] resize-y"
                           placeholder="General specs, mounting requirements..."
                         />
                       </div>
@@ -2964,7 +2965,7 @@ export default function ProjectMapCanvas({
                             <select
                               value={wirelessRadio}
                               onChange={e => setWirelessRadio(e.target.value)}
-                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                             >
                               <option value="TBD">TBD / Planned</option>
                               <option value="Base Station (AP)">Base Station (AP)</option>
@@ -2979,7 +2980,7 @@ export default function ProjectMapCanvas({
                             <select
                               value={assignedSwitchId}
                               onChange={e => setAssignedSwitchId(e.target.value)}
-                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                             >
                               <option value="">Select Receiver...</option>
                               {networkDevices.map(dev => (
@@ -2997,7 +2998,7 @@ export default function ProjectMapCanvas({
                             <select
                               value={wirelessFrequency}
                               onChange={e => setWirelessFrequency(e.target.value)}
-                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                             >
                               <option value="5.8 GHz">5.8 GHz</option>
                               <option value="60 GHz">60 GHz (V-Band)</option>
@@ -3015,7 +3016,7 @@ export default function ProjectMapCanvas({
                               value={wirelessSignal}
                               onChange={e => setWirelessSignal(e.target.value)}
                               placeholder="e.g., -65 dBm"
-                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)]"
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)]"
                             />
                           </div>
                         </div>
@@ -3028,7 +3029,7 @@ export default function ProjectMapCanvas({
                               value={wirelessCapacity}
                               onChange={e => setWirelessCapacity(e.target.value)}
                               placeholder="e.g., 500 Mbps"
-                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)]"
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)]"
                             />
                           </div>
 
@@ -3039,7 +3040,7 @@ export default function ProjectMapCanvas({
                               value={wirelessLatency}
                               onChange={e => setWirelessLatency(e.target.value)}
                               placeholder="e.g., 2 ms"
-                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)]"
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)]"
                             />
                           </div>
                         </div>
@@ -3050,7 +3051,7 @@ export default function ProjectMapCanvas({
                             <select
                               value={wirelessLos}
                               onChange={e => setWirelessLos(e.target.value)}
-                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                             >
                               <option value="Clear">Clear LoS</option>
                               <option value="Partially Obstructed">Partially Obstructed</option>
@@ -3064,7 +3065,7 @@ export default function ProjectMapCanvas({
                             <select
                               value={wirelessValidation}
                               onChange={e => setWirelessValidation(e.target.value)}
-                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                             >
                               <option value="Validated">Validated</option>
                               <option value="Pending">Pending Validation</option>
@@ -3103,7 +3104,7 @@ export default function ProjectMapCanvas({
                             <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Source Fiber Node</label>
                             <select
                               value={cameraSourceNodeId} onChange={e => setCameraSourceNodeId(e.target.value)}
-                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                             >
                               <option value="">Select Node...</option>
                               {fiberNodes.map(node => (
@@ -3118,7 +3119,7 @@ export default function ProjectMapCanvas({
                             <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Fiber Enclosure</label>
                             <select
                               value={cameraEnclosureId} onChange={e => setCameraEnclosureId(e.target.value)}
-                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                             >
                               <option value="">Select Enclosure...</option>
                               {fiberEnclosures
@@ -3135,7 +3136,7 @@ export default function ProjectMapCanvas({
                             <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Drop Cable</label>
                             <select
                               value={cameraDropCableId} onChange={e => setCameraDropCableId(e.target.value)}
-                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                             >
                               <option value="">Select Cable...</option>
                               {fiberCables
@@ -3152,7 +3153,7 @@ export default function ProjectMapCanvas({
                             <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Backbone Cable</label>
                             <select
                               value={cameraBackboneCableId} onChange={e => setCameraBackboneCableId(e.target.value)}
-                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                             >
                               <option value="">Select Backbone...</option>
                               {fiberCables
@@ -3170,7 +3171,7 @@ export default function ProjectMapCanvas({
                               <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">TX Strand</label>
                               <select
                                 value={assignedStrandTxId} onChange={e => setAssignedStrandTxId(e.target.value)}
-                                className="w-full px-2 py-1.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
+                                className="w-full px-2 py-1.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                               >
                                 <option value="">None</option>
                                 {fiberStrands
@@ -3190,7 +3191,7 @@ export default function ProjectMapCanvas({
                               <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">RX Strand</label>
                               <select
                                 value={assignedStrandRxId} onChange={e => setAssignedStrandRxId(e.target.value)}
-                                className="w-full px-2 py-1.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
+                                className="w-full px-2 py-1.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                               >
                                 <option value="">None</option>
                                 {fiberStrands
@@ -3212,7 +3213,7 @@ export default function ProjectMapCanvas({
                               <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Fiber Path Status</label>
                               <select
                                 value={cameraFiberPathStatus} onChange={e => setCameraFiberPathStatus(e.target.value)}
-                                className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
+                                className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                               >
                                 <option value="Planned">Planned</option>
                                 <option value="Pulled">Pulled</option>
@@ -3227,7 +3228,7 @@ export default function ProjectMapCanvas({
                                 <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Splice Status</label>
                                 <select
                                   value={cameraSpliceStatus} onChange={e => setCameraSpliceStatus(e.target.value)}
-                                  className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
+                                  className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                                 >
                                   <option value="Not Spliced">Not Spliced</option>
                                   <option value="In Progress">In Progress</option>
@@ -3239,7 +3240,7 @@ export default function ProjectMapCanvas({
                                 <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Test Status</label>
                                 <select
                                   value={cameraTestStatus} onChange={e => setCameraTestStatus(e.target.value)}
-                                  className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
+                                  className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                                 >
                                   <option value="Not Tested">Not Tested</option>
                                   <option value="Passed">Passed</option>
@@ -3258,7 +3259,7 @@ export default function ProjectMapCanvas({
                             <select
                               value={assignedSwitchId}
                               onChange={e => setAssignedSwitchId(e.target.value)}
-                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                             >
                               <option value="">Select Switch...</option>
                               {networkDevices
@@ -3277,7 +3278,7 @@ export default function ProjectMapCanvas({
                               value={assignedPortId}
                               onChange={e => setAssignedPortId(e.target.value)}
                               disabled={loadingPorts || !assignedSwitchId}
-                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)] disabled:opacity-50 cursor-pointer"
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)] disabled:opacity-50 cursor-pointer"
                             >
                               <option value="">{loadingPorts ? 'Loading Ports...' : 'Select Port...'}</option>
                               {switchPorts.map(port => {
@@ -3396,7 +3397,7 @@ export default function ProjectMapCanvas({
                   <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Device Name</label>
                   <input
                     type="text" required value={deviceName} onChange={e => setDeviceName(e.target.value)}
-                    className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none"
+                    className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none"
                   />
                 </div>
 
@@ -3404,7 +3405,7 @@ export default function ProjectMapCanvas({
                   <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Device Type</label>
                   <select
                     value={deviceType} onChange={e => setDeviceType(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none"
+                    className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none"
                   >
                     <option value="switch">Switch</option>
                     <option value="cabinet_device">Cabinet Device</option>
@@ -3419,14 +3420,14 @@ export default function ProjectMapCanvas({
                     <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Brand</label>
                     <input
                       type="text" placeholder="e.g. Cisco" value={deviceBrand} onChange={e => setDeviceBrand(e.target.value)}
-                      className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs"
+                      className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs"
                     />
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Model</label>
                     <input
                       type="text" placeholder="e.g. C1000" value={deviceModel} onChange={e => setDeviceModel(e.target.value)}
-                      className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs"
+                      className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs"
                     />
                   </div>
                 </div>
@@ -3437,14 +3438,14 @@ export default function ProjectMapCanvas({
                       <label className="block text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Total Ports</label>
                       <input
                         type="number" min={1} max={96} value={deviceTotalPorts} onChange={e => setDeviceTotalPorts(parseInt(e.target.value, 10))}
-                        className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none"
+                        className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none"
                       />
                     </div>
                     <div>
                       <label className="block text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">PoE Budget (W)</label>
                       <input
                         type="number" min={0} value={devicePoeBudget} onChange={e => setDevicePoeBudget(parseInt(e.target.value, 10))}
-                        className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none"
+                        className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none"
                       />
                     </div>
                   </div>
@@ -3455,14 +3456,14 @@ export default function ProjectMapCanvas({
                     <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">IP Address</label>
                     <input
                       type="text" placeholder="10.0.0.1" value={deviceIp} onChange={e => setDeviceIp(e.target.value)}
-                      className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs"
+                      className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs"
                     />
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Rack Unit</label>
                     <input
                       type="text" placeholder="e.g. RU 4" value={deviceRackUnit} onChange={e => setDeviceRackUnit(e.target.value)}
-                      className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs"
+                      className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs"
                     />
                   </div>
                 </div>
@@ -3471,7 +3472,7 @@ export default function ProjectMapCanvas({
                   <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Location Ref</label>
                   <input
                     type="text" placeholder="MDF Room, Rack cabinet..." value={deviceLocRef} onChange={e => setDeviceLocRef(e.target.value)}
-                    className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs"
+                    className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs"
                   />
                 </div>
 
@@ -3804,7 +3805,7 @@ export default function ProjectMapCanvas({
                           <select
                             value={activeTask.status}
                             onChange={(e) => handleTaskStatusChange(activeTask.id, e.target.value)}
-                            className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                            className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-[var(--text-primary)] focus:outline-none"
                           >
                             <option value="Not Started">Not Started</option>
                             <option value="In Progress">In Progress</option>
@@ -3821,7 +3822,7 @@ export default function ProjectMapCanvas({
                           <select
                             value={activeTask.priority}
                             onChange={(e) => handleTaskPriorityChange(activeTask.id, e.target.value)}
-                            className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                            className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-[var(--text-primary)] focus:outline-none"
                           >
                             <option value="Low">Low</option>
                             <option value="Medium">Medium</option>

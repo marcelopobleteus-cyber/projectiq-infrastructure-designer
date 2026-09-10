@@ -455,6 +455,10 @@ export function getCameraReadiness(
     power_type: string
     notes: string | null
     assigned_network_device_id: string | null
+    // Una camara colocada sobre un plano subido no tiene coordenadas GPS a
+    // proposito: su posicion vive en plan_x/plan_y. Sin esto, el panel le
+    // exigia para siempre "poner latitud y longitud en el mapa".
+    floor_plan_id?: string | null
   },
   fiberAssignments: Array<{ camera_id: string; fiber_route_id?: string | null; drop_cable_id?: string | null; backbone_cable_id?: string | null; assigned_strand_tx_id?: string | null }>,
   switchPorts: Array<{ assigned_camera_location_id?: string | null }>,
@@ -464,7 +468,9 @@ export function getCameraReadiness(
   const isFiber = camera.communication_type === 'fiber'
   const isWireless = ['Wireless PTP', 'Wireless PTMP', 'Wi-Fi Bridge', 'LTE / 5G'].includes(detailedMethod)
 
-  const location: 'Done' | 'Missing' = camera.latitude !== 0 && camera.longitude !== 0 ? 'Done' : 'Missing'
+  const isOnFloorPlan = !!camera.floor_plan_id
+  const location: 'Done' | 'Missing' =
+    isOnFloorPlan || (camera.latitude !== 0 && camera.longitude !== 0) ? 'Done' : 'Missing'
   const connectivity = detailedMethod
 
   // Fiber route checks
