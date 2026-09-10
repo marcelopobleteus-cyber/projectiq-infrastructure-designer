@@ -135,7 +135,7 @@ export default function FiberPathToolbar({
                   id="fiber-draw-undo-node"
                   type="button"
                   onClick={onUndo}
-                  className="px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--border)] hover:border-slate-700 text-[var(--text-secondary)] hover:text-white text-[10px] font-semibold rounded-lg transition-all text-center flex items-center justify-center gap-1.5"
+                  className="px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--border)] hover:border-slate-700 text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-[10px] font-semibold rounded-lg transition-all text-center flex items-center justify-center gap-1.5"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
                   Undo Last

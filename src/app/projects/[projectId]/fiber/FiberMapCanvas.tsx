@@ -3672,7 +3672,7 @@ export default function FiberMapCanvas({
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={() => setConfirmModal(null)}
-                className="px-4 py-2 bg-[var(--surface-2)] border border-[var(--border)] hover:bg-slate-800 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-xl text-xs font-bold transition-all"
+                className="px-4 py-2 bg-[var(--surface-2)] border border-[var(--border)] hover:bg-[var(--surface-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-xl text-xs font-bold transition-all"
               >
                 Cancel
               </button>

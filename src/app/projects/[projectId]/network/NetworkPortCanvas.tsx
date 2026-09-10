@@ -413,7 +413,7 @@ export default function NetworkPortCanvas({
                         const isAssigned = camera !== null
                         
                         return (
-                          <tr key={port.id} className="hover:bg-slate-850/20 transition-colors">
+                          <tr key={port.id} className="hover:bg-[var(--surface-hover)]/20 transition-colors">
                             <td className="py-3.5 px-6 font-bold text-[var(--text-primary)]">Port {port.port_number}</td>
                             <td className="py-3.5 px-4 uppercase font-mono text-[10px] text-[var(--text-secondary)]">{port.port_type}</td>
                             <td className="py-3.5 px-4 font-mono text-[var(--text-primary)]">{port.speed_mbps}M</td>

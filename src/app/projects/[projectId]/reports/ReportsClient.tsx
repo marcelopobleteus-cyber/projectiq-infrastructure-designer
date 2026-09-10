@@ -281,7 +281,7 @@ export default function ReportsClient({ projectId, projectName, fiberData }: Rep
                 </thead>
                 <tbody className="divide-y divide-slate-850">
                   {reportsList.map((rep, idx) => (
-                    <tr key={idx} className="hover:bg-slate-855/15 transition-colors">
+                    <tr key={idx} className="hover:bg-[var(--surface-hover)]/15 transition-colors">
                       <td className="py-3.5 px-6 font-mono font-bold text-[var(--accent-text)]">
                         {rep.code}
                       </td>

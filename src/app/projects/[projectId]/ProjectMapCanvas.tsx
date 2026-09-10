@@ -2104,7 +2104,7 @@ export default function ProjectMapCanvas({
               className={`w-full flex items-center justify-between text-left px-2 py-1.5 rounded-lg text-xs transition-colors ${
                 selectedCamera?.id === cam.id
                   ? 'bg-[var(--accent)] text-white/15 border border-[var(--accent)]/30 text-white'
-                  : 'hover:bg-slate-800 text-[var(--text-secondary)] hover:text-white border border-transparent'
+                  : 'hover:bg-[var(--surface-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent'
               }`}
             >
               <span className="flex items-center gap-1.5 truncate">
@@ -2164,7 +2164,7 @@ export default function ProjectMapCanvas({
               className={`w-full flex items-center justify-between text-left px-2 py-1.5 rounded-lg text-xs transition-colors ${
                 selectedDevice?.id === dev.id
                   ? 'bg-[var(--accent)] text-white/15 border border-[var(--accent)]/30 text-white'
-                  : 'hover:bg-slate-800 text-[var(--text-secondary)] hover:text-white border border-transparent'
+                  : 'hover:bg-[var(--surface-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent'
               }`}
             >
               <span className="flex items-center gap-1.5 truncate">
@@ -2283,7 +2283,7 @@ export default function ProjectMapCanvas({
           {canvasMode === 'map' && (
           <div className="absolute top-[68px] right-4 z-20 bg-[var(--surface-1)]/90 backdrop-blur-md border border-[var(--border)] p-2.5 rounded-xl shadow-xl flex flex-col gap-1.5 text-[10px] font-bold text-[var(--text-primary)] font-sans pointer-events-auto">
             <div className="text-[9px] text-[var(--accent-text)] uppercase tracking-wider border-b border-[var(--border)] pb-1 mb-0.5">Fiber Layers</div>
-            <label className="flex items-center gap-2 cursor-pointer hover:text-white transition-colors">
+            <label className="flex items-center gap-2 cursor-pointer hover:text-[var(--text-primary)] transition-colors">
               <input
                 type="checkbox"
                 checked={showFiberNodes}
@@ -2292,7 +2292,7 @@ export default function ProjectMapCanvas({
               />
               Nodes (HH/MH/ENC)
             </label>
-            <label className="flex items-center gap-2 cursor-pointer hover:text-white transition-colors">
+            <label className="flex items-center gap-2 cursor-pointer hover:text-[var(--text-primary)] transition-colors">
               <input
                 type="checkbox"
                 checked={showFiberRoutes}
@@ -2495,7 +2495,7 @@ export default function ProjectMapCanvas({
         const completeCount = cameraTasks.filter(t => t.status === 'Complete').length
 
         return (
-          <div className="absolute top-4 right-4 bottom-4 w-[27rem] max-w-[calc(100%-2rem)] max-h-[calc(100%-2rem)] bg-[var(--surface-1)] border border-[var(--border-strong)] rounded-2xl flex flex-col justify-between p-5 z-30 overflow-hidden shadow-2xl">
+          <div className="absolute top-4 right-4 bottom-4 w-80 max-h-[calc(100%-2rem)] bg-[var(--surface-1)] border border-[var(--border-strong)] rounded-2xl flex flex-col justify-between p-6 z-30 overflow-hidden shadow-2xl">
             <form onSubmit={handleSaveCamera} className="flex flex-col h-full justify-between overflow-hidden">
               {/* Header FIJO: el cerrar no debe irse con el scroll. */}
               <div className="flex justify-between items-start border-b border-[var(--border)] pb-3 shrink-0">
@@ -2518,13 +2518,13 @@ export default function ProjectMapCanvas({
 
               {/* Pestanas: solo se ofrecen las que aplican a esta camara. Las de
                   otros modulos apareceran cuando esos modulos se conecten. */}
-              <div className="flex items-center gap-1 overflow-x-auto py-1.5 shrink-0 scrollbar-thin">
+              <div className="flex items-center gap-1 overflow-x-auto py-2 shrink-0 scrollbar-thin">
                 {cameraPanelTabs.map(tab => (
                   <button
                     key={tab.key}
                     type="button"
                     onClick={() => setCameraTab(tab.key)}
-                    className={`px-2 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all ${
+                    className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all ${
                       cameraTab === tab.key
                         ? 'bg-[var(--accent)] text-white'
                         : 'bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-secondary)]'
@@ -2669,29 +2669,27 @@ export default function ProjectMapCanvas({
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Address Ref.</label>
-                          <input
-                            type="text" value={cameraAddressRef} onChange={e => setCameraAddressRef(e.target.value)}
-                            className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)]"
-                            placeholder="100 Main St Pole 4"
-                          />
-                        </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Address Reference</label>
+                        <input
+                          type="text" value={cameraAddressRef} onChange={e => setCameraAddressRef(e.target.value)}
+                          className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)]"
+                          placeholder="e.g., 100 Main St Pole 4"
+                        />
+                      </div>
 
-                        <div>
-                          <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Structure Ref.</label>
-                          <input
-                            type="text" value={cameraStructureRef} onChange={e => setCameraStructureRef(e.target.value)}
-                            className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)]"
-                            placeholder="Pole 4B, Wall Mount"
-                          />
-                        </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Structure Reference</label>
+                        <input
+                          type="text" value={cameraStructureRef} onChange={e => setCameraStructureRef(e.target.value)}
+                          className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)]"
+                          placeholder="e.g., Pole 4B, Wall Mount"
+                        />
                       </div>
 
                       {/* ── Especificaciones opticas y de red ── */}
                       <div className="pt-1 border-t border-[var(--border)]">
-                        <p className="text-[10px] font-black text-[var(--accent-text)] uppercase tracking-wider mb-2 mt-1">Optics & Network</p>
+                        <p className="text-[10px] font-black text-[var(--accent-text)] uppercase tracking-wider mb-2 mt-2">Optics & Network</p>
 
                         <div className="grid grid-cols-2 gap-3">
                           <div>
@@ -2818,7 +2816,7 @@ export default function ProjectMapCanvas({
                                       onChange={() => handleToggleTaskStatus(task)}
                                       className="mt-0.5 rounded border-[var(--border)] bg-[var(--surface-2)] text-indigo-600 focus:ring-indigo-500 w-3 h-3 shrink-0"
                                     />
-                                    <span className={`text-[11px] font-bold text-[var(--text-primary)] leading-snug group-hover:text-white transition-colors ${task.status === 'Complete' ? 'line-through text-[var(--text-tertiary)] group-hover:text-[var(--text-tertiary)] font-medium' : ''}`}>
+                                    <span className={`text-[11px] font-bold text-[var(--text-primary)] leading-snug group-hover:text-[var(--text-primary)] transition-colors ${task.status === 'Complete' ? 'line-through text-[var(--text-tertiary)] group-hover:text-[var(--text-tertiary)] font-medium' : ''}`}>
                                       {task.title}
                                     </span>
                                   </label>
@@ -3363,7 +3361,7 @@ export default function ProjectMapCanvas({
       })()}
       
       {selectedDevice && (
-        <div className="absolute top-4 right-4 bottom-4 w-[27rem] max-w-[calc(100%-2rem)] max-h-[calc(100%-2rem)] bg-[var(--surface-1)] border border-[var(--border-strong)] rounded-2xl flex flex-col justify-between p-5 z-30 overflow-hidden shadow-2xl">
+        <div className="absolute top-4 right-4 bottom-4 w-80 max-h-[calc(100%-2rem)] bg-[var(--surface-1)] border border-[var(--border-strong)] rounded-2xl flex flex-col justify-between p-6 z-30 overflow-hidden shadow-2xl">
           <form onSubmit={handleSaveDevice} className="flex flex-col h-full justify-between">
             <div className="space-y-4 overflow-y-auto pr-1 flex-1 scrollbar-thin">
               <div className="flex justify-between items-start border-b border-[var(--border)] pb-4">
@@ -3377,7 +3375,7 @@ export default function ProjectMapCanvas({
                 <button
                   type="button"
                   onClick={() => setSelectedDevice(null)}
-                  className="p-1 rounded bg-[var(--surface-2)] hover:bg-slate-850 text-[var(--text-secondary)] hover:text-white"
+                  className="p-1 rounded bg-[var(--surface-2)] hover:bg-[var(--surface-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
@@ -3554,7 +3552,7 @@ export default function ProjectMapCanvas({
             </div>
             <button
               onClick={() => setIsBackfillPreviewOpen(false)}
-              className="p-1 rounded bg-[var(--surface-2)] hover:bg-slate-850 text-[var(--text-secondary)] hover:text-white"
+              className="p-1 rounded bg-[var(--surface-2)] hover:bg-[var(--surface-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
@@ -3653,7 +3651,7 @@ export default function ProjectMapCanvas({
               <>
                 <button
                   onClick={() => setIsBackfillPreviewOpen(false)}
-                  className="flex-1 py-2 px-4 bg-[var(--surface-2)] hover:bg-slate-850 border border-[var(--border)] text-[var(--text-secondary)] font-bold rounded-xl text-xs transition"
+                  className="flex-1 py-2 px-4 bg-[var(--surface-2)] hover:bg-[var(--surface-hover)] border border-[var(--border)] text-[var(--text-secondary)] font-bold rounded-xl text-xs transition"
                 >
                   Cancel
                 </button>
@@ -3698,7 +3696,7 @@ export default function ProjectMapCanvas({
             </div>
             <button
               onClick={() => setIsFullChecklistOpen(false)}
-              className="p-2 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] hover:border-slate-700 text-[var(--text-secondary)] hover:text-white transition"
+              className="p-2 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] hover:border-slate-700 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>

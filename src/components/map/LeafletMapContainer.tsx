@@ -312,7 +312,7 @@ export default function LeafletMapContainer({
           className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
             activeTileLayer === 'dark'
               ? 'bg-[var(--accent)] text-white text-white shadow-md'
-              : 'text-[var(--text-secondary)] hover:text-white hover:bg-slate-800'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]'
           }`}
         >
           Dark
@@ -322,7 +322,7 @@ export default function LeafletMapContainer({
           className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
             activeTileLayer === 'streets'
               ? 'bg-[var(--accent)] text-white text-white shadow-md'
-              : 'text-[var(--text-secondary)] hover:text-white hover:bg-slate-800'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]'
           }`}
         >
           Calles
@@ -332,7 +332,7 @@ export default function LeafletMapContainer({
           className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
             activeTileLayer === 'satellite'
               ? 'bg-[var(--accent)] text-white text-white shadow-md'
-              : 'text-[var(--text-secondary)] hover:text-white hover:bg-slate-800'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]'
           }`}
         >
           Esri Satellite (Free)

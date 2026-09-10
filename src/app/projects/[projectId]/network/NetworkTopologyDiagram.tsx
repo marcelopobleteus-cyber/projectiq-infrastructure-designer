@@ -399,7 +399,7 @@ export default function NetworkTopologyDiagram({
           <div className="flex items-center gap-2">
             <button
               onClick={handleResetLayout}
-              className="px-2.5 py-1 bg-[var(--surface-1)] hover:bg-slate-800 text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border)] rounded-lg text-[10px] font-bold transition-all"
+              className="px-2.5 py-1 bg-[var(--surface-1)] hover:bg-[var(--surface-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border)] rounded-lg text-[10px] font-bold transition-all"
             >
               Reset Layout
             </button>

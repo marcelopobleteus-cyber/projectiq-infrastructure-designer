@@ -259,7 +259,7 @@ export default function FiberRouteDrawer({
         <button
           id="fiber-route-drawer-close"
           onClick={onClose}
-          className="p-1.5 text-[var(--text-tertiary)] hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+          className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] rounded-lg transition-colors"
           title="Close"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
@@ -619,7 +619,7 @@ export default function FiberRouteDrawer({
           type="button"
           onClick={onClose}
           className="w-full py-2 bg-[var(--surface-2)] border border-[var(--border)] hover:border-slate-700 text-[var(--text-secondary)]
-            hover:text-white font-medium text-[11px] rounded-xl transition-all"
+            hover:text-[var(--text-primary)] font-medium text-[11px] rounded-xl transition-all"
         >
           {isCreating ? 'Cancel' : 'Close'}
         </button>

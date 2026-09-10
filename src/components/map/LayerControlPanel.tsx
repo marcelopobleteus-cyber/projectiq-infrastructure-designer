@@ -41,7 +41,7 @@ export default function LayerControlPanel({
         <button
           type="button"
           onClick={() => setIsLayerPanelOpen(true)}
-          className="absolute top-16 right-4 z-20 w-10 h-10 bg-[var(--surface-1)]/95 border border-[var(--border)] hover:border-slate-700 text-[var(--text-secondary)] hover:text-white rounded-xl shadow-xl flex items-center justify-center pointer-events-auto transition-all duration-200"
+          className="absolute top-16 right-4 z-20 w-10 h-10 bg-[var(--surface-1)]/95 border border-[var(--border)] hover:border-slate-700 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-xl shadow-xl flex items-center justify-center pointer-events-auto transition-all duration-200"
           title="Workspace Layers"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -73,7 +73,7 @@ export default function LayerControlPanel({
             <button
               type="button"
               onClick={() => setIsLayerPanelOpen(false)}
-              className="p-1 rounded bg-[var(--surface-2)] hover:bg-slate-850 text-[var(--text-secondary)] hover:text-white"
+              className="p-1 rounded bg-[var(--surface-2)] hover:bg-[var(--surface-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
@@ -96,7 +96,7 @@ export default function LayerControlPanel({
                       return (
                         <div key={id} className={`flex items-start gap-2 p-1.5 rounded-lg transition-colors ${
                           isInteractive 
-                            ? 'hover:bg-slate-850/50' 
+                            ? 'hover:bg-[var(--surface-hover)]/50' 
                             : 'opacity-40 italic cursor-not-allowed pointer-events-none select-none'
                         }`}>
                           {isInteractive ? (
@@ -150,7 +150,7 @@ export default function LayerControlPanel({
                 })
                 setLayerVisibility(defaults)
               }}
-              className="hover:text-white font-bold transition-colors"
+              className="hover:text-[var(--text-primary)] font-bold transition-colors"
             >
               Reset Defaults
             </button>

@@ -116,7 +116,7 @@ export default function GlobalLayoutWrapper({ children }: GlobalLayoutWrapperPro
             <button
               type="button"
               onClick={() => setIsPastDueDismissed(true)}
-              className="text-amber-400 hover:text-white transition px-2 py-0.5 rounded text-[11px] font-bold"
+              className="text-amber-400 hover:text-[var(--text-primary)] transition px-2 py-0.5 rounded text-[11px] font-bold"
             >
               Dismiss
             </button>

@@ -274,7 +274,7 @@ export default function CreateProjectPage() {
           <div className="pt-4 border-t border-[var(--border)] flex items-center justify-end gap-4">
             <Link
               href="/projects"
-              className="px-5 py-2.5 bg-[var(--surface-1)] hover:bg-slate-850 border border-[var(--border)] text-[var(--text-primary)] text-sm font-semibold rounded-xl transition-all"
+              className="px-5 py-2.5 bg-[var(--surface-1)] hover:bg-[var(--surface-hover)] border border-[var(--border)] text-[var(--text-primary)] text-sm font-semibold rounded-xl transition-all"
             >
               Cancel
             </Link>
