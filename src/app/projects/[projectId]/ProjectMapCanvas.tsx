@@ -244,6 +244,12 @@ export default function ProjectMapCanvas({
   const [assignedStrandTxId, setAssignedStrandTxId] = useState('')
   const [assignedStrandRxId, setAssignedStrandRxId] = useState('')
   const [cameraNotes, setCameraNotes] = useState('')
+  // Especificaciones opticas y de red (migracion 040)
+  const [cameraLens, setCameraLens] = useState('')
+  const [cameraMountHeight, setCameraMountHeight] = useState('')
+  const [cameraIpAddress, setCameraIpAddress] = useState('')
+  const [cameraResolution, setCameraResolution] = useState('')
+  const [cameraFov, setCameraFov] = useState('')
   const [assignedSwitchId, setAssignedSwitchId] = useState('')
   const [assignedPortId, setAssignedPortId] = useState('')
   const [connectivityPathType, setConnectivityPathType] = useState('Fiber -> Camera')
@@ -482,6 +488,11 @@ export default function ProjectMapCanvas({
       setCameraAddressRef(selectedCamera.address_reference || '')
       setCameraStructureRef(selectedCamera.structure_reference || '')
       setCameraNotes(selectedCamera.notes || '')
+      setCameraLens((selectedCamera as any).lens ?? '')
+      setCameraMountHeight((selectedCamera as any).mounting_height_ft?.toString() ?? '')
+      setCameraIpAddress((selectedCamera as any).ip_address ?? '')
+      setCameraResolution((selectedCamera as any).resolution ?? '')
+      setCameraFov((selectedCamera as any).fov_degrees?.toString() ?? '')
       setAssignedSwitchId(selectedCamera.assigned_network_device_id || '')
       setCameraPanelMessage(null)
       const notesStr = selectedCamera.notes || ''
@@ -1373,6 +1384,15 @@ export default function ProjectMapCanvas({
       address_reference: cameraAddressRef || null,
       structure_reference: cameraStructureRef || null,
       notes: finalNotes || null,
+      lens: cameraLens.trim() || null,
+      // Campos numericos: cadena vacia o no numerica se guarda como null en
+      // vez de NaN, que Postgres rechazaria.
+      mounting_height_ft: cameraMountHeight.trim() === '' || isNaN(Number(cameraMountHeight))
+        ? null : Number(cameraMountHeight),
+      ip_address: cameraIpAddress.trim() || null,
+      resolution: cameraResolution.trim() || null,
+      fov_degrees: cameraFov.trim() === '' || isNaN(Number(cameraFov))
+        ? null : Number(cameraFov),
     }
 
     startTransition(async () => {
@@ -2664,6 +2684,60 @@ export default function ProjectMapCanvas({
                           className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white text-xs focus:outline-none focus:border-[var(--accent)]"
                           placeholder="e.g., Pole 4B, Wall Mount"
                         />
+                      </div>
+
+                      {/* ── Especificaciones opticas y de red ── */}
+                      <div className="pt-1 border-t border-[var(--border)]">
+                        <p className="text-[10px] font-black text-[var(--accent-text)] uppercase tracking-wider mb-2 mt-2">Optics & Network</p>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Lens</label>
+                            <input
+                              type="text" value={cameraLens} onChange={e => setCameraLens(e.target.value)}
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)]"
+                              placeholder="e.g., 2.8mm"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Mount Height (ft)</label>
+                            <input
+                              type="number" min={0} max={1000} step="0.5"
+                              value={cameraMountHeight} onChange={e => setCameraMountHeight(e.target.value)}
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)]"
+                              placeholder="e.g., 14"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Resolution</label>
+                            <input
+                              type="text" value={cameraResolution} onChange={e => setCameraResolution(e.target.value)}
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)]"
+                              placeholder="e.g., 4MP"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Field of View (°)</label>
+                            <input
+                              type="number" min={1} max={360} step="1"
+                              value={cameraFov} onChange={e => setCameraFov(e.target.value)}
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)]"
+                              placeholder="e.g., 90"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="mt-3">
+                          <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">IP Address</label>
+                          <input
+                            type="text" value={cameraIpAddress} onChange={e => setCameraIpAddress(e.target.value)}
+                            className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs font-mono focus:outline-none focus:border-[var(--accent)]"
+                            placeholder="e.g., 192.168.1.64"
+                          />
+                        </div>
                       </div>
 
                       <div>

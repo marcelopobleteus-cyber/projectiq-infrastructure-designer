@@ -186,6 +186,13 @@ export async function updateCameraDetails(params: {
     address_reference: string | null
     structure_reference: string | null
     notes: string | null
+    // Especificaciones opticas y de red (migracion 040). Opcionales: las
+    // camaras existentes las tienen en null.
+    lens?: string | null
+    mounting_height_ft?: number | null
+    ip_address?: string | null
+    resolution?: string | null
+    fov_degrees?: number | null
   }
 }) {
   const supabase = await createClient()
@@ -235,6 +242,11 @@ export async function updateCameraDetails(params: {
       address_reference: params.details.address_reference,
       structure_reference: params.details.structure_reference,
       notes: params.details.notes,
+      lens: params.details.lens ?? null,
+      mounting_height_ft: params.details.mounting_height_ft ?? null,
+      ip_address: params.details.ip_address ?? null,
+      resolution: params.details.resolution ?? null,
+      fov_degrees: params.details.fov_degrees ?? null,
     })
     .eq('id', params.id)
     .select()

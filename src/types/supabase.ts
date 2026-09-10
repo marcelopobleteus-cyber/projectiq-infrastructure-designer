@@ -611,18 +611,23 @@ export type Database = {
           created_at: string
           drop_cable_ft: number | null
           floor_plan_id: string | null
+          fov_degrees: number | null
           id: string
+          ip_address: string | null
           latitude: number
+          lens: string | null
           longitude: number
           material_received: boolean
           material_received_at: string | null
           mount_hardware: string | null
+          mounting_height_ft: number | null
           notes: string | null
           owner_of_record: string | null
           plan_x: number | null
           plan_y: number | null
           power_type: Database["public"]["Enums"]["power_type"]
           project_id: string
+          resolution: string | null
           served_by_cabinet_id: string | null
           status: Database["public"]["Enums"]["camera_status"]
           structure_reference: string | null
@@ -645,18 +650,23 @@ export type Database = {
           created_at?: string
           drop_cable_ft?: number | null
           floor_plan_id?: string | null
+          fov_degrees?: number | null
           id?: string
+          ip_address?: string | null
           latitude: number
+          lens?: string | null
           longitude: number
           material_received?: boolean
           material_received_at?: string | null
           mount_hardware?: string | null
+          mounting_height_ft?: number | null
           notes?: string | null
           owner_of_record?: string | null
           plan_x?: number | null
           plan_y?: number | null
           power_type?: Database["public"]["Enums"]["power_type"]
           project_id: string
+          resolution?: string | null
           served_by_cabinet_id?: string | null
           status?: Database["public"]["Enums"]["camera_status"]
           structure_reference?: string | null
@@ -679,18 +689,23 @@ export type Database = {
           created_at?: string
           drop_cable_ft?: number | null
           floor_plan_id?: string | null
+          fov_degrees?: number | null
           id?: string
+          ip_address?: string | null
           latitude?: number
+          lens?: string | null
           longitude?: number
           material_received?: boolean
           material_received_at?: string | null
           mount_hardware?: string | null
+          mounting_height_ft?: number | null
           notes?: string | null
           owner_of_record?: string | null
           plan_x?: number | null
           plan_y?: number | null
           power_type?: Database["public"]["Enums"]["power_type"]
           project_id?: string
+          resolution?: string | null
           served_by_cabinet_id?: string | null
           status?: Database["public"]["Enums"]["camera_status"]
           structure_reference?: string | null
