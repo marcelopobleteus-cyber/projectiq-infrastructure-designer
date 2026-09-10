@@ -106,7 +106,7 @@ export default function ProjectMapCanvas({
   const [activeFloorPlanId, setActiveFloorPlanId] = useState<string | null>(null)
   // Pestanas del panel de camara. Antes era un solo scroll larguisimo que
   // mezclaba CCTV, fibra, wireless y auditoria.
-  type CameraTab = 'camera' | 'checklist' | 'network' | 'fiber' | 'wireless' | 'history'
+  type CameraTab = 'camera' | 'specs' | 'checklist' | 'network' | 'fiber' | 'wireless' | 'history'
   const [cameraTab, setCameraTab] = useState<CameraTab>('camera')
 
   // Confirmacion propia. El confirm() nativo se puede suprimir desde el
@@ -2057,6 +2057,7 @@ export default function ProjectMapCanvas({
 
   const cameraPanelTabs: { key: CameraTab; label: string }[] = [
     { key: 'camera', label: 'Camera' },
+    { key: 'specs', label: 'Specs' },
     { key: 'checklist', label: 'Checklist' },
     { key: 'network', label: 'Network' },
     ...(cameraCommType === 'fiber' ? [{ key: 'fiber' as CameraTab, label: 'Fiber' }] : []),
@@ -2495,7 +2496,7 @@ export default function ProjectMapCanvas({
         const completeCount = cameraTasks.filter(t => t.status === 'Complete').length
 
         return (
-          <div className="absolute top-4 right-4 bottom-4 w-80 max-h-[calc(100%-2rem)] bg-[var(--surface-1)] border border-[var(--border-strong)] rounded-2xl flex flex-col justify-between p-6 z-30 overflow-hidden shadow-2xl">
+          <div className="absolute top-4 right-4 bottom-4 w-[27rem] max-w-[calc(100%-2rem)] max-h-[calc(100%-2rem)] bg-[var(--surface-1)] border border-[var(--border-strong)] rounded-2xl flex flex-col justify-between p-5 z-30 overflow-hidden shadow-2xl">
             <form onSubmit={handleSaveCamera} className="flex flex-col h-full justify-between overflow-hidden">
               {/* Header FIJO: el cerrar no debe irse con el scroll. */}
               <div className="flex justify-between items-start border-b border-[var(--border)] pb-3 shrink-0">
@@ -2518,13 +2519,13 @@ export default function ProjectMapCanvas({
 
               {/* Pestanas: solo se ofrecen las que aplican a esta camara. Las de
                   otros modulos apareceran cuando esos modulos se conecten. */}
-              <div className="flex items-center gap-1 overflow-x-auto py-2 shrink-0 scrollbar-thin">
+              <div className="flex items-center gap-1 overflow-x-auto py-1.5 shrink-0 scrollbar-thin">
                 {cameraPanelTabs.map(tab => (
                   <button
                     key={tab.key}
                     type="button"
                     onClick={() => setCameraTab(tab.key)}
-                    className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all ${
+                    className={`px-2 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all ${
                       cameraTab === tab.key
                         ? 'bg-[var(--accent)] text-white'
                         : 'bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-secondary)]'
@@ -2607,7 +2608,7 @@ export default function ProjectMapCanvas({
                   >
                     <span className="text-[10px] font-bold text-[var(--accent-text)] uppercase tracking-wider flex items-center gap-2">
                       <svg className="w-3.5 h-3.5 text-[var(--accent-text)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
-                      Specs & Details
+                      Device & Status
                     </span>
                     <span className="text-[var(--text-secondary)]">{isSpecsOpen ? '▲' : '▼'}</span>
                   </button>
@@ -2669,27 +2670,46 @@ export default function ProjectMapCanvas({
                         </div>
                       </div>
 
-                      <div>
-                        <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Address Reference</label>
-                        <input
-                          type="text" value={cameraAddressRef} onChange={e => setCameraAddressRef(e.target.value)}
-                          className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)]"
-                          placeholder="e.g., 100 Main St Pole 4"
-                        />
-                      </div>
+                    </div>
+                  )}
+                </div>
+                )}
 
-                      <div>
-                        <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Structure Reference</label>
-                        <input
-                          type="text" value={cameraStructureRef} onChange={e => setCameraStructureRef(e.target.value)}
-                          className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)]"
-                          placeholder="e.g., Pole 4B, Wall Mount"
-                        />
+                {/* Specs: referencias, optica y notas. Separado de Camera para
+                    que ninguna pestaña necesite scroll. */}
+                {cameraTab === 'specs' && (
+                <div className="border border-[var(--border)] rounded-xl overflow-hidden bg-[var(--surface-2)]/10">
+                  <div className="w-full flex justify-between items-center p-3.5 bg-[var(--surface-2)] border-b border-[var(--border)]">
+                    <span className="text-[10px] font-bold text-[var(--accent-text)] uppercase tracking-wider flex items-center gap-2">
+                      <svg className="w-3.5 h-3.5 text-[var(--accent-text)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
+                      Specs & References
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 space-y-3.5 bg-[var(--surface-1)]">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Address Ref.</label>
+                          <input
+                            type="text" value={cameraAddressRef} onChange={e => setCameraAddressRef(e.target.value)}
+                            className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)]"
+                            placeholder="100 Main St Pole 4"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Structure Ref.</label>
+                          <input
+                            type="text" value={cameraStructureRef} onChange={e => setCameraStructureRef(e.target.value)}
+                            className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)]"
+                            placeholder="Pole 4B, Wall Mount"
+                          />
+                        </div>
                       </div>
 
                       {/* ── Especificaciones opticas y de red ── */}
                       <div className="pt-1 border-t border-[var(--border)]">
-                        <p className="text-[10px] font-black text-[var(--accent-text)] uppercase tracking-wider mb-2 mt-2">Optics & Network</p>
+                        <p className="text-[10px] font-black text-[var(--accent-text)] uppercase tracking-wider mb-2 mt-1">Optics & Network</p>
 
                         <div className="grid grid-cols-2 gap-3">
                           <div>
@@ -2750,7 +2770,6 @@ export default function ProjectMapCanvas({
                         />
                       </div>
                     </div>
-                  )}
                 </div>
                 )}
 
@@ -3361,7 +3380,7 @@ export default function ProjectMapCanvas({
       })()}
       
       {selectedDevice && (
-        <div className="absolute top-4 right-4 bottom-4 w-80 max-h-[calc(100%-2rem)] bg-[var(--surface-1)] border border-[var(--border-strong)] rounded-2xl flex flex-col justify-between p-6 z-30 overflow-hidden shadow-2xl">
+        <div className="absolute top-4 right-4 bottom-4 w-[27rem] max-w-[calc(100%-2rem)] max-h-[calc(100%-2rem)] bg-[var(--surface-1)] border border-[var(--border-strong)] rounded-2xl flex flex-col justify-between p-5 z-30 overflow-hidden shadow-2xl">
           <form onSubmit={handleSaveDevice} className="flex flex-col h-full justify-between">
             <div className="space-y-4 overflow-y-auto pr-1 flex-1 scrollbar-thin">
               <div className="flex justify-between items-start border-b border-[var(--border)] pb-4">
