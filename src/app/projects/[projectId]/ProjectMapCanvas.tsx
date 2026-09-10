@@ -2390,7 +2390,7 @@ export default function ProjectMapCanvas({
                       </svg>
                     </div>
                     <div className="min-w-0">
-                      <h4 className="text-sm font-black text-white tracking-tight truncate">{displayCam.camera_id_tag}</h4>
+                      <h4 className="text-sm font-black text-[var(--text-primary)] tracking-tight truncate">{displayCam.camera_id_tag}</h4>
                       <p className="text-[9px] text-[var(--text-tertiary)] font-mono">{displayCam.latitude.toFixed(5)}, {displayCam.longitude.toFixed(5)}</p>
                     </div>
                   </div>
@@ -2500,7 +2500,7 @@ export default function ProjectMapCanvas({
             <div className="absolute inset-0 bg-[var(--surface-2)] backdrop-blur-sm flex items-center justify-center z-20">
               <div className="flex items-center gap-3 px-6 py-4 bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl shadow-xl">
                 <svg className="animate-spin text-[var(--accent-text)]" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                <span className="text-sm font-medium text-white">Updating spatial layout...</span>
+                <span className="text-sm font-medium text-[var(--text-primary)]">Updating spatial layout...</span>
               </div>
             </div>
           )}
@@ -2916,10 +2916,10 @@ export default function ProjectMapCanvas({
                                         'bg-slate-500/10 text-[var(--text-secondary)]'
                                       }`}
                                     >
-                                      <option value="Low" className="bg-[var(--surface-2)] text-white">Low</option>
-                                      <option value="Medium" className="bg-[var(--surface-2)] text-white">Medium</option>
-                                      <option value="High" className="bg-[var(--surface-2)] text-white">High</option>
-                                      <option value="Critical" className="bg-[var(--surface-2)] text-white">Critical</option>
+                                      <option value="Low" className="bg-[var(--surface-2)] text-[var(--text-primary)]">Low</option>
+                                      <option value="Medium" className="bg-[var(--surface-2)] text-[var(--text-primary)]">Medium</option>
+                                      <option value="High" className="bg-[var(--surface-2)] text-[var(--text-primary)]">High</option>
+                                      <option value="Critical" className="bg-[var(--surface-2)] text-[var(--text-primary)]">Critical</option>
                                     </select>
                                   </div>
                                 </div>
@@ -3422,7 +3422,7 @@ export default function ProjectMapCanvas({
             <div className="space-y-4 overflow-y-auto pr-1 flex-1 scrollbar-thin">
               <div className="flex justify-between items-start border-b border-[var(--border)] pb-4">
                 <div>
-                  <h3 className="font-bold text-white tracking-tight flex items-center gap-2">
+                  <h3 className="font-bold text-[var(--text-primary)] tracking-tight flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getNetworkDeviceColor(selectedDevice.device_type) }} />
                     {selectedDevice.name} Settings
                   </h3>
@@ -3603,7 +3603,7 @@ export default function ProjectMapCanvas({
           {/* Header */}
           <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider">Checklist Backfill Preview</h3>
+              <h3 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider">Checklist Backfill Preview</h3>
               <p className="text-[10px] text-[var(--text-secondary)] mt-0.5">Dry-run summary of legacy project upgrade actions</p>
             </div>
             <button
@@ -3621,11 +3621,11 @@ export default function ProjectMapCanvas({
                 <div className="grid grid-cols-2 gap-3.5">
                   <div className="bg-[var(--surface-2)] border border-[var(--border)] p-3 rounded-xl">
                     <span className="block text-[9px] text-[var(--text-tertiary)] font-bold uppercase tracking-wider">Cameras Scanned</span>
-                    <span className="text-base font-bold text-white font-mono">{backfillPreviewData.cameras_scanned}</span>
+                    <span className="text-base font-bold text-[var(--text-primary)] font-mono">{backfillPreviewData.cameras_scanned}</span>
                   </div>
                   <div className="bg-[var(--surface-2)] border border-[var(--border)] p-3 rounded-xl">
                     <span className="block text-[9px] text-[var(--text-tertiary)] font-bold uppercase tracking-wider">Missing Checklists</span>
-                    <span className="text-base font-bold text-white font-mono">{backfillPreviewData.cameras_missing_checklists}</span>
+                    <span className="text-base font-bold text-[var(--text-primary)] font-mono">{backfillPreviewData.cameras_missing_checklists}</span>
                   </div>
                 </div>
 
@@ -3745,7 +3745,7 @@ export default function ProjectMapCanvas({
             <div className="space-y-1">
               <div className="flex items-center gap-2.5">
                 <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getCameraStatusColor(cameraStatus) }} />
-                <h3 className="text-base font-black text-white tracking-tight">{selectedCamera.camera_id_tag} Full Checklist</h3>
+                <h3 className="text-base font-black text-[var(--text-primary)] tracking-tight">{selectedCamera.camera_id_tag} Full Checklist</h3>
                 <span className="text-[10px] text-[var(--text-secondary)] font-semibold font-mono bg-[var(--surface-2)] border border-[var(--border)] px-2 py-0.5 rounded-full uppercase">{cameraCommType}</span>
               </div>
               <p className="text-[11px] text-[var(--text-secondary)]">Detailed task controls, due dates, assignee configuration, and audit logs.</p>
@@ -3835,7 +3835,7 @@ export default function ProjectMapCanvas({
                       {/* Title & Type */}
                       <div className="flex justify-between items-start gap-4">
                         <div className="space-y-1">
-                          <h4 className="text-base font-bold text-white leading-tight">{activeTask.title}</h4>
+                          <h4 className="text-base font-bold text-[var(--text-primary)] leading-tight">{activeTask.title}</h4>
                           <span className="inline-block text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wider bg-[var(--surface-2)] border border-[var(--border)] px-2 py-0.5 rounded">
                             {activeTask.task_type}
                           </span>
@@ -3902,7 +3902,7 @@ export default function ProjectMapCanvas({
                                 await loadCameraTasksAndHistory(selectedCamera.id)
                               })
                             }}
-                            className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                            className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-[var(--text-primary)] focus:outline-none"
                           >
                             <option value="">Unassigned</option>
                             {profiles.map(p => (
@@ -3927,7 +3927,7 @@ export default function ProjectMapCanvas({
                                 await loadCameraTasksAndHistory(selectedCamera.id)
                               })
                             }}
-                            className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                            className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-[var(--text-primary)] focus:outline-none"
                           />
                         </div>
                       </div>
@@ -3952,12 +3952,16 @@ export default function ProjectMapCanvas({
                               })
                             }
                           }}
-                          className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-white resize-none"
+                          className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-[var(--text-primary)] resize-none"
                         />
                       </div>
                     </div>
 
-                    {/* Task History Timeline */}
+                    {/* Bitacora de la tarea. Se oculta cuando lo unico
+                        registrado es la generacion automatica: ahi no aporta
+                        nada y solo ocupa espacio. */}
+                    {!(taskHistory.length === 0 ||
+                       (taskHistory.length === 1 && /template/i.test(taskHistory[0].event_type || ''))) && (
                     <div className="border-t border-[var(--border)] pt-4 mt-2">
                       <span className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2.5">Task Activity Log</span>
                       {taskHistory.length === 0 ? (
@@ -3977,6 +3981,7 @@ export default function ProjectMapCanvas({
                         </div>
                       )}
                     </div>
+                    )}
                   </div>
                 )
               })()}

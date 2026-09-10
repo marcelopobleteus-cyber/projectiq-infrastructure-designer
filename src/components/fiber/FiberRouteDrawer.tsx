@@ -249,7 +249,7 @@ export default function FiberRouteDrawer({
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] shrink-0">
         <div>
-          <h3 className="text-[13px] font-bold text-white tracking-tight">
+          <h3 className="text-[13px] font-bold text-[var(--text-primary)] tracking-tight">
             {isCreating ? 'New Fiber Route' : `Route ${existingRoute?.route_id_tag ?? ''}`}
           </h3>
           <p className="text-[10px] text-[var(--text-tertiary)] mt-0.5">
@@ -279,7 +279,7 @@ export default function FiberRouteDrawer({
           <div className="flex items-center gap-6 text-[11px] font-mono">
             <div>
               <span className="text-[var(--text-tertiary)] block text-[9px] uppercase font-sans">Measured</span>
-              <span className="text-white font-bold text-xs">{distanceFt.toLocaleString()} ft</span>
+              <span className="text-[var(--text-primary)] font-bold text-xs">{distanceFt.toLocaleString()} ft</span>
             </div>
             <div>
               <span className="text-[var(--accent-text)] block text-[9px] uppercase font-sans">Slack-Adjusted</span>
@@ -323,7 +323,7 @@ export default function FiberRouteDrawer({
             placeholder="e.g. R-001"
             maxLength={50}
             disabled={!isCreating}
-            className="w-full px-3 py-2 bg-[var(--surface-2)] border border-slate-700 text-white text-[12px] font-mono rounded-lg
+            className="w-full px-3 py-2 bg-[var(--surface-2)] border border-slate-700 text-[var(--text-primary)] text-[12px] font-mono rounded-lg
               focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-[var(--accent)]
               disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-slate-600"
           />
@@ -384,7 +384,7 @@ export default function FiberRouteDrawer({
             value={conduitDiameterInches}
             onChange={e => setConduitDiameterInches(parseFloat(e.target.value) || 2.0)}
             disabled={!isCreating}
-            className="w-full px-3 py-2 bg-[var(--surface-2)] border border-slate-700 text-white text-[12px] rounded-lg
+            className="w-full px-3 py-2 bg-[var(--surface-2)] border border-slate-700 text-[var(--text-primary)] text-[12px] rounded-lg
               focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-[var(--accent)]
               disabled:opacity-50 disabled:cursor-not-allowed"
           />
@@ -404,7 +404,7 @@ export default function FiberRouteDrawer({
             value={slackPercentage}
             onChange={e => setSlackPercentage(parseFloat(e.target.value) || 10.0)}
             disabled={!isCreating}
-            className="w-full px-3 py-2 bg-[var(--surface-2)] border border-slate-700 text-white text-[12px] rounded-lg
+            className="w-full px-3 py-2 bg-[var(--surface-2)] border border-slate-700 text-[var(--text-primary)] text-[12px] rounded-lg
               focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-[var(--accent)]
               disabled:opacity-50 disabled:cursor-not-allowed"
           />
@@ -441,27 +441,27 @@ export default function FiberRouteDrawer({
                   <div className="p-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl space-y-1.5 text-[11px]">
                     <div className="flex justify-between text-[var(--text-tertiary)]">
                       <span>Manufacturer</span>
-                      <span className="text-white font-medium">{selectedCatalogItem.manufacturer}</span>
+                      <span className="text-[var(--text-primary)] font-medium">{selectedCatalogItem.manufacturer}</span>
                     </div>
                     <div className="flex justify-between text-[var(--text-tertiary)]">
                       <span>Model/Part #</span>
-                      <span className="text-white font-mono">{selectedCatalogItem.part_number}</span>
+                      <span className="text-[var(--text-primary)] font-mono">{selectedCatalogItem.part_number}</span>
                     </div>
                     <div className="flex justify-between text-[var(--text-tertiary)]">
                       <span>Fiber Count</span>
-                      <span className="text-white font-bold">{selectedCatalogItem.fiber_count} Cores</span>
+                      <span className="text-[var(--text-primary)] font-bold">{selectedCatalogItem.fiber_count} Cores</span>
                     </div>
                     <div className="flex justify-between text-[var(--text-tertiary)]">
                       <span>Fiber Mode</span>
-                      <span className="text-white font-medium">{selectedCatalogItem.mode} ({selectedCatalogItem.grade})</span>
+                      <span className="text-[var(--text-primary)] font-medium">{selectedCatalogItem.mode} ({selectedCatalogItem.grade})</span>
                     </div>
                     <div className="flex justify-between text-[var(--text-tertiary)]">
                       <span>Diameter</span>
-                      <span className="text-white font-mono">{selectedCatalogItem.diameter_mm} mm</span>
+                      <span className="text-[var(--text-primary)] font-mono">{selectedCatalogItem.diameter_mm} mm</span>
                     </div>
                     <div className="flex justify-between text-[var(--text-tertiary)]">
                       <span>Unit Cost</span>
-                      <span className="text-white font-mono">${Number(selectedCatalogItem.cost_per_foot).toFixed(2)}/ft</span>
+                      <span className="text-[var(--text-primary)] font-mono">${Number(selectedCatalogItem.cost_per_foot).toFixed(2)}/ft</span>
                     </div>
                     {/* Estimated Cost */}
                     <div className="flex justify-between pt-1 border-t border-[var(--border)] text-[var(--accent-text)] font-semibold">
@@ -502,15 +502,15 @@ export default function FiberRouteDrawer({
               <div className="space-y-1.5 text-[11px]">
                 <div className="flex justify-between text-[var(--text-tertiary)]">
                   <span>Cable Tag</span>
-                  <span className="text-white font-mono font-bold">{linkedCable.cable_tag}</span>
+                  <span className="text-[var(--text-primary)] font-mono font-bold">{linkedCable.cable_tag}</span>
                 </div>
                 <div className="flex justify-between text-[var(--text-tertiary)]">
                   <span>Manufacturer</span>
-                  <span className="text-white font-medium">{linkedCable.manufacturer ?? 'Generic'}</span>
+                  <span className="text-[var(--text-primary)] font-medium">{linkedCable.manufacturer ?? 'Generic'}</span>
                 </div>
                 <div className="flex justify-between text-[var(--text-tertiary)]">
                   <span>Model/Part #</span>
-                  <span className="text-white font-mono">{linkedCable.model ?? 'N/A'}</span>
+                  <span className="text-[var(--text-primary)] font-mono">{linkedCable.model ?? 'N/A'}</span>
                 </div>
                 <div className="flex justify-between text-[var(--text-tertiary)]">
                   <span>Strand Count</span>
@@ -541,7 +541,7 @@ export default function FiberRouteDrawer({
               onChange={e => setNotes(e.target.value)}
               rows={2}
               placeholder="Optional route notes…"
-              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-slate-700 text-white text-[12px] rounded-lg
+              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-slate-700 text-[var(--text-primary)] text-[12px] rounded-lg
                 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-[var(--accent)]
                 resize-none placeholder:text-slate-600"
             />
@@ -556,19 +556,19 @@ export default function FiberRouteDrawer({
             </span>
             <div className="flex justify-between text-[var(--text-tertiary)]">
               <span>Installation</span>
-              <span className="text-white capitalize">{existingRoute.installation_type?.replace('_', ' ')}</span>
+              <span className="text-[var(--text-primary)] capitalize">{existingRoute.installation_type?.replace('_', ' ')}</span>
             </div>
             <div className="flex justify-between text-[var(--text-tertiary)]">
               <span>Purpose</span>
-              <span className="text-white capitalize">{existingRoute.route_purpose?.replace(/_/g, ' ')}</span>
+              <span className="text-[var(--text-primary)] capitalize">{existingRoute.route_purpose?.replace(/_/g, ' ')}</span>
             </div>
             <div className="flex justify-between text-[var(--text-tertiary)]">
               <span>Conduit size</span>
-              <span className="text-white font-mono">{existingRoute.conduit_diameter_inches ?? '—'} in</span>
+              <span className="text-[var(--text-primary)] font-mono">{existingRoute.conduit_diameter_inches ?? '—'} in</span>
             </div>
             <div className="flex justify-between text-[var(--text-tertiary)]">
               <span>Slack pct</span>
-              <span className="text-white font-mono">{existingRoute.slack_percentage ?? 10}%</span>
+              <span className="text-[var(--text-primary)] font-mono">{existingRoute.slack_percentage ?? 10}%</span>
             </div>
           </div>
         )}

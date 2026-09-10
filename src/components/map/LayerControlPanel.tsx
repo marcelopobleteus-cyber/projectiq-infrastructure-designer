@@ -60,7 +60,7 @@ export default function LayerControlPanel({
           {/* Header */}
           <div className="flex justify-between items-center border-b border-[var(--border)] pb-2.5 mb-2.5 shrink-0">
             <div>
-              <h4 className="font-bold text-white text-xs tracking-tight flex items-center gap-1.5">
+              <h4 className="font-bold text-[var(--text-primary)] text-xs tracking-tight flex items-center gap-1.5">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--accent-text)]">
                   <polygon points="12 2 2 7 12 12 22 7 12 2"/>
                   <polyline points="2 17 12 22 22 17"/>

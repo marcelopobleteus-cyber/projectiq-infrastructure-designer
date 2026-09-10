@@ -206,7 +206,7 @@ export default function CreateProjectPage() {
               type="text"
               required
               placeholder="e.g. Beltline Fiber Ring & CCTV Deployment"
-              className="w-full px-4 py-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
+              className="w-full px-4 py-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] placeholder-slate-500 focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
             />
           </div>
 
@@ -235,7 +235,7 @@ export default function CreateProjectPage() {
                 step="0.000001"
                 required
                 defaultValue="33.7490"
-                className="w-full px-4 py-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
+                className="w-full px-4 py-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
               />
             </div>
 
@@ -250,7 +250,7 @@ export default function CreateProjectPage() {
                 step="0.000001"
                 required
                 defaultValue="-84.3880"
-                className="w-full px-4 py-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
+                className="w-full px-4 py-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
               />
             </div>
 
@@ -266,7 +266,7 @@ export default function CreateProjectPage() {
                 defaultValue="15"
                 min="0"
                 max="22"
-                className="w-full px-4 py-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-white focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
+                className="w-full px-4 py-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
               />
             </div>
           </div>
