@@ -2,6 +2,8 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
+import { getProjectReportData } from '../../actions-reports'
+import { buildSimpleReport, buildProjectDocument, downloadPdf } from '@/lib/pdf/projectPdf'
 
 interface FiberNode {
   id: string
@@ -33,6 +35,36 @@ interface ReportsClientProps {
 
 export default function ReportsClient({ projectId, projectName, fiberData }: ReportsClientProps) {
   const [selectedReport, setSelectedReport] = useState<string | null>(null)
+
+  // Generacion de PDF real. Vive en el navegador: los datos vienen del server
+  // action y el documento se arma aca, asi que no hay que mantener una ruta
+  // de servidor ni un runtime aparte solo para imprimir.
+  const [pdfBusy, setPdfBusy] = useState<null | 'simple' | 'full'>(null)
+  const [pdfError, setPdfError] = useState<string | null>(null)
+
+  const handleExportPdf = async (kind: 'simple' | 'full') => {
+    setPdfBusy(kind)
+    setPdfError(null)
+    try {
+      const res = await getProjectReportData(projectId)
+      if (res.error || !res.data) {
+        setPdfError(res.error || 'Could not load the project data.')
+        return
+      }
+      const bytes =
+        kind === 'simple' ? await buildSimpleReport(res.data) : await buildProjectDocument(res.data)
+      // El nombre lleva el proyecto y la fecha: quien lo recibe por correo
+      // tiene que saber que es sin abrirlo.
+      const slug = res.data.project.name.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40)
+      const date = new Date().toISOString().slice(0, 10)
+      downloadPdf(bytes, `${slug}-${kind === 'simple' ? 'Site-Report' : 'Design-Package'}-${date}.pdf`)
+    } catch (err) {
+      console.error('PDF export failed:', err)
+      setPdfError('The PDF could not be generated. Please try again.')
+    } finally {
+      setPdfBusy(null)
+    }
+  }
   
   // Node sorting & filtering state
   const [nodeSearch, setNodeSearch] = useState('')
@@ -252,16 +284,44 @@ export default function ReportsClient({ projectId, projectName, fiberData }: Rep
             </div>
           </div>
 
-          {/* Info Card */}
-          <div className="bg-[var(--surface-1)] backdrop-blur-md border border-[var(--border)] rounded-2xl p-4 flex items-start gap-3 no-print">
-            <div className="p-2 rounded-lg bg-[var(--accent-soft)] text-[var(--accent-text)] border border-[var(--accent)]/10">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-            </div>
-            <div>
-              <h4 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">Engineering Compliance Verification</h4>
-              <p className="text-[11px] text-[var(--text-secondary)] mt-1 leading-relaxed">
-                All reports are dynamically updated from active canvas camera nodes, switch port matrices, and RLS tables. Print layouts will generate PDF sheets complying with Axis Site Designer & Bentley systems format.
-              </p>
+          {/* Exportacion PDF real. Antes el unico boton de PDF era un mock
+              que mostraba un toast y no descargaba nada. */}
+          <div className="bg-[var(--surface-1)] backdrop-blur-md border border-[var(--border)] rounded-2xl p-4 no-print">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-lg bg-[var(--accent-soft)] text-[var(--accent-text)] border border-[var(--accent)]/10">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">Export this project as PDF</h4>
+                <p className="text-[11px] text-[var(--text-secondary)] mt-1 leading-relaxed">
+                  Both documents are built from this project&apos;s live data — cameras, tasks, network
+                  devices and the same bill of materials shown on the BOM screen. Amounts are internal
+                  cost; margin and tax are not applied yet.
+                </p>
+
+                <div className="flex flex-wrap items-center gap-2 mt-3">
+                  <button
+                    type="button"
+                    onClick={() => handleExportPdf('simple')}
+                    disabled={pdfBusy !== null}
+                    className="px-3.5 py-2 bg-[var(--accent)] disabled:opacity-50 text-white text-xs font-bold rounded-lg transition cursor-pointer shadow-xs"
+                  >
+                    {pdfBusy === 'simple' ? 'Building PDF...' : 'Site Report (1 page)'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleExportPdf('full')}
+                    disabled={pdfBusy !== null}
+                    className="px-3.5 py-2 bg-[var(--surface-2)] hover:bg-[var(--surface-hover)] disabled:opacity-50 border border-[var(--border)] text-[var(--text-primary)] text-xs font-bold rounded-lg transition cursor-pointer"
+                  >
+                    {pdfBusy === 'full' ? 'Building PDF...' : 'Design Package (full)'}
+                  </button>
+                </div>
+
+                {pdfError && (
+                  <p className="text-[11px] text-[var(--danger)] font-semibold mt-2">{pdfError}</p>
+                )}
+              </div>
             </div>
           </div>
 

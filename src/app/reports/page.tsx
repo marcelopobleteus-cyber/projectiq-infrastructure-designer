@@ -206,13 +206,15 @@ export default function GlobalReportsPage() {
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
-              <button 
-                type="button" 
-                onClick={() => showToast('Mock PDF generation complete — starting download.')}
-                className="px-4 py-2 bg-[var(--accent)] text-white rounded-lg text-xs font-bold transition shadow-xs"
-              >
-                Export PDF (Mock)
-              </button>
+              {/* Esta pantalla es un catalogo de reportes a nivel de toda la
+                  organizacion y todavia muestra datos de ejemplo. El boton de
+                  exportar que habia aqui era un mock: decia "descarga
+                  completa" y no generaba ningun archivo. Se quita en vez de
+                  dejarlo mintiendo; la exportacion PDF real, con datos vivos,
+                  vive dentro de cada proyecto. */}
+              <span className="px-4 py-2 text-[11px] text-[var(--text-tertiary)] font-semibold">
+                PDF export lives inside each project, under Reports.
+              </span>
               <button type="button" onClick={() => setPreviewReport(null)} className="px-4 py-2 bg-[var(--surface-2)] border border-[var(--border)] hover:bg-[var(--surface-hover)] text-[var(--text-primary)] rounded-lg text-xs font-bold transition">
                 Close Preview
               </button>
