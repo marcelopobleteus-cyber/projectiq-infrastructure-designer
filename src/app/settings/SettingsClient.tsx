@@ -17,6 +17,7 @@ import {
 } from './actions'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 import ChecklistTemplatesPanel from '@/components/settings/ChecklistTemplatesPanel'
+import BrandingPanel from '@/components/settings/BrandingPanel'
 
 export default function SettingsClient({ initialTeamData }: { initialTeamData: OrganizationTeamData }) {
   const [activeTab, setActiveTab] = useState<'general' | 'profile' | 'company' | 'branding' | 'team' | 'rates' | 'checklists' | 'preferences' | 'integrations' | 'security'>('general')
@@ -243,7 +244,7 @@ export default function SettingsClient({ initialTeamData }: { initialTeamData: O
     { id: 'checklists', label: 'Camera Checklists', built: true },
     { id: 'profile', label: 'Profile', built: false },
     { id: 'company', label: 'Company / Organization', built: false },
-    { id: 'branding', label: 'Branding', built: false },
+    { id: 'branding', label: 'Branding', built: true },
     { id: 'preferences', label: 'Preferences', built: false },
     { id: 'integrations', label: 'Integrations', built: false },
     { id: 'security', label: 'Data & Security', built: false },
@@ -350,6 +351,11 @@ export default function SettingsClient({ initialTeamData }: { initialTeamData: O
               )}
             </div>
           </div>
+        )}
+
+        {/* Branding Tab */}
+        {activeTab === 'branding' && (
+          <BrandingPanel active={activeTab === 'branding'} showToast={showToast} />
         )}
 
         {/* Camera Checklists Tab */}

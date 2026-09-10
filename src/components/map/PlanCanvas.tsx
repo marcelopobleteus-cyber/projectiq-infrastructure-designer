@@ -11,6 +11,7 @@ import {
   updateCameraPlanPosition,
 } from '@/app/projects/actions-floorplans'
 import { createCameraMarkerSvg } from '@/lib/cameraMarker'
+import { conePlanPath, doriBands, FEET_PER_METER } from '@/lib/fov'
 
 interface FloorPlan {
   id: string
@@ -30,6 +31,14 @@ interface PlanCameraMarker {
   plan_y: number | null
   status: string
   floor_plan_id: string | null
+  /** Cono de vision. El padre ya resolvio los valores contra el catalogo. */
+  heading_degrees?: number | null
+  fov_degrees?: number
+  fov_range_ft?: number
+  ir_range_ft?: number | null
+  show_fov?: boolean
+  /** Pixeles horizontales del sensor; null si no se pudo deducir. */
+  horizontal_pixels?: number | null
 }
 
 interface PlanCanvasProps {
@@ -55,6 +64,12 @@ interface PlanCanvasProps {
   onActivePlanChange?: (planId: string | null) => void
   /** Notifica la nueva posicion tras arrastrar, para actualizar el estado del padre. */
   onCameraMoved?: (cameraId: string, planX: number, planY: number) => void
+  /** Dibujar el cono de vision sobre el plano. */
+  showFov?: boolean
+  /** Colorear el cono por bandas DORI en vez de un color plano. */
+  showDori?: boolean
+  /** Modo noche: el alcance lo manda el iluminador IR. */
+  showNightIr?: boolean
 }
 
 export default function PlanCanvas({
@@ -72,6 +87,9 @@ export default function PlanCanvas({
   onCanvasContextMenu,
   registerCalibrate,
   onActivePlanChange,
+  showFov = true,
+  showDori = false,
+  showNightIr = false,
 }: PlanCanvasProps) {
   const [plans, setPlans] = useState<FloorPlan[]>([])
   const [activePlanId, setActivePlanId] = useState<string | null>(null)
@@ -428,6 +446,19 @@ export default function PlanCanvas({
 
   const planCameras = cameras.filter(c => c.floor_plan_id === activePlanId && c.plan_x != null && c.plan_y != null)
 
+  // Pixeles nativos por pie, sacados de la calibracion del plano. Sin
+  // calibrar no hay escala, y sin escala un cono de "75 ft" no significa
+  // nada sobre esta imagen: se prefiere no dibujarlo a dibujar una mentira.
+  const pxPerFoot = (() => {
+    const cal = activePlan?.scale_calibration
+    if (!cal || !cal.real_distance_m || cal.real_distance_m <= 0) return null
+    const dx = cal.point_b.x - cal.point_a.x
+    const dy = cal.point_b.y - cal.point_a.y
+    const distPx = Math.hypot(dx, dy)
+    if (distPx <= 0) return null
+    return distPx / (cal.real_distance_m * FEET_PER_METER)
+  })()
+
   // Dialogos propios (reemplazan window.prompt / confirm). Se renderizan tanto
   // en el estado vacio como en la vista normal, porque el primer plano se sube
   // desde el estado vacio.
@@ -747,6 +778,65 @@ export default function PlanCanvas({
               }}
               draggable={false}
             />
+
+            {/* Conos de vision. Un solo SVG en coordenadas nativas de la
+                imagen: asi el cono se escala junto con el plano al hacer zoom
+                sin recalcular nada, igual que los marcadores. */}
+            {showFov && pxPerFoot && naturalSize && (
+              <svg
+                className="absolute inset-0 w-full h-full pointer-events-none"
+                viewBox={`0 0 ${naturalSize.w} ${naturalSize.h}`}
+                preserveAspectRatio="none"
+              >
+                {planCameras.map(cam => {
+                  if (cam.show_fov === false) return null
+                  if (cam.heading_degrees === null || cam.heading_degrees === undefined) return null
+
+                  const fovDeg = cam.fov_degrees ?? 90
+                  const dayRangeFt = cam.fov_range_ft ?? 75
+                  const selected = selectedCameraId === cam.id
+                  const irRangeFt = cam.ir_range_ft && cam.ir_range_ft > 0 ? cam.ir_range_ft : null
+
+                  // Modo noche: manda el iluminador. Sin dato de IR se dibuja
+                  // en gris — no sabemos hasta donde llega, y decirlo es mejor
+                  // que pintar alcance de dia sobre una escena nocturna.
+                  const rangeFt = showNightIr ? (irRangeFt ?? dayRangeFt) : dayRangeFt
+                  const bands =
+                    !showNightIr && showDori && cam.horizontal_pixels
+                      ? doriBands(cam.horizontal_pixels, fovDeg, rangeFt).slice().reverse()
+                      : null
+
+                  // De la banda mas lejana a la mas cercana, para que la mas
+                  // exigente quede dibujada encima.
+                  const flatColor = showNightIr ? (irRangeFt ? '#a78bfa' : '#64748b') : '#38bdf8'
+                  const shapes = bands
+                    ? bands.map(b => ({ radiusFt: b.maxDistanceFt, color: b.color }))
+                    : [{ radiusFt: rangeFt, color: flatColor }]
+
+                  return (
+                    <g key={`fov-${cam.id}`}>
+                      {shapes.map((shape, i) => (
+                        <path
+                          key={i}
+                          d={conePlanPath(
+                            cam.plan_x!,
+                            cam.plan_y!,
+                            Number(cam.heading_degrees),
+                            fovDeg,
+                            shape.radiusFt * pxPerFoot,
+                          )}
+                          fill={shape.color}
+                          fillOpacity={showNightIr && !irRangeFt ? 0.12 : selected ? 0.34 : 0.2}
+                          stroke={shape.color}
+                          strokeOpacity={0.7}
+                          strokeWidth={Math.max(1, naturalSize.w / 900)}
+                        />
+                      ))}
+                    </g>
+                  )
+                })}
+              </svg>
+            )}
 
             {/* Marcadores de camara: mismo icono y colores que en el mapa. */}
             {planCameras.map(cam => (

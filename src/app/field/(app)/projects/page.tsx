@@ -3,7 +3,7 @@ import FieldAppShell from '@/components/field/FieldAppShell'
 
 export default function FieldProjectsStubPage() {
   return (
-    <FieldAppShell title="Lista de Proyectos" subtitle="Field Mode">
+    <FieldAppShell title="Projects" subtitle="Field Mode">
       <div className="space-y-4 font-sans">
         <div className="bg-[var(--surface-1)] border border-[var(--border)] p-6 rounded-2xl text-center space-y-3">
           <div className="w-12 h-12 rounded-xl bg-[var(--accent)] text-white/20 border border-[var(--accent)]/30 text-[var(--accent-text)] font-bold text-xl flex items-center justify-center mx-auto">

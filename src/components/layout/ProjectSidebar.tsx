@@ -169,7 +169,7 @@ export default function ProjectSidebar({ projectId, projectName, disciplines }: 
         },
         {
           id: 'tasks',
-          label: 'Ordenes de Trabajo',
+          label: 'Work Orders',
           href: `/projects/${projectId}/tasks`,
           active: pathname === `/projects/${projectId}/tasks`,
           icon: (
@@ -178,7 +178,7 @@ export default function ProjectSidebar({ projectId, projectName, disciplines }: 
         },
         {
           id: 'reports-proj',
-          label: 'Reportes Ejecutivos PDF',
+          label: 'Reports & PDF Export',
           href: `/projects/${projectId}/reports`,
           active: pathname === `/projects/${projectId}/reports`,
           icon: (
@@ -188,11 +188,11 @@ export default function ProjectSidebar({ projectId, projectName, disciplines }: 
       ]
     },
     {
-      label: 'SOPORTE',
+      label: 'SUPPORT',
       items: [
         {
           id: 'help',
-          label: 'Centro de Ayuda',
+          label: 'Help Center',
           href: `/projects/${projectId}/help`,
           active: pathname === `/projects/${projectId}/help`,
           icon: (

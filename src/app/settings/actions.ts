@@ -6,6 +6,7 @@ import type { Json } from '@/types/supabase'
 import { sendInviteEmail } from '@/utils/supabase/admin'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { BYPASS_AUTH } from '@/config/auth'
+import { DEFAULT_BRANDING, type OrganizationBranding } from '@/lib/branding'
 import {
   COMMUNICATION_TYPES,
   DEFAULT_CHECKLIST_TEMPLATES,
@@ -747,6 +748,101 @@ export async function resetChecklistTemplate(
     .delete()
     .eq('organization_id', caller.orgId)
     .eq('communication_type', communicationType)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/settings')
+  return { success: true }
+}
+
+// ---------------------------------------------------------------------------
+// Marca de la organizacion (white-label)
+// ---------------------------------------------------------------------------
+
+export async function getOrganizationBranding(): Promise<{
+  branding: OrganizationBranding
+  organizationName: string
+  canEdit: boolean
+  error?: string
+}> {
+  const caller = await resolveCallerOrg()
+  if ('error' in caller) {
+    return { branding: DEFAULT_BRANDING, organizationName: '', canEdit: false, error: caller.error }
+  }
+
+  const supabase = await createClient()
+  const [{ data: row }, { data: org }] = await Promise.all([
+    supabase.from('organization_branding').select('*').eq('organization_id', caller.orgId).maybeSingle(),
+    supabase.from('organizations').select('name').eq('id', caller.orgId).maybeSingle(),
+  ])
+
+  const canEdit = caller.role === 'owner' || caller.role === 'admin'
+  const organizationName = org?.name || ''
+
+  if (!row) return { branding: DEFAULT_BRANDING, organizationName, canEdit }
+
+  return {
+    organizationName,
+    canEdit,
+    branding: {
+      logoDataUrl: row.logo_data_url,
+      primaryColor: row.primary_color || DEFAULT_BRANDING.primaryColor,
+      contactName: row.contact_name,
+      contactEmail: row.contact_email,
+      contactPhone: row.contact_phone,
+      website: row.website,
+      address: row.address,
+      licenseNumber: row.license_number,
+    },
+  }
+}
+
+export async function saveOrganizationBranding(
+  branding: OrganizationBranding
+): Promise<{ success?: boolean; error?: string }> {
+  const caller = await resolveCallerOrg()
+  if ('error' in caller) return { error: caller.error }
+  if (caller.role !== 'owner' && caller.role !== 'admin' && !BYPASS_AUTH) {
+    return { error: 'Only owners and admins can change branding.' }
+  }
+
+  if (!/^#[0-9A-Fa-f]{6}$/.test(branding.primaryColor)) {
+    return { error: 'The color must be a hex value like #009973.' }
+  }
+
+  // Se valida el tipo del logo: el PDF solo puede incrustar PNG y JPEG, y un
+  // SVG aqui reventaria recien al generar el documento, lejos de donde el
+  // usuario lo subio.
+  if (branding.logoDataUrl) {
+    if (!/^data:image\/(png|jpeg|jpg);base64,/.test(branding.logoDataUrl)) {
+      return { error: 'The logo must be a PNG or JPEG image.' }
+    }
+    if (branding.logoDataUrl.length > 700_000) {
+      return { error: 'The logo is too large. Please use an image under 500 KB.' }
+    }
+  }
+
+  const clean = (v: string | null) => {
+    const t = (v || '').trim()
+    return t === '' ? null : t.slice(0, 200)
+  }
+
+  const supabase = await createClient()
+  const { error } = await supabase.from('organization_branding').upsert(
+    {
+      organization_id: caller.orgId,
+      logo_data_url: branding.logoDataUrl,
+      primary_color: branding.primaryColor,
+      contact_name: clean(branding.contactName),
+      contact_email: clean(branding.contactEmail),
+      contact_phone: clean(branding.contactPhone),
+      website: clean(branding.website),
+      address: clean(branding.address),
+      license_number: clean(branding.licenseNumber),
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'organization_id' }
+  )
 
   if (error) return { error: error.message }
 

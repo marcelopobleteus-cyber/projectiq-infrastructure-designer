@@ -39,6 +39,16 @@ import { getDetailedConnectivity, setDetailedConnectivityInNotes, getCameraReadi
 import ContextSidebar from '@/components/layout/ContextSidebar'
 import PlanCanvas from '@/components/map/PlanCanvas'
 import { setCanvasMode as persistCanvasMode, getFloorPlans, placeCameraOnPlan } from '../actions-floorplans'
+import {
+  coneGeoJsonPolygon,
+  resolveFovDegrees,
+  resolveRangeFt,
+  resolveHorizontalPixels,
+  doriBands,
+  DEFAULT_RANGE_FT,
+  normalizeHeading,
+  DORI_THRESHOLDS,
+} from '@/lib/fov'
 import { useRouter } from 'next/navigation'
 import {
   getCameraStatusColor,
@@ -153,6 +163,12 @@ export default function ProjectMapCanvas({
   const [cameras, setCameras] = useState<CameraLocation[]>(initialCameras)
   const [networkDevices, setNetworkDevices] = useState<NetworkDevice[]>(initialNetworkDevices)
   const [showCameras, setShowCameras] = useState(true)
+  // Cono de vision. showDori colorea el cono por bandas de la norma
+  // EN 62676-4 en vez de un solo color plano.
+  const [showFovCones, setShowFovCones] = useState(true)
+  const [showDori, setShowDori] = useState(false)
+  // Simulacion nocturna: reemplaza el alcance del cono por el del iluminador IR.
+  const [showNightIr, setShowNightIr] = useState(false)
   const [showDevices, setShowDevices] = useState(true)
   
   // Fiber Overlay & States
@@ -254,6 +270,11 @@ export default function ProjectMapCanvas({
   const [cameraIpAddress, setCameraIpAddress] = useState('')
   const [cameraResolution, setCameraResolution] = useState('')
   const [cameraFov, setCameraFov] = useState('')
+  // Cono de vision (migracion 042)
+  const [cameraHeading, setCameraHeading] = useState('')
+  const [cameraFovRange, setCameraFovRange] = useState('')
+  const [cameraShowFov, setCameraShowFov] = useState(true)
+  const [cameraIrRange, setCameraIrRange] = useState('')
   const [assignedSwitchId, setAssignedSwitchId] = useState('')
   const [assignedPortId, setAssignedPortId] = useState('')
   const [connectivityPathType, setConnectivityPathType] = useState('Fiber -> Camera')
@@ -498,6 +519,10 @@ export default function ProjectMapCanvas({
       setCameraIpAddress((selectedCamera as any).ip_address ?? '')
       setCameraResolution((selectedCamera as any).resolution ?? '')
       setCameraFov((selectedCamera as any).fov_degrees?.toString() ?? '')
+      setCameraHeading((selectedCamera as any).heading_degrees?.toString() ?? '')
+      setCameraFovRange((selectedCamera as any).fov_range_ft?.toString() ?? '')
+      setCameraShowFov((selectedCamera as any).show_fov !== false)
+      setCameraIrRange((selectedCamera as any).ir_range_ft?.toString() ?? '')
       setAssignedSwitchId(selectedCamera.assigned_network_device_id || '')
       setCameraPanelMessage(null)
       const notesStr = selectedCamera.notes || ''
@@ -861,6 +886,122 @@ export default function ProjectMapCanvas({
       }
     })
   }, [cameras, map, selectedCamera, showCameras, projectId])
+
+  // ── Cono de vision sobre el mapa ──────────────────────────────────────────
+  // Se dibuja como UNA sola capa GeoJSON con todos los conos, no un marcador
+  // por camara: con 35 camaras, 35 overlays DOM separados hacen que el mapa se
+  // arrastre al hacer paneo, mientras que una capa la dibuja la GPU.
+  useEffect(() => {
+    if (!map) return
+
+    const FILL_ID = 'camera-fov-fill'
+    const LINE_ID = 'camera-fov-line'
+
+    const cleanup = () => {
+      if (map.getLayer(LINE_ID)) map.removeLayer(LINE_ID)
+      if (map.getLayer(FILL_ID)) map.removeLayer(FILL_ID)
+      if (map.getSource(FILL_ID)) map.removeSource(FILL_ID)
+    }
+
+    if (!showCameras || !showFovCones || canvasMode !== 'map') {
+      cleanup()
+      return
+    }
+
+    const features: GeoJSON.Feature[] = []
+
+    for (const cam of cameras) {
+      // Sin heading no hay hacia donde apuntar, y una camara en el plano no
+      // tiene coordenadas reales: en ambos casos no se dibuja nada en vez de
+      // inventar una direccion.
+      if (cam.heading_degrees === null || cam.heading_degrees === undefined) continue
+      if (cam.show_fov === false) continue
+      if (cam.floor_plan_id) continue
+      if (!cam.latitude || !cam.longitude) continue
+
+      const model = cameraModels.find(m => m.id === cam.camera_model_id)
+      const fovDeg = resolveFovDegrees(cam.fov_degrees, model?.lens_type)
+      const dayRangeFt = resolveRangeFt(cam.fov_range_ft)
+      const heading = normalizeHeading(Number(cam.heading_degrees))
+      const isSelected = selectedCamera?.id === cam.id
+
+      // De noche manda el iluminador: mas alla de su alcance la camara ve
+      // negro, por mucho que el lente cubra mas lejos. Una camara sin IR
+      // cargado se dibuja en gris para que se note que NO es que llegue
+      // lejos, es que no sabemos hasta donde llega.
+      const irRangeFt = cam.ir_range_ft && Number(cam.ir_range_ft) > 0 ? Number(cam.ir_range_ft) : null
+      const rangeFt = showNightIr ? (irRangeFt ?? 0) : dayRangeFt
+
+      if (showNightIr && !irRangeFt) {
+        features.push({
+          type: 'Feature',
+          properties: { color: '#64748b', opacity: 0.12, cameraId: cam.id },
+          geometry: {
+            type: 'Polygon',
+            coordinates: [coneGeoJsonPolygon(cam.latitude, cam.longitude, heading, fovDeg, dayRangeFt)],
+          },
+        })
+        continue
+      }
+
+      const pixels = showDori && !showNightIr ? resolveHorizontalPixels(cam.resolution || model?.resolution) : null
+
+      if (pixels) {
+        // Bandas DORI: se empujan de la mas lejana a la mas cercana para que
+        // la mas exigente quede ARRIBA. Al reves, "Detect" taparia a
+        // "Identify" y el plano diria lo contrario de lo que calcula.
+        const bands = doriBands(pixels, fovDeg, rangeFt).slice().reverse()
+        for (const band of bands) {
+          features.push({
+            type: 'Feature',
+            properties: { color: band.color, opacity: isSelected ? 0.34 : 0.22, cameraId: cam.id },
+            geometry: {
+              type: 'Polygon',
+              coordinates: [coneGeoJsonPolygon(cam.latitude, cam.longitude, heading, fovDeg, band.maxDistanceFt)],
+            },
+          })
+        }
+        continue
+      }
+
+      features.push({
+        type: 'Feature',
+        properties: {
+          color: showNightIr ? '#a78bfa' : '#38bdf8',
+          opacity: isSelected ? 0.36 : 0.2,
+          cameraId: cam.id,
+        },
+        geometry: {
+          type: 'Polygon',
+          coordinates: [coneGeoJsonPolygon(cam.latitude, cam.longitude, heading, fovDeg, rangeFt)],
+        },
+      })
+    }
+
+    const data: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features }
+    const existing = map.getSource(FILL_ID) as maplibregl.GeoJSONSource | undefined
+
+    if (existing) {
+      existing.setData(data)
+      return
+    }
+
+    map.addSource(FILL_ID, { type: 'geojson', data })
+    map.addLayer({
+      id: FILL_ID,
+      type: 'fill',
+      source: FILL_ID,
+      paint: { 'fill-color': ['get', 'color'], 'fill-opacity': ['get', 'opacity'] },
+    })
+    map.addLayer({
+      id: LINE_ID,
+      type: 'line',
+      source: FILL_ID,
+      paint: { 'line-color': ['get', 'color'], 'line-width': 1, 'line-opacity': 0.7 },
+    })
+
+    return cleanup
+  }, [cameras, cameraModels, map, selectedCamera, showCameras, showFovCones, showDori, showNightIr, canvasMode])
 
   // Synchronize Network Device Markers
   useEffect(() => {
@@ -1421,6 +1562,13 @@ export default function ProjectMapCanvas({
       resolution: cameraResolution.trim() || null,
       fov_degrees: cameraFov.trim() === '' || isNaN(Number(cameraFov))
         ? null : Number(cameraFov),
+      heading_degrees: cameraHeading.trim() === '' || isNaN(Number(cameraHeading))
+        ? null : normalizeHeading(Number(cameraHeading)),
+      fov_range_ft: cameraFovRange.trim() === '' || isNaN(Number(cameraFovRange))
+        ? null : Number(cameraFovRange),
+      show_fov: cameraShowFov,
+      ir_range_ft: cameraIrRange.trim() === '' || isNaN(Number(cameraIrRange))
+        ? null : Number(cameraIrRange),
     }
 
     startTransition(async () => {
@@ -2245,7 +2393,23 @@ export default function ProjectMapCanvas({
                 plan_y: (c as any).plan_y ?? null,
                 status: c.status,
                 floor_plan_id: (c as any).floor_plan_id ?? null,
+                // Cono de vision: se resuelve aqui y no dentro de PlanCanvas
+                // porque el catalogo de modelos vive en este componente.
+                heading_degrees: (c as any).heading_degrees ?? null,
+                show_fov: (c as any).show_fov !== false,
+                fov_degrees: resolveFovDegrees(
+                  (c as any).fov_degrees,
+                  cameraModels.find(m => m.id === c.camera_model_id)?.lens_type,
+                ),
+                fov_range_ft: resolveRangeFt((c as any).fov_range_ft),
+                ir_range_ft: (c as any).ir_range_ft ? Number((c as any).ir_range_ft) : null,
+                horizontal_pixels: resolveHorizontalPixels(
+                  (c as any).resolution || cameraModels.find(m => m.id === c.camera_model_id)?.resolution,
+                ),
               }))}
+              showFov={showFovCones}
+              showDori={showDori}
+              showNightIr={showNightIr}
               addCameraMode={addCameraMode}
               selectedCameraId={selectedCamera?.id ?? null}
               onSelectCamera={(id) => {
@@ -2336,6 +2500,64 @@ export default function ProjectMapCanvas({
               />
               Conduit & Drops
             </label>
+
+            {/* Cono de vision (migracion 042) */}
+            <div className="text-[9px] text-[var(--accent-text)] uppercase tracking-wider border-b border-[var(--border)] pb-1 mb-0.5 mt-1.5">Coverage</div>
+            <label className="flex items-center gap-2 cursor-pointer hover:text-[var(--text-primary)] transition-colors">
+              <input
+                type="checkbox"
+                checked={showFovCones}
+                onChange={() => setShowFovCones(!showFovCones)}
+                className="rounded border-[var(--border)] bg-[var(--surface-2)] text-[var(--accent-text)] focus:ring-0 focus:ring-offset-0 w-3 h-3 cursor-pointer"
+              />
+              Field of view
+            </label>
+            <label
+              className={`flex items-center gap-2 transition-colors ${showFovCones ? 'cursor-pointer hover:text-[var(--text-primary)]' : 'opacity-40 cursor-not-allowed'}`}
+              title="Colors the cone by EN 62676-4 bands. Needs the camera resolution to be set."
+            >
+              <input
+                type="checkbox"
+                checked={showDori}
+                disabled={!showFovCones}
+                onChange={() => setShowDori(!showDori)}
+                className="rounded border-[var(--border)] bg-[var(--surface-2)] text-[var(--accent-text)] focus:ring-0 focus:ring-offset-0 w-3 h-3 cursor-pointer"
+              />
+              DORI bands
+            </label>
+            <label
+              className={`flex items-center gap-2 transition-colors ${showFovCones ? 'cursor-pointer hover:text-[var(--text-primary)]' : 'opacity-40 cursor-not-allowed'}`}
+              title="Replaces the cone range with the camera's IR illuminator range."
+            >
+              <input
+                type="checkbox"
+                checked={showNightIr}
+                disabled={!showFovCones}
+                onChange={() => setShowNightIr(!showNightIr)}
+                className="rounded border-[var(--border)] bg-[var(--surface-2)] text-[var(--accent-text)] focus:ring-0 focus:ring-offset-0 w-3 h-3 cursor-pointer"
+              />
+              Night / IR reach
+            </label>
+            {showFovCones && showNightIr && (
+              <div className="pt-1 mt-0.5 border-t border-[var(--border)] space-y-0.5 font-normal">
+                <div className="flex items-center gap-1.5 text-[9px] text-[var(--text-secondary)]">
+                  <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: '#a78bfa' }} /> IR reach
+                </div>
+                <div className="flex items-center gap-1.5 text-[9px] text-[var(--text-secondary)]">
+                  <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: '#64748b' }} /> No IR range on file
+                </div>
+              </div>
+            )}
+            {showFovCones && showDori && (
+              <div className="pt-1 mt-0.5 border-t border-[var(--border)] space-y-0.5 font-normal">
+                {DORI_THRESHOLDS.map(t => (
+                  <div key={t.key} className="flex items-center gap-1.5 text-[9px] text-[var(--text-secondary)]">
+                    <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: t.color }} />
+                    {t.label} <span className="text-[var(--text-tertiary)]">{t.ppm} px/m</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           )}
 
@@ -2787,6 +3009,121 @@ export default function ProjectMapCanvas({
                             />
                           </div>
                         </div>
+
+                        {/* ── Cono de vision ──
+                            Heading vacio = no se dibuja nada. Es deliberado:
+                            una camara con direccion inventada dibuja cobertura
+                            que nadie verifico en terreno. */}
+                        <div className="grid grid-cols-2 gap-3 mt-3">
+                          <div>
+                            <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Aim / Heading (°)</label>
+                            <input
+                              type="number" min={0} max={359} step="1"
+                              value={cameraHeading} onChange={e => setCameraHeading(e.target.value)}
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)]"
+                              placeholder="0 = North"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Coverage Range (ft)</label>
+                            <input
+                              type="number" min={1} max={3000} step="5"
+                              value={cameraFovRange} onChange={e => setCameraFovRange(e.target.value)}
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)]"
+                              placeholder={`default ${DEFAULT_RANGE_FT}`}
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">IR Illuminator Reach (ft)</label>
+                            <input
+                              type="number" min={1} max={3000} step="5"
+                              value={cameraIrRange} onChange={e => setCameraIrRange(e.target.value)}
+                              className="w-full px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)]"
+                              placeholder="e.g., 100 — leave blank if the camera has no IR"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                          <label className="flex items-center gap-2 text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={cameraShowFov}
+                              onChange={e => setCameraShowFov(e.target.checked)}
+                              className="rounded border-[var(--border)] bg-[var(--surface-2)] w-3.5 h-3.5 cursor-pointer"
+                            />
+                            Show coverage cone
+                          </label>
+                          {cameraHeading.trim() === '' && (
+                            <span className="text-[10px] text-[var(--text-tertiary)]">Set a heading to draw it</span>
+                          )}
+                        </div>
+
+                        {/* Rosa de orientacion: en terreno nadie piensa en
+                            grados, piensa en "apunta al norte". */}
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {[['N', 0], ['NE', 45], ['E', 90], ['SE', 135], ['S', 180], ['SW', 225], ['W', 270], ['NW', 315]].map(([label, deg]) => (
+                            <button
+                              key={label as string}
+                              type="button"
+                              onClick={() => { setCameraHeading(String(deg)); setCameraFormDirty(true) }}
+                              className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition cursor-pointer ${
+                                cameraHeading.trim() !== '' && Number(cameraHeading) === deg
+                                  ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                                  : 'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                              }`}
+                            >
+                              {label as string}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Distancias DORI de ESTA camara (EN 62676-4).
+                            Se calculan de la resolucion y la apertura, asi que
+                            si falta la resolucion se dice, en vez de mostrar
+                            un numero inventado. */}
+                        {(() => {
+                          const model = cameraModels.find(m => m.id === selectedCamera?.camera_model_id)
+                          const pixels = resolveHorizontalPixels(cameraResolution || model?.resolution)
+                          const fovDeg = resolveFovDegrees(
+                            cameraFov.trim() === '' ? null : Number(cameraFov),
+                            model?.lens_type,
+                          )
+                          const rangeFt = resolveRangeFt(
+                            cameraFovRange.trim() === '' ? null : Number(cameraFovRange),
+                          )
+                          if (!pixels) {
+                            return (
+                              <p className="mt-2 text-[10px] text-[var(--text-tertiary)] leading-relaxed">
+                                Set the resolution (e.g. 4MP or 1920x1080) to see DORI distances.
+                              </p>
+                            )
+                          }
+                          const bands = doriBands(pixels, fovDeg, rangeFt)
+                          return (
+                            <div className="mt-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl p-2.5">
+                              <p className="text-[9px] font-black text-[var(--text-tertiary)] uppercase tracking-wider mb-1.5">
+                                DORI · EN 62676-4 · {pixels}px @ {fovDeg}&deg;
+                              </p>
+                              <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                                {bands.map(b => (
+                                  <div key={b.key} className="flex items-center justify-between gap-2 text-[10px]">
+                                    <span className="flex items-center gap-1.5 text-[var(--text-secondary)]">
+                                      <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: b.color }} />
+                                      {b.label}
+                                    </span>
+                                    <span className="font-mono font-bold text-[var(--text-primary)]">
+                                      {b.maxDistanceFt.toFixed(0)} ft
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                              <p className="text-[9px] text-[var(--text-tertiary)] mt-1.5 leading-relaxed">
+                                Distances are capped at the coverage range you set.
+                              </p>
+                            </div>
+                          )
+                        })()}
 
                         <div className="mt-3">
                           <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">IP Address</label>

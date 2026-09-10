@@ -198,6 +198,11 @@ export async function updateCameraDetails(params: {
     ip_address?: string | null
     resolution?: string | null
     fov_degrees?: number | null
+    // Cono de vision (migracion 042): hacia donde apunta y hasta donde llega.
+    heading_degrees?: number | null
+    fov_range_ft?: number | null
+    show_fov?: boolean
+    ir_range_ft?: number | null
   }
 }) {
   const supabase = await createClient()
@@ -252,6 +257,10 @@ export async function updateCameraDetails(params: {
       ip_address: params.details.ip_address ?? null,
       resolution: params.details.resolution ?? null,
       fov_degrees: params.details.fov_degrees ?? null,
+      heading_degrees: params.details.heading_degrees ?? null,
+      fov_range_ft: params.details.fov_range_ft ?? null,
+      show_fov: params.details.show_fov ?? true,
+      ir_range_ft: params.details.ir_range_ft ?? null,
     })
     .eq('id', params.id)
     .select()

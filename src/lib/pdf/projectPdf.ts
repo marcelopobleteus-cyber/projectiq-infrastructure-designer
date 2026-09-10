@@ -23,7 +23,15 @@ const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2
 const INK = rgb(0.09, 0.11, 0.15)
 const MUTED = rgb(0.42, 0.45, 0.5)
 const RULE = rgb(0.85, 0.87, 0.89)
-const ACCENT = rgb(0, 0.6, 0.45)
+const DEFAULT_ACCENT = rgb(0, 0.6, 0.45)
+
+/** #RRGGBB -> rgb() de pdf-lib. Cae al verde por defecto si viene basura. */
+function hexToRgb(hex: string | null | undefined) {
+  const m = /^#([0-9a-fA-F]{6})$/.exec((hex || '').trim())
+  if (!m) return DEFAULT_ACCENT
+  const n = parseInt(m[1], 16)
+  return rgb(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255)
+}
 const ZEBRA = rgb(0.96, 0.97, 0.98)
 
 interface Ctx {
@@ -35,6 +43,8 @@ interface Ctx {
   mono: PDFFont
   pageNumber: number
   footerLabel: string
+  /** Color de la marca de la organizacion. */
+  accent: ReturnType<typeof rgb>
 }
 
 function newPage(ctx: Ctx) {
@@ -117,7 +127,7 @@ function heading(ctx: Ctx, text: string) {
     y: ctx.y,
     size: 9,
     font: ctx.bold,
-    color: ACCENT,
+    color: ctx.accent,
   })
   ctx.y -= 6
   ctx.page.drawLine({
@@ -263,6 +273,22 @@ async function createCtx(data: ProjectReportData, label: string): Promise<Ctx> {
   doc.setProducer('NextQ Infrastructure Designer')
   doc.setCreator('NextQ Infrastructure Designer')
 
+  // El pie lleva los datos de contacto si estan cargados: quien recibe el PDF
+  // impreso tiene que saber a quien llamar sin buscar el correo original.
+  const contactBits = [
+    data.branding?.contactName,
+    data.branding?.contactPhone,
+    data.branding?.contactEmail,
+    data.branding?.website,
+  ].filter(Boolean) as string[]
+
+  const footerLabel = [
+    `${safe(data.organizationName)} - ${safe(data.project.name)} - ${label}`,
+    contactBits.length > 0 ? safe(contactBits.join('  |  ')) : '',
+  ]
+    .filter(Boolean)
+    .join('   ')
+
   return {
     doc,
     page,
@@ -271,20 +297,58 @@ async function createCtx(data: ProjectReportData, label: string): Promise<Ctx> {
     bold,
     mono,
     pageNumber: 1,
-    footerLabel: `${safe(data.organizationName)} - ${safe(data.project.name)} - ${label}`,
+    footerLabel,
+    accent: hexToRgb(data.branding?.primaryColor),
   }
 }
 
-function documentHeader(ctx: Ctx, data: ProjectReportData, title: string) {
+/**
+ * Incrusta el logo si hay uno. Nunca revienta el documento: si la imagen esta
+ * corrupta se sigue sin logo — un PDF sin logo sirve, uno que no se genera no.
+ */
+async function drawLogo(ctx: Ctx, data: ProjectReportData): Promise<number> {
+  const url = data.branding?.logoDataUrl
+  if (!url) return 0
+
+  try {
+    const base64 = url.split(',')[1]
+    if (!base64) return 0
+    const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0))
+    const image = url.startsWith('data:image/png')
+      ? await ctx.doc.embedPng(bytes)
+      : await ctx.doc.embedJpg(bytes)
+
+    const maxW = 130
+    const maxH = 42
+    const scale = Math.min(maxW / image.width, maxH / image.height, 1)
+    const w = image.width * scale
+    const h = image.height * scale
+
+    ctx.page.drawImage(image, {
+      x: PAGE_WIDTH - MARGIN - w,
+      y: PAGE_HEIGHT - MARGIN - h + 6,
+      width: w,
+      height: h,
+    })
+    return h
+  } catch {
+    return 0
+  }
+}
+
+async function documentHeader(ctx: Ctx, data: ProjectReportData, title: string) {
+  await drawLogo(ctx, data)
+
   ctx.page.drawText(safe(data.organizationName).toUpperCase(), {
     x: MARGIN,
     y: ctx.y,
     size: 8,
     font: ctx.bold,
-    color: ACCENT,
+    color: ctx.accent,
   })
   ctx.y -= 24
-  ctx.page.drawText(truncate(data.project.name, ctx.bold, 20, CONTENT_WIDTH), {
+  const titleWidth = data.branding?.logoDataUrl ? CONTENT_WIDTH - 145 : CONTENT_WIDTH
+  ctx.page.drawText(truncate(data.project.name, ctx.bold, 20, titleWidth), {
     x: MARGIN,
     y: ctx.y,
     size: 20,
@@ -304,7 +368,7 @@ function documentHeader(ctx: Ctx, data: ProjectReportData, title: string) {
     start: { x: MARGIN, y: ctx.y },
     end: { x: MARGIN + CONTENT_WIDTH, y: ctx.y },
     thickness: 1.5,
-    color: ACCENT,
+    color: ctx.accent,
   })
   ctx.y -= 22
 }
@@ -315,13 +379,20 @@ function documentHeader(ctx: Ctx, data: ProjectReportData, title: string) {
  */
 export async function buildSimpleReport(data: ProjectReportData): Promise<Uint8Array> {
   const ctx = await createCtx(data, 'Site Report')
-  documentHeader(ctx, data, 'Site Report')
+  await documentHeader(ctx, data, 'Site Report')
 
   statRow(ctx, [
     { label: 'Cameras', value: String(data.cameraTotals.total) },
     { label: 'Task progress', value: `${data.tasks.percentComplete}%` },
     { label: 'Network devices', value: String(data.network.deviceCount) },
-    { label: 'Material cost', value: money(data.bom.totalCost) },
+    {
+      label: data.pricing.settings.materialMarkupPct > 0 || data.pricing.settings.taxPct > 0 ? 'Client total' : 'Material cost',
+      value: money(
+        data.pricing.settings.materialMarkupPct > 0 || data.pricing.settings.taxPct > 0
+          ? data.pricing.total
+          : data.bom.totalCost,
+      ),
+    },
   ])
 
   if (data.project.description) {
@@ -369,23 +440,44 @@ export async function buildSimpleReport(data: ProjectReportData): Promise<Uint8A
     )
   }
 
-  heading(ctx, 'Cost summary')
+  const p = data.pricing
+  const quoted = p.settings.materialMarkupPct > 0 || p.settings.laborMarkupPct > 0 || p.settings.taxPct > 0
+
+  heading(ctx, quoted ? 'Price summary' : 'Cost summary')
   table(
     ctx,
     [
       { header: 'Line', width: 3 },
       { header: 'Amount', width: 1, align: 'right' },
     ],
-    [
-      ['Contractor-supplied', money(data.bom.contractorCost)],
-      ['Owner-supplied (OFCI)', money(data.bom.ownerSuppliedCost)],
-      ['Total material and labor cost', money(data.bom.totalCost)],
-    ]
+    quoted
+      ? [
+          ['Material', money(p.materialPrice)],
+          ['Labor', money(p.laborPrice)],
+          ['Subtotal', money(p.subtotal)],
+          [`Tax (${p.settings.taxPct}%)`, money(p.tax)],
+          ['Client total', money(p.total)],
+        ]
+      : [
+          ['Contractor-supplied', money(data.bom.contractorCost)],
+          ['Owner-supplied (OFCI)', money(data.bom.ownerSuppliedCost)],
+          ['Total material and labor cost', money(data.bom.totalCost)],
+        ]
   )
+
+  if (data.bom.ownerSuppliedCost > 0) {
+    paragraph(
+      ctx,
+      `${money(data.bom.ownerSuppliedCost)} of owner-supplied (OFCI) material is excluded from the amounts above.`,
+      8
+    )
+  }
 
   paragraph(
     ctx,
-    'Costs shown are internal cost, not a client quote. Margin and tax are not applied.',
+    quoted
+      ? 'Amounts above are client price, including margin and tax.'
+      : 'Costs shown are internal cost, not a client quote. Margin and tax are not applied.',
     8
   )
 
@@ -399,7 +491,7 @@ export async function buildSimpleReport(data: ProjectReportData): Promise<Uint8A
  */
 export async function buildProjectDocument(data: ProjectReportData): Promise<Uint8Array> {
   const ctx = await createCtx(data, 'Design Package')
-  documentHeader(ctx, data, 'Design Package')
+  await documentHeader(ctx, data, 'Design Package')
 
   heading(ctx, 'Overview')
   paragraph(
@@ -485,22 +577,40 @@ export async function buildProjectDocument(data: ProjectReportData): Promise<Uin
       ])
     )
 
+    const p = data.pricing
+    const quoted =
+      p.settings.materialMarkupPct > 0 || p.settings.laborMarkupPct > 0 || p.settings.taxPct > 0
+
     table(
       ctx,
       [
         { header: 'Summary', width: 3 },
         { header: 'Amount', width: 1, align: 'right' },
       ],
-      [
-        ['Contractor-supplied', money(data.bom.contractorCost)],
-        ['Owner-supplied (OFCI)', money(data.bom.ownerSuppliedCost)],
-        ['Total cost', money(data.bom.totalCost)],
-      ]
+      quoted
+        ? [
+            ['Material', money(p.materialPrice)],
+            ['Labor', money(p.laborPrice)],
+            ['Subtotal', money(p.subtotal)],
+            [`Tax (${p.settings.taxPct}%${p.settings.taxAppliesToLabor ? ', incl. labor' : ', material only'})`, money(p.tax)],
+            ['Owner-supplied (OFCI), not billed', money(data.bom.ownerSuppliedCost)],
+            ['Client total', money(p.total)],
+          ]
+        : [
+            ['Contractor-supplied', money(data.bom.contractorCost)],
+            ['Owner-supplied (OFCI)', money(data.bom.ownerSuppliedCost)],
+            ['Total cost', money(data.bom.totalCost)],
+          ]
     )
 
+    // La tabla de arriba lista COSTO por linea. Si el documento va cotizado,
+    // hay que decirlo o alguien suma las lineas, no le da el total, y piensa
+    // que el documento esta mal.
     paragraph(
       ctx,
-      'Amounts are internal cost. Margin, markup and tax are not included in this document.',
+      quoted
+        ? 'The line items above show cost. The summary shows client price, with margin and tax applied.'
+        : 'Amounts are internal cost. Margin, markup and tax are not included in this document.',
       8
     )
   }

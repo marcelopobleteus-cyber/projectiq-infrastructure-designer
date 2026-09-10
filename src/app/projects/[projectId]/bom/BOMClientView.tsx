@@ -1,8 +1,15 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { recalculateProjectLabor, LaborRecalcResult } from '../../actions-labor'
+import { getProjectPricing, saveProjectPricing } from '../../actions-pricing'
+import {
+  priceProjectBom,
+  hasPricing,
+  ZERO_PRICING,
+  type PricingSettings,
+} from '@/lib/bom/pricing'
 
 interface BOMItem {
   id: string
@@ -36,6 +43,43 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
   // Recalculo de mano de obra: siempre se previsualiza antes de escribir.
   const [laborPreview, setLaborPreview] = useState<LaborRecalcResult | null>(null)
   const [laborBusy, setLaborBusy] = useState(false)
+
+  // ── Precio de venta (margen + impuesto) ──
+  // Sin fila guardada esto queda en ceros y la pantalla muestra costo puro,
+  // exactamente como antes de existir el modulo.
+  const [pricing, setPricing] = useState<PricingSettings>(ZERO_PRICING)
+  const [pricingDraft, setPricingDraft] = useState<PricingSettings | null>(null)
+  const [canEditPricing, setCanEditPricing] = useState(false)
+  const [pricingOpen, setPricingOpen] = useState(false)
+  const [pricingBusy, setPricingBusy] = useState(false)
+  const [pricingError, setPricingError] = useState<string | null>(null)
+  const pricingLoaded = useRef(false)
+
+  useEffect(() => {
+    if (pricingLoaded.current) return
+    pricingLoaded.current = true
+    getProjectPricing(projectId)
+      .then(res => {
+        if (res.error) return
+        setPricing(res.settings)
+        setCanEditPricing(res.canEdit)
+      })
+      .catch(() => {})
+  }, [projectId])
+
+  const handleSavePricing = async () => {
+    if (!pricingDraft) return
+    setPricingBusy(true)
+    setPricingError(null)
+    const res = await saveProjectPricing({ projectId, settings: pricingDraft })
+    setPricingBusy(false)
+    if (res.error) {
+      setPricingError(res.error)
+      return
+    }
+    setPricing(pricingDraft)
+    setPricingDraft(null)
+  }
 
   const handlePreviewLabor = async () => {
     setLaborBusy(true)
@@ -123,6 +167,11 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
       if (item.partNumber === 'LAB-OSP-NODE-SET') return acc + item.quantity * 8
       return acc
     }, 0)
+
+  // Totales comerciales. Se calculan con la MISMA funcion que usa el PDF del
+  // cliente, para que el precio impreso y el de pantalla no puedan separarse.
+  const priced = priceProjectBom(items as any, pricing)
+  const pricingActive = hasPricing(pricing)
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -212,6 +261,163 @@ export default function BOMClientView({ projectId, items }: BOMClientViewProps) 
             </div>
           </div>
         </div>
+      </div>
+
+      {/* ── Precio de venta ──
+          El BOM siempre mostro costo. Este bloque agrega la capa comercial.
+          Mientras los porcentajes esten en cero no cambia ningun numero. */}
+      <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-xl shadow-xs overflow-hidden">
+        <button
+          type="button"
+          onClick={() => { setPricingOpen(!pricingOpen); if (!pricingDraft) setPricingDraft({ ...pricing }) }}
+          className="w-full flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-[var(--surface-hover)] transition"
+        >
+          <div className="flex items-center gap-3 text-left">
+            <span className="text-[10px] font-bold text-[var(--accent-text)] uppercase tracking-wider">Client Price</span>
+            {pricingActive ? (
+              <span className="text-lg font-black text-[var(--text-primary)] font-mono">{formatCurrency(priced.total)}</span>
+            ) : (
+              <span className="text-[11px] text-[var(--text-secondary)]">No margin or tax set — the BOM is showing internal cost</span>
+            )}
+          </div>
+          <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">{pricingOpen ? 'Hide' : 'Set margin & tax'}</span>
+        </button>
+
+        {pricingOpen && (
+          <div className="border-t border-[var(--border)] px-4 py-4 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Pricing mode</label>
+                  <div className="flex gap-1.5">
+                    {(['markup', 'margin'] as const).map(mode => (
+                      <button
+                        key={mode}
+                        type="button"
+                        disabled={!canEditPricing}
+                        onClick={() => setPricingDraft(d => ({ ...(d ?? pricing), pricingMode: mode }))}
+                        className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition cursor-pointer disabled:opacity-50 ${
+                          (pricingDraft ?? pricing).pricingMode === mode
+                            ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                            : 'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text-secondary)]'
+                        }`}
+                      >
+                        {mode === 'markup' ? 'Markup on cost' : 'Margin on price'}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Se explica la diferencia en la pantalla, no en un manual:
+                      confundirlas cambia el precio final. */}
+                  <p className="text-[10px] text-[var(--text-tertiary)] mt-1.5 leading-relaxed">
+                    {(pricingDraft ?? pricing).pricingMode === 'markup'
+                      ? 'Markup 20% on $100 cost sells at $120 (profit is 16.7% of the price).'
+                      : 'Margin 20% on $100 cost sells at $125 (profit is 20% of the price).'}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">Material %</label>
+                    <input
+                      type="number" min={0} max={500} step="0.5"
+                      disabled={!canEditPricing}
+                      value={(pricingDraft ?? pricing).materialMarkupPct}
+                      onChange={e => setPricingDraft(d => ({ ...(d ?? pricing), materialMarkupPct: Number(e.target.value) }))}
+                      className="w-full px-2.5 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] text-xs font-mono focus:outline-none focus:border-[var(--accent)] disabled:opacity-50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">Labor %</label>
+                    <input
+                      type="number" min={0} max={500} step="0.5"
+                      disabled={!canEditPricing}
+                      value={(pricingDraft ?? pricing).laborMarkupPct}
+                      onChange={e => setPricingDraft(d => ({ ...(d ?? pricing), laborMarkupPct: Number(e.target.value) }))}
+                      className="w-full px-2.5 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] text-xs font-mono focus:outline-none focus:border-[var(--accent)] disabled:opacity-50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">Tax %</label>
+                    <input
+                      type="number" min={0} max={100} step="0.001"
+                      disabled={!canEditPricing}
+                      value={(pricingDraft ?? pricing).taxPct}
+                      onChange={e => setPricingDraft(d => ({ ...(d ?? pricing), taxPct: Number(e.target.value) }))}
+                      className="w-full px-2.5 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] text-xs font-mono focus:outline-none focus:border-[var(--accent)] disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-2 text-[11px] text-[var(--text-secondary)] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    disabled={!canEditPricing}
+                    checked={(pricingDraft ?? pricing).taxAppliesToLabor}
+                    onChange={e => setPricingDraft(d => ({ ...(d ?? pricing), taxAppliesToLabor: e.target.checked }))}
+                    className="rounded border-[var(--border)] bg-[var(--surface-2)] w-3.5 h-3.5 cursor-pointer"
+                  />
+                  Tax also applies to labor
+                </label>
+
+                {pricingError && <p className="text-[11px] text-[var(--danger)] font-semibold">{pricingError}</p>}
+
+                {canEditPricing ? (
+                  pricingDraft && JSON.stringify(pricingDraft) !== JSON.stringify(pricing) && (
+                    <div className="flex gap-2">
+                      <button
+                        type="button" onClick={handleSavePricing} disabled={pricingBusy}
+                        className="px-3.5 py-2 bg-[var(--accent)] disabled:opacity-50 text-white text-xs font-bold rounded-lg cursor-pointer"
+                      >
+                        {pricingBusy ? 'Saving…' : 'Save pricing'}
+                      </button>
+                      <button
+                        type="button" onClick={() => { setPricingDraft({ ...pricing }); setPricingError(null) }} disabled={pricingBusy}
+                        className="px-3.5 py-2 bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-primary)] text-xs font-bold rounded-lg cursor-pointer"
+                      >
+                        Discard
+                      </button>
+                    </div>
+                  )
+                ) : (
+                  <p className="text-[11px] text-[var(--text-tertiary)]">Only owners and admins can change pricing.</p>
+                )}
+              </div>
+
+              {/* Desglose en vivo con lo GUARDADO, no con el borrador: es el
+                  numero que hoy sale en el PDF del cliente. */}
+              <div className="bg-[var(--surface-2)] border border-[var(--border)] rounded-xl p-3.5 space-y-1.5 text-xs font-mono">
+                {[
+                  ['Material cost', priced.materialCost],
+                  ['Labor cost', priced.laborCost],
+                  ['Material price', priced.materialPrice],
+                  ['Labor price', priced.laborPrice],
+                  ['Subtotal', priced.subtotal],
+                  [`Tax (${pricing.taxPct}%${pricing.taxAppliesToLabor ? ', incl. labor' : ', material only'})`, priced.tax],
+                ].map(([label, value]) => (
+                  <div key={label as string} className="flex justify-between">
+                    <span className="text-[var(--text-secondary)]">{label as string}</span>
+                    <span className="text-[var(--text-primary)]">{formatCurrency(value as number)}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between border-t border-[var(--border)] pt-1.5 mt-1.5 font-bold">
+                  <span className="text-[var(--text-primary)]">Client total</span>
+                  <span className="text-[var(--text-primary)]">{formatCurrency(priced.total)}</span>
+                </div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-[var(--text-secondary)]">Gross profit</span>
+                  <span className="text-[var(--success)]">
+                    {formatCurrency(priced.grossProfit)} ({priced.grossMarginPct.toFixed(1)}%)
+                  </span>
+                </div>
+                {priced.ownerSuppliedCost > 0 && (
+                  <p className="text-[10px] text-[var(--text-tertiary)] pt-1.5 border-t border-[var(--border)] leading-relaxed font-sans">
+                    {formatCurrency(priced.ownerSuppliedCost)} of owner-supplied (OFCI) material is excluded — we don&apos;t buy it, so it carries no margin.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Control Bar: Category Selector, Search, CSV Export */}

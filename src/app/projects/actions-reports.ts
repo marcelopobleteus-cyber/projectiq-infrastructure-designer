@@ -17,6 +17,7 @@ import { BYPASS_AUTH } from '@/config/auth'
 import { buildProjectBom, type ProjectBomItem } from '@/lib/bom/buildProjectBom'
 import { getCameraLocations, getCameraModels } from './actions-sprint2'
 import { getNetworkDevices } from './actions-sprint3'
+import { priceProjectBom, ZERO_PRICING, type PricedTotals } from '@/lib/bom/pricing'
 
 export interface ProjectReportCamera {
   tag: string
@@ -31,9 +32,21 @@ export interface ProjectReportCamera {
   placement: string
 }
 
+export interface ReportBranding {
+  logoDataUrl: string | null
+  primaryColor: string
+  contactName: string | null
+  contactEmail: string | null
+  contactPhone: string | null
+  website: string | null
+  address: string | null
+  licenseNumber: string | null
+}
+
 export interface ProjectReportData {
   generatedAt: string
   organizationName: string
+  branding: ReportBranding
   project: {
     id: string
     name: string
@@ -69,6 +82,8 @@ export interface ProjectReportData {
     contractorCost: number
     ownerSuppliedCost: number
   }
+  /** Precio de venta. Con margen e impuesto en cero es igual al costo. */
+  pricing: PricedTotals
 }
 
 export async function getProjectReportData(
@@ -103,11 +118,25 @@ export async function getProjectReportData(
     if (!membership && !BYPASS_AUTH) return { error: 'Access denied' }
   }
 
-  const { data: org } = await supabase
-    .from('organizations')
-    .select('name')
-    .eq('id', project.organization_id)
-    .maybeSingle()
+  const [{ data: org }, { data: brandingRow }] = await Promise.all([
+    supabase.from('organizations').select('name').eq('id', project.organization_id).maybeSingle(),
+    supabase
+      .from('organization_branding')
+      .select('*')
+      .eq('organization_id', project.organization_id)
+      .maybeSingle(),
+  ])
+
+  const branding: ReportBranding = {
+    logoDataUrl: brandingRow?.logo_data_url ?? null,
+    primaryColor: brandingRow?.primary_color || '#009973',
+    contactName: brandingRow?.contact_name ?? null,
+    contactEmail: brandingRow?.contact_email ?? null,
+    contactPhone: brandingRow?.contact_phone ?? null,
+    website: brandingRow?.website ?? null,
+    address: brandingRow?.address ?? null,
+    licenseNumber: brandingRow?.license_number ?? null,
+  }
 
   let cameras: any[] = []
   let cameraModels: any[] = []
@@ -169,6 +198,24 @@ export async function getProjectReportData(
 
   // --- BOM (misma funcion que la pantalla) ---
   const bomItems = buildProjectBom({ cameras, cameraModels, devices, dbBomItems })
+
+  const { data: pricingRow } = await supabase
+    .from('project_pricing')
+    .select('*')
+    .eq('project_id', projectId)
+    .maybeSingle()
+
+  const pricingSettings = pricingRow
+    ? {
+        pricingMode: pricingRow.pricing_mode === 'margin' ? ('margin' as const) : ('markup' as const),
+        materialMarkupPct: Number(pricingRow.material_markup_pct) || 0,
+        laborMarkupPct: Number(pricingRow.labor_markup_pct) || 0,
+        taxPct: Number(pricingRow.tax_pct) || 0,
+        taxAppliesToLabor: !!pricingRow.tax_applies_to_labor,
+      }
+    : ZERO_PRICING
+
+  const priced = priceProjectBom(bomItems, pricingSettings)
   const totalCost = bomItems.reduce((sum, i) => sum + (i.totalCost || 0), 0)
   const ownerSuppliedCost = bomItems
     .filter(i => i.supplyResponsibility === 'owner')
@@ -178,6 +225,7 @@ export async function getProjectReportData(
     data: {
       generatedAt: new Date().toISOString(),
       organizationName: org?.name || 'NextQ',
+      branding,
       project: {
         id: project.id,
         name: project.name,
@@ -206,6 +254,7 @@ export async function getProjectReportData(
         switches: devices.filter((d: any) => (d.device_type || '').toLowerCase().includes('switch')).length,
         poeBudgetWatts: devices.reduce((sum: number, d: any) => sum + (d.poe_budget_watts || 0), 0),
       },
+      pricing: priced,
       bom: {
         items: bomItems,
         totalCost,

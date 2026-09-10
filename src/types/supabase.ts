@@ -612,8 +612,12 @@ export type Database = {
           drop_cable_ft: number | null
           floor_plan_id: string | null
           fov_degrees: number | null
+          fov_range_ft: number | null
+          heading_degrees: number | null
+          show_fov: boolean
           id: string
           ip_address: string | null
+          ir_range_ft: number | null
           latitude: number
           lens: string | null
           longitude: number
@@ -651,8 +655,12 @@ export type Database = {
           drop_cable_ft?: number | null
           floor_plan_id?: string | null
           fov_degrees?: number | null
+          fov_range_ft?: number | null
+          heading_degrees?: number | null
+          show_fov?: boolean
           id?: string
           ip_address?: string | null
+          ir_range_ft?: number | null
           latitude: number
           lens?: string | null
           longitude: number
@@ -690,8 +698,12 @@ export type Database = {
           drop_cable_ft?: number | null
           floor_plan_id?: string | null
           fov_degrees?: number | null
+          fov_range_ft?: number | null
+          heading_degrees?: number | null
+          show_fov?: boolean
           id?: string
           ip_address?: string | null
+          ir_range_ft?: number | null
           latitude?: number
           lens?: string | null
           longitude?: number
@@ -3071,6 +3083,53 @@ export type Database = {
           },
         ]
       }
+      organization_branding: {
+        Row: {
+          address: string | null
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          license_number: string | null
+          logo_data_url: string | null
+          organization_id: string
+          primary_color: string
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          address?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          license_number?: string | null
+          logo_data_url?: string | null
+          organization_id: string
+          primary_color?: string
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          license_number?: string | null
+          logo_data_url?: string | null
+          organization_id?: string
+          primary_color?: string
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_branding_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_members: {
         Row: {
           created_at: string
@@ -3323,6 +3382,103 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "project_floor_plans_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_pricing: {
+        Row: {
+          labor_markup_pct: number
+          organization_id: string
+          pricing_mode: string
+          project_id: string
+          tax_applies_to_labor: boolean
+          tax_pct: number
+          material_markup_pct: number
+          updated_at: string
+        }
+        Insert: {
+          labor_markup_pct?: number
+          organization_id: string
+          pricing_mode?: string
+          project_id: string
+          tax_applies_to_labor?: boolean
+          tax_pct?: number
+          material_markup_pct?: number
+          updated_at?: string
+        }
+        Update: {
+          labor_markup_pct?: number
+          organization_id?: string
+          pricing_mode?: string
+          project_id?: string
+          tax_applies_to_labor?: boolean
+          tax_pct?: number
+          material_markup_pct?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_pricing_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_share_links: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          id: string
+          label: string | null
+          last_viewed_at: string | null
+          organization_id: string
+          password_hash: string
+          password_salt: string
+          project_id: string
+          revoked: boolean
+          token: string
+          view_count: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          expires_at: string
+          id?: string
+          label?: string | null
+          last_viewed_at?: string | null
+          organization_id: string
+          password_hash: string
+          password_salt: string
+          project_id: string
+          revoked?: boolean
+          token: string
+          view_count?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          label?: string | null
+          last_viewed_at?: string | null
+          organization_id?: string
+          password_hash?: string
+          password_salt?: string
+          project_id?: string
+          revoked?: boolean
+          token?: string
+          view_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_share_links_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"

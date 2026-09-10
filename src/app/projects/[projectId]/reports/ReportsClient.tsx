@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { getProjectReportData } from '../../actions-reports'
 import { buildSimpleReport, buildProjectDocument, downloadPdf } from '@/lib/pdf/projectPdf'
+import ShareLinksPanel from '@/components/projects/ShareLinksPanel'
 
 interface FiberNode {
   id: string
@@ -324,6 +325,8 @@ export default function ReportsClient({ projectId, projectName, fiberData }: Rep
               </div>
             </div>
           </div>
+
+          <ShareLinksPanel projectId={projectId} />
 
           {/* Reports Grid/Table */}
           <div className="bg-[var(--surface-1)] backdrop-blur-md border border-[var(--border)] rounded-2xl shadow-xl overflow-hidden no-print">

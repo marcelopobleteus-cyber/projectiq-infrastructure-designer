@@ -352,7 +352,7 @@ export default function ProjectGridClient({ initialProjects }: ProjectGridClient
                         setStatusDropdownId(null)
                       }}
                       className="p-1 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] rounded-md hover:bg-[var(--surface-hover)] transition cursor-pointer"
-                      title="Opciones del proyecto"
+                      title="Project options"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
                     </button>
@@ -484,7 +484,7 @@ export default function ProjectGridClient({ initialProjects }: ProjectGridClient
                         setStatusDropdownId(null)
                       }}
                       className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] rounded-md hover:bg-[var(--surface-2)] border border-transparent hover:border-[var(--border)] transition cursor-pointer"
-                      title="Opciones del proyecto"
+                      title="Project options"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
                     </button>
