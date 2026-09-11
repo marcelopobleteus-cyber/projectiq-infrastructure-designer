@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState, useTransition } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import { attachMarkerFanOut, registerFanOutMarker, unregisterFanOutMarker } from '@/lib/map/markerFanOut'
 import { Database } from '@/types/supabase'
 import {
   createCameraLocation,
@@ -686,6 +687,11 @@ export default function ProjectMapCanvas({
     el.style.width = `${size[0]}px`
     el.style.height = `${size[1]}px`
     el.style.cursor = cursor
+    // Marca este marcador para el sistema de "abanico": cuando varios
+    // elementos (camara, nodo de fibra, dispositivo de red) caen en el
+    // mismo punto del mapa, se agrupan en una burbuja con contador en vez
+    // de taparse unos a otros. Ver src/lib/map/markerFanOut.ts.
+    el.setAttribute('data-fanout', 'true')
     el.innerHTML = svg
     const svgEl = el.firstElementChild as SVGElement | null
     if (svgEl) {
@@ -782,15 +788,22 @@ export default function ProjectMapCanvas({
       })
     })
 
+    let detachFanOut: (() => void) | null = null
     newMap.on('load', () => {
       setMap(newMap)
       // Arranca plegada (solo el boton "i"): el credito sigue disponible a un
       // clic, que es lo que exigen las licencias, sin ocupar la esquina.
       const attrib = newMap.getContainer().querySelector('.maplibregl-ctrl-attrib')
       attrib?.classList.remove('maplibregl-compact-show')
+
+      // Cuando varios marcadores (camara, nodo de fibra, dispositivo) caen
+      // en el mismo punto, se agrupan en una burbuja con contador que se
+      // abre en abanico al pasar el mouse o hacer clic.
+      detachFanOut = attachMarkerFanOut(newMap)
     })
 
     return () => {
+      detachFanOut?.()
       newMap.remove()
       setMap(null)
     }
@@ -805,6 +818,7 @@ export default function ProjectMapCanvas({
     Object.keys(cameraMarkersRef.current).forEach(id => {
       const cam = cameras.find(c => c.id === id)
       if (!cam || !showCameras) {
+        unregisterFanOutMarker(map, cameraMarkersRef.current[id])
         cameraMarkersRef.current[id].remove()
         delete cameraMarkersRef.current[id]
         delete cameraMarkerStateRef.current[id]
@@ -849,6 +863,7 @@ export default function ProjectMapCanvas({
         })
           .setLngLat([cam.longitude, cam.latitude])
           .addTo(map)
+        registerFanOutMarker(map, marker)
 
         cameraMarkerStateRef.current[cam.id] = { isSelected, status: cam.status, tag: cam.camera_id_tag }
 
@@ -1258,6 +1273,7 @@ export default function ProjectMapCanvas({
       const dev = networkDevices.find(d => d.id === id)
       const hasCoords = dev && dev.latitude !== null && dev.longitude !== null
       if (!dev || !hasCoords || !showDevices) {
+        unregisterFanOutMarker(map, deviceMarkersRef.current[id])
         deviceMarkersRef.current[id].remove()
         delete deviceMarkersRef.current[id]
         delete deviceMarkerStateRef.current[id]
@@ -1301,6 +1317,7 @@ export default function ProjectMapCanvas({
         })
           .setLngLat([dev.longitude, dev.latitude])
           .addTo(map)
+        registerFanOutMarker(map, marker)
 
         deviceMarkerStateRef.current[dev.id] = { isSelected, deviceType: dev.device_type, name: dev.name }
 
@@ -1416,6 +1433,7 @@ export default function ProjectMapCanvas({
 
     // 2. Clear old node markers
     Object.keys(fiberNodeMarkersRef.current).forEach(id => {
+      unregisterFanOutMarker(map, fiberNodeMarkersRef.current[id])
       fiberNodeMarkersRef.current[id].remove()
       delete fiberNodeMarkersRef.current[id]
     })
@@ -1522,6 +1540,7 @@ export default function ProjectMapCanvas({
         })
           .setLngLat([node.longitude, node.latitude])
           .addTo(map)
+        registerFanOutMarker(map, marker)
 
         // Click Card
         el.addEventListener('click', (e: MouseEvent) => {
