@@ -71,6 +71,7 @@ export default async function ProjectLayout({ children, params }: ProjectLayoutP
         projectId={projectId}
         projectName={project.name}
         disciplines={disciplines}
+        projectSection={project.project_section}
       />
 
       {/* Main Content Pane */}

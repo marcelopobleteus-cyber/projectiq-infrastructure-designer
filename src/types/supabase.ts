@@ -3500,6 +3500,7 @@ export type Database = {
           name: string
           organization_id: string
           parent_id: string | null
+          project_section: string
           status: Database["public"]["Enums"]["project_status"]
           updated_at: string | null
         }
@@ -3516,6 +3517,7 @@ export type Database = {
           name: string
           organization_id: string
           parent_id?: string | null
+          project_section?: string
           status?: Database["public"]["Enums"]["project_status"]
           updated_at?: string | null
         }
@@ -3532,6 +3534,7 @@ export type Database = {
           name?: string
           organization_id?: string
           parent_id?: string | null
+          project_section?: string
           status?: Database["public"]["Enums"]["project_status"]
           updated_at?: string | null
         }

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { deleteProject, updateProjectStatus, ProjectStatusType } from './actions'
 import ConfirmModal from '@/components/ui/ConfirmModal'
+import { getSectionMeta } from '@/lib/disciplines'
 
 export interface Project {
   id: string
@@ -17,6 +18,7 @@ export interface Project {
   tasksTotal?: number
   tasksComplete?: number
   lastUpdatedBy?: string
+  project_section?: string | null
 }
 
 interface ProjectGridClientProps {
@@ -197,6 +199,17 @@ export default function ProjectGridClient({ initialProjects }: ProjectGridClient
     }
   }
 
+  const renderSectionBadge = (section?: string | null) => {
+    if (!section) return null
+    const meta = getSectionMeta(section)
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-[var(--surface-2)] text-[var(--text-secondary)] border border-[var(--border)]">
+        <span>{meta.icon}</span>
+        {meta.title}
+      </span>
+    )
+  }
+
   const renderTaskProgress = (complete: number = 0, total: number = 0) => {
     if (total === 0) {
       return <span className="text-[11px] text-[var(--text-tertiary)] font-mono">No tasks</span>
@@ -337,6 +350,7 @@ export default function ProjectGridClient({ initialProjects }: ProjectGridClient
                     </h3>
                     <div className="flex items-center gap-2 flex-wrap">
                       {renderStatusBadge(project.status)}
+                      {renderSectionBadge(project.project_section)}
                       {renderTaskProgress(project.tasksComplete, project.tasksTotal)}
                     </div>
                   </div>
@@ -360,7 +374,7 @@ export default function ProjectGridClient({ initialProjects }: ProjectGridClient
                     {openMenuId === project.id && (
                       <div className="absolute right-0 top-full mt-1 bg-[var(--surface-1)] border border-[var(--border-strong)] rounded-lg shadow-lg p-1.5 z-30 w-48 space-y-1 font-sans">
                         <div className="text-[9.5px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider px-2 py-0.5 border-b border-[var(--border)]">
-                          Cambiar Estado
+                          Change Status
                         </div>
 
                         {(['planning', 'in_progress', 'on_hold', 'completed', 'closed'] as ProjectStatusType[]).map((s) => (
@@ -450,6 +464,7 @@ export default function ProjectGridClient({ initialProjects }: ProjectGridClient
                     {project.name}
                   </Link>
                   {renderStatusBadge(project.status)}
+                  {renderSectionBadge(project.project_section)}
                   {renderTaskProgress(project.tasksComplete, project.tasksTotal)}
                 </div>
                 <p className="text-xs text-[var(--text-secondary)] truncate max-w-2xl">
@@ -492,7 +507,7 @@ export default function ProjectGridClient({ initialProjects }: ProjectGridClient
                     {openMenuId === project.id && (
                       <div className="absolute right-0 top-full mt-1 bg-[var(--surface-1)] border border-[var(--border-strong)] rounded-lg shadow-lg p-1.5 z-30 w-48 space-y-1 font-sans">
                         <div className="text-[9.5px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider px-2 py-0.5 border-b border-[var(--border)]">
-                          Cambiar Estado
+                          Change Status
                         </div>
 
                         {(['planning', 'in_progress', 'on_hold', 'completed', 'closed'] as ProjectStatusType[]).map((s) => (

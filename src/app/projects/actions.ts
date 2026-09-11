@@ -4,13 +4,13 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { BYPASS_AUTH } from '@/config/auth'
+import { CANONICAL_DISCIPLINE_IDS, PROJECT_SECTIONS, DEFAULT_PROJECT_SECTION, type ProjectSection } from '@/lib/disciplines'
 
-// Canonical discipline ids — must match DISCIPLINE_OPTIONS in /projects/create,
-// ALL_DISCIPLINES in ProjectSidebar.tsx, and DISCIPLINE_LABELS in
-// overview/PortfolioSection.tsx. The create form now submits one or more
-// 'disciplines' form values directly (a real multi-select) instead of a single
-// preset project_type.
-const CANONICAL_DISCIPLINES = ['cctv', 'fiber', 'conduit', 'networking', 'wireless', 'power', 'lighting']
+// Canonical discipline ids and project sections now live in src/lib/disciplines.ts
+// (single source of truth shared with /projects/create, ProjectSidebar.tsx and
+// overview/PortfolioSection.tsx — used to be duplicated across all 4 files).
+const CANONICAL_DISCIPLINES = CANONICAL_DISCIPLINE_IDS
+const VALID_SECTIONS = PROJECT_SECTIONS.map(s => s.id)
 
 export async function createProject(formData: FormData) {
   const supabase = await createClient()
@@ -74,12 +74,18 @@ export async function createProject(formData: FormData) {
     return { error: 'Select at least one discipline for the project.' }
   }
 
+  const requestedSection = String(formData.get('project_section') || '')
+  const project_section: ProjectSection = VALID_SECTIONS.includes(requestedSection as ProjectSection)
+    ? (requestedSection as ProjectSection)
+    : DEFAULT_PROJECT_SECTION
+
   const { data: project } = await supabase
     .from('projects')
     .insert({
       name,
       description: description || null,
       disciplines,
+      project_section,
       organization_id: orgId,
       default_latitude: latitude,
       default_longitude: longitude,

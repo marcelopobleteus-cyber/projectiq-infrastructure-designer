@@ -1,31 +1,31 @@
 'use client'
 
-import React, { useState, useEffect, useTransition } from 'react'
+import React, { useState, useEffect, useTransition, useMemo } from 'react'
 import Link from 'next/link'
 import { createProject } from '../actions'
 import { createClient } from '@/utils/supabase/client'
-
-// Canonical discipline ids — must match ALL_DISCIPLINES in ProjectSidebar.tsx
-// and DISCIPLINE_LABELS in overview/PortfolioSection.tsx.
-const DISCIPLINE_OPTIONS = [
-  { id: 'cctv', title: 'CCTV & Video Surveillance', subtitle: '4K PTZ cameras, LPR, VLANs, NVRs and FOV coverage', icon: '📹', color: 'border-[var(--accent)]/50 bg-[var(--accent)]/10 text-[var(--accent-text)]', ready: true },
-  { id: 'fiber', title: 'Fiber Optic (OSP / ISP)', subtitle: 'SMF 24F/48F routes, manholes, splices and FDUs', icon: '🌐', color: 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400', ready: true },
-  { id: 'networking', title: 'Networking & Switches', subtitle: 'Industrial PoE switches, racks, patch cords & ports', icon: '🖧', color: 'border-purple-500/50 bg-purple-500/10 text-purple-400', ready: true },
-  { id: 'wireless', title: 'Wireless Links & PTP', subtitle: 'Point-to-point antennas, PtMP, line of sight and Wi-Fi coverage', icon: '📡', color: 'border-cyan-500/50 bg-cyan-500/10 text-cyan-400', ready: true },
-  { id: 'power', title: 'Power & Substations', subtitle: 'AC services, transformers, UPS and wattage load', icon: '⚡', color: 'border-red-500/50 bg-red-500/10 text-red-400', ready: true },
-  { id: 'conduit', title: 'Conduit & Duct Bank', subtitle: 'Duct bank, PVC/HDPE pipe and handholes', icon: '🏗️', color: 'border-amber-500/50 bg-amber-500/10 text-amber-400', ready: false },
-  { id: 'lighting', title: 'Public & Private Lighting', subtitle: 'Smart lighting, poles, LED luminaires and photocells', icon: '💡', color: 'border-yellow-500/50 bg-yellow-500/10 text-yellow-400', ready: false },
-]
-
-const READY_IDS = DISCIPLINE_OPTIONS.filter(d => d.ready).map(d => d.id)
-const ALL_IDS = DISCIPLINE_OPTIONS.map(d => d.id)
+import { PROJECT_SECTIONS, disciplinesForSection, type ProjectSection } from '@/lib/disciplines'
 
 export default function CreateProjectPage() {
   const supabase = createClient()
   const [error, setError] = useState<string | null>(null)
   const [purchasedModuleIds, setPurchasedModuleIds] = useState<string[] | null>(null)
-  const [selectedDisciplines, setSelectedDisciplines] = useState<string[]>(READY_IDS)
+  const [section, setSection] = useState<ProjectSection>('its')
+  const [selectedDisciplines, setSelectedDisciplines] = useState<string[]>([])
   const [isPending, startTransition] = useTransition()
+
+  const sectionDisciplines = useMemo(() => disciplinesForSection(section), [section])
+  const readyIds = useMemo(() => sectionDisciplines.filter(d => d.ready).map(d => d.id), [sectionDisciplines])
+  const allIdsInSection = useMemo(() => sectionDisciplines.map(d => d.id), [sectionDisciplines])
+
+  // Switching section resets the discipline picks to that section's ready-by-default set.
+  useEffect(() => {
+    setSelectedDisciplines(prev => {
+      const carried = prev.filter(id => allIdsInSection.includes(id))
+      return carried.length > 0 ? carried : readyIds
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section])
 
   useEffect(() => {
     async function loadOrgPurchasedModules() {
@@ -71,9 +71,9 @@ export default function CreateProjectPage() {
 
   const selectAllAllowed = () => {
     if (purchasedModuleIds !== null) {
-      setSelectedDisciplines(ALL_IDS.filter(id => purchasedModuleIds.includes(id)))
+      setSelectedDisciplines(allIdsInSection.filter(id => purchasedModuleIds.includes(id)))
     } else {
-      setSelectedDisciplines(ALL_IDS)
+      setSelectedDisciplines(allIdsInSection)
     }
   }
 
@@ -82,11 +82,12 @@ export default function CreateProjectPage() {
     setError(null)
 
     if (selectedDisciplines.length === 0) {
-      setError('Elige al menos una disciplina contratada para el proyecto.')
+      setError('Pick at least one module for this project.')
       return
     }
 
     const formData = new FormData(event.currentTarget)
+    formData.append('project_section', section)
     selectedDisciplines.forEach(d => formData.append('disciplines', d))
 
     startTransition(async () => {
@@ -97,12 +98,74 @@ export default function CreateProjectPage() {
     })
   }
 
+  // Construction / Maintenance sub-headers only apply to the Tower section today.
+  const constructionItems = sectionDisciplines.filter(d => d.group === 'construction')
+  const maintenanceItems = sectionDisciplines.filter(d => d.group === 'maintenance')
+  const ungroupedItems = sectionDisciplines.filter(d => !d.group)
+
+  const renderDisciplineCard = (pt: (typeof sectionDisciplines)[number]) => {
+    const isPurchased = purchasedModuleIds === null || purchasedModuleIds.includes(pt.id)
+    const isSelected = selectedDisciplines.includes(pt.id)
+
+    return (
+      <button
+        type="button"
+        key={pt.id}
+        onClick={() => toggleDiscipline(pt.id)}
+        disabled={!isPurchased}
+        aria-pressed={isSelected}
+        className={`p-3.5 rounded-xl border text-left transition-all flex items-start gap-3 relative ${
+          !isPurchased
+            ? 'opacity-50 border-[var(--border)] bg-[var(--surface-2)] cursor-not-allowed text-[var(--text-tertiary)]'
+            : isSelected
+            ? `${pt.color} ring-1 ring-indigo-500/30`
+            : 'border-[var(--border)] bg-[var(--surface-2)] text-[var(--text-secondary)] hover:border-slate-700 hover:bg-[var(--surface-1)] cursor-pointer'
+        }`}
+      >
+        <span
+          className={`mt-0.5 w-4 h-4 rounded-md border shrink-0 flex items-center justify-center ${
+            !isPurchased
+              ? 'border-slate-700 bg-slate-800'
+              : isSelected
+              ? 'bg-[var(--accent)] text-white border-indigo-400'
+              : 'border-slate-600'
+          }`}
+        >
+          {isSelected && (
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          )}
+        </span>
+        <span className="text-xl shrink-0">{pt.icon}</span>
+        <div className="min-w-0 flex-1">
+          <div className={`text-xs font-bold flex items-center gap-1.5 ${isSelected ? 'text-white' : 'text-[var(--text-primary)]'}`}>
+            {pt.title}
+            {!isPurchased && (
+              <span className="text-[8.5px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 tracking-wide">
+                Not purchased
+              </span>
+            )}
+            {isPurchased && !pt.ready && (
+              <span className="text-[8.5px] font-black uppercase px-1.5 py-0.5 rounded bg-slate-800 text-[var(--text-secondary)] tracking-wide">
+                Under construction
+              </span>
+            )}
+          </div>
+          <div className="text-[11px] text-[var(--text-secondary)] mt-0.5 leading-tight">
+            {pt.subtitle}
+          </div>
+        </div>
+      </button>
+    )
+  }
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">Create Infrastructure Project</h1>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">Configure project metadata, engineering scope, and default map coordinates.</p>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">Choose the product line, engineering scope, and default map coordinates.</p>
         </div>
       </div>
 
@@ -114,84 +177,81 @@ export default function CreateProjectPage() {
             </div>
           )}
 
-          {/* Disciplines Selection with Commercial Gating */}
+          {/* Step 1 — Product line / section */}
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <label className="block text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider">
-                Project Disciplines
-                <span className="ml-2 text-[var(--text-tertiary)] normal-case font-normal">pick one or more, according to your plan</span>
-              </label>
-              <div className="flex items-center gap-3 text-[11px] font-semibold">
-                <button type="button" onClick={selectAllAllowed} className="text-[var(--accent-text)] hover:text-indigo-300">
-                  Todas las contratadas
-                </button>
-                <span className="text-slate-700">•</span>
-                <button type="button" onClick={() => setSelectedDisciplines([])} className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">
-                  Ninguna
-                </button>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {DISCIPLINE_OPTIONS.map(pt => {
-                const isPurchased = purchasedModuleIds === null || purchasedModuleIds.includes(pt.id)
-                const isSelected = selectedDisciplines.includes(pt.id)
-
+            <label className="block text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider mb-3">
+              Product Line
+              <span className="ml-2 text-[var(--text-tertiary)] normal-case font-normal">what kind of project is this?</span>
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {PROJECT_SECTIONS.map(s => {
+                const isActive = section === s.id
                 return (
                   <button
                     type="button"
-                    key={pt.id}
-                    onClick={() => toggleDiscipline(pt.id)}
-                    disabled={!isPurchased}
-                    aria-pressed={isSelected}
-                    className={`p-3.5 rounded-xl border text-left transition-all flex items-start gap-3 relative ${
-                      !isPurchased
-                        ? 'opacity-50 border-[var(--border)] bg-[var(--surface-2)] cursor-not-allowed text-[var(--text-tertiary)]'
-                        : isSelected
-                        ? `${pt.color} ring-1 ring-indigo-500/30`
-                        : 'border-[var(--border)] bg-[var(--surface-2)] text-[var(--text-secondary)] hover:border-slate-700 hover:bg-[var(--surface-1)] cursor-pointer'
+                    key={s.id}
+                    onClick={() => setSection(s.id)}
+                    aria-pressed={isActive}
+                    className={`p-4 rounded-xl border text-left transition-all flex flex-col gap-1.5 cursor-pointer ${
+                      isActive
+                        ? 'border-[var(--accent)] bg-[var(--accent)]/10 ring-1 ring-indigo-500/30'
+                        : 'border-[var(--border)] bg-[var(--surface-2)] hover:border-slate-700 hover:bg-[var(--surface-1)]'
                     }`}
                   >
-                    <span
-                      className={`mt-0.5 w-4 h-4 rounded-md border shrink-0 flex items-center justify-center ${
-                        !isPurchased
-                          ? 'border-slate-700 bg-slate-800'
-                          : isSelected
-                          ? 'bg-[var(--accent)] text-white border-indigo-400'
-                          : 'border-slate-600'
-                      }`}
-                    >
-                      {isSelected && (
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      )}
-                    </span>
-                    <span className="text-xl shrink-0">{pt.icon}</span>
-                    <div className="min-w-0 flex-1">
-                      <div className={`text-xs font-bold flex items-center gap-1.5 ${isSelected ? 'text-white' : 'text-[var(--text-primary)]'}`}>
-                        {pt.title}
-                        {!isPurchased && (
-                          <span className="text-[8.5px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 tracking-wide">
-                            No contratado
-                          </span>
-                        )}
-                        {isPurchased && !pt.ready && (
-                          <span className="text-[8.5px] font-black uppercase px-1.5 py-0.5 rounded bg-slate-800 text-[var(--text-secondary)] tracking-wide">
-                            En desarrollo
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-[var(--text-secondary)] mt-0.5 leading-tight">
-                        {pt.subtitle}
-                      </div>
-                    </div>
+                    <span className="text-2xl">{s.icon}</span>
+                    <span className={`text-xs font-bold ${isActive ? 'text-[var(--accent-text)]' : 'text-[var(--text-primary)]'}`}>{s.title}</span>
+                    <span className="text-[11px] text-[var(--text-secondary)] leading-tight">{s.subtitle}</span>
                   </button>
                 )
               })}
             </div>
-            {selectedDisciplines.some(d => !READY_IDS.includes(d)) && (
-              <p className="text-[10.5px] text-amber-400 mt-2">
-                Disciplines marked &ldquo;In development&rdquo; are saved to the project, but their work module is not built in the app yet.
+          </div>
+
+          {/* Step 2 — Modules within the chosen section */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <label className="block text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider">
+                Project Modules
+                <span className="ml-2 text-[var(--text-tertiary)] normal-case font-normal">pick one or more, according to your plan</span>
+              </label>
+              <div className="flex items-center gap-3 text-[11px] font-semibold">
+                <button type="button" onClick={selectAllAllowed} className="text-[var(--accent-text)] hover:text-indigo-300">
+                  Select all purchased
+                </button>
+                <span className="text-slate-700">•</span>
+                <button type="button" onClick={() => setSelectedDisciplines([])} className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">
+                  Clear
+                </button>
+              </div>
+            </div>
+
+            {ungroupedItems.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {ungroupedItems.map(renderDisciplineCard)}
+              </div>
+            )}
+
+            {constructionItems.length > 0 && (
+              <div className="mt-4">
+                <div className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider mb-2">Construction</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {constructionItems.map(renderDisciplineCard)}
+                </div>
+              </div>
+            )}
+
+            {maintenanceItems.length > 0 && (
+              <div className="mt-4">
+                <div className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider mb-2">Maintenance</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {maintenanceItems.map(renderDisciplineCard)}
+                </div>
+              </div>
+            )}
+
+            {selectedDisciplines.some(d => !sectionDisciplines.find(sd => sd.id === d)?.ready) && (
+              <p className="text-[10.5px] text-amber-400 mt-3">
+                Modules marked &ldquo;Under construction&rdquo; are saved to the project so its full scope is visible, but their work module is not built in the app yet.
               </p>
             )}
           </div>

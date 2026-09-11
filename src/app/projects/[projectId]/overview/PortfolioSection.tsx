@@ -4,6 +4,7 @@ import React, { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { linkProjectToParent, type PortfolioData } from '../../actions'
+import { DISCIPLINE_SHORT_LABELS } from '@/lib/disciplines'
 
 interface PortfolioSectionProps {
   projectId: string
@@ -12,16 +13,6 @@ interface PortfolioSectionProps {
 
 const currency = (n: number) =>
   n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
-
-const DISCIPLINE_LABELS: Record<string, string> = {
-  cctv: 'CCTV',
-  fiber: 'Fibra',
-  conduit: 'Conduit',
-  networking: 'Networking',
-  wireless: 'Wireless',
-  power: 'Power',
-  lighting: 'Alumbrado',
-}
 
 function DisciplineBadges({ disciplines }: { disciplines: string[] }) {
   if (!disciplines.length) return null
@@ -32,7 +23,7 @@ function DisciplineBadges({ disciplines }: { disciplines: string[] }) {
           key={d}
           className="text-[8.5px] font-black uppercase px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-[var(--text-tertiary)] dark:text-[var(--text-secondary)] tracking-wide"
         >
-          {DISCIPLINE_LABELS[d] || d}
+          {DISCIPLINE_SHORT_LABELS[d] || d}
         </span>
       ))}
     </div>

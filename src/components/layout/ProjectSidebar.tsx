@@ -4,43 +4,52 @@ import React, { useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { updateProjectDisciplines } from '@/app/projects/actions'
+import { DISCIPLINES, getSectionMeta, type ProjectSection } from '@/lib/disciplines'
 
 interface ProjectSidebarProps {
   projectId: string
   projectName: string
   disciplines: string[]
+  projectSection?: ProjectSection
 }
 
-const ALL_DISCIPLINES: { id: string; name: string; href: string; icon: React.ReactNode; ready: boolean }[] = [
-  {
-    id: 'cctv', name: 'CCTV & Videovigilancia', href: 'cameras', ready: true,
-    icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>,
-  },
-  {
-    id: 'fiber', name: 'Fiber Optic (OSP/ISP)', href: 'fiber', ready: true,
-    icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0z"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg>,
-  },
-  {
-    id: 'conduit', name: 'Conduit & Duct Bank', href: 'fiber', ready: true,
-    icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h6a4 4 0 0 1 4 4v4a4 4 0 0 0 4 4h2"/><circle cx="4" cy="6" r="2"/><circle cx="20" cy="18" r="2"/></svg>,
-  },
-  {
-    id: 'networking', name: 'Networking & Switches', href: 'network', ready: true,
-    icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M12 8v8"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/></svg>,
-  },
-  {
-    id: 'wireless', name: 'Enlaces Wireless & PTP', href: 'wireless', ready: true,
-    icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>,
-  },
-  {
-    id: 'power', name: 'Power & Substations', href: 'power', ready: true,
-    icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
-  },
-  {
-    id: 'lighting', name: 'Street Lighting (In development)', href: '', ready: false,
-    icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6M10 22h4M12 2a6 6 0 0 0-4 10.5c.6.55 1 1.36 1 2.5h6c0-1.14.4-1.95 1-2.5A6 6 0 0 0 12 2z"/></svg>,
-  },
-]
+function disciplineIcon(id: string): React.ReactNode {
+  switch (id) {
+    case 'cctv':
+      return <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+    case 'fiber':
+      return <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0z"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg>
+    case 'conduit':
+      return <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h6a4 4 0 0 1 4 4v4a4 4 0 0 0 4 4h2"/><circle cx="4" cy="6" r="2"/><circle cx="20" cy="18" r="2"/></svg>
+    case 'networking':
+      return <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M12 8v8"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/></svg>
+    case 'wireless':
+      return <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>
+    case 'power':
+      return <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+    case 'lighting':
+      return <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6M10 22h4M12 2a6 6 0 0 0-4 10.5c.6.55 1 1.36 1 2.5h6c0-1.14.4-1.95 1-2.5A6 6 0 0 0 12 2z"/></svg>
+    case 'traffic_signal':
+      return <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="1" width="6" height="16" rx="3"/><circle cx="12" cy="5" r="1.2" fill="currentColor"/><circle cx="12" cy="9" r="1.2" fill="currentColor"/><circle cx="12" cy="13" r="1.2" fill="currentColor"/><path d="M12 17v6"/></svg>
+    default:
+      // Tower construction/maintenance items share one icon — distinct route/label is enough.
+      return <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2 4 10l8 4 8-4-8-8z"/><path d="M4 14l8 4 8-4"/><path d="M12 18v4"/></svg>
+  }
+}
+
+// ALL_DISCIPLINES used to be its own hand-maintained array here, duplicated
+// against 3 other files. Now it's derived from the single shared catalog in
+// src/lib/disciplines.ts (only the id/title/href/ready/group fields this
+// component needs).
+const ALL_DISCIPLINES: { id: string; name: string; href: string; icon: React.ReactNode; ready: boolean; group?: 'construction' | 'maintenance' }[] =
+  DISCIPLINES.map(d => ({
+    id: d.id,
+    name: d.ready ? d.title : `${d.title} (Under construction)`,
+    href: d.href,
+    icon: disciplineIcon(d.id),
+    ready: d.ready,
+    group: d.group,
+  }))
 
 // Routes that need every pixel of horizontal space for the map/canvas —
 // the sidebar collapses to icons here even if the user pinned it open
@@ -50,7 +59,7 @@ const CANVAS_ROUTE_PATTERN = /\/(maps|cameras|fiber|network|wireless|power)(\/|$
 const EXPANDED_WIDTH = 222
 const COLLAPSED_WIDTH = 56
 
-export default function ProjectSidebar({ projectId, projectName, disciplines }: ProjectSidebarProps) {
+export default function ProjectSidebar({ projectId, projectName, disciplines, projectSection }: ProjectSidebarProps) {
   const pathname = usePathname()
   const [showAddMenu, setShowAddMenu] = useState(false)
   const [activeDisciplines, setActiveDisciplines] = useState<string[]>(disciplines)
@@ -100,31 +109,38 @@ export default function ProjectSidebar({ projectId, projectName, disciplines }: 
   const getDisciplineBadge = () => {
     if (activeDisciplines.length === 1) {
       const disc = ALL_DISCIPLINES.find(d => d.id === activeDisciplines[0])
-      return { title: disc?.name || 'Proyecto Especializado' }
+      return { title: disc?.name || 'Specialized Project' }
     }
-    return { title: `Multi-Discipline (${activeDisciplines.length} modules)` }
+    const sectionTitle = projectSection ? getSectionMeta(projectSection).title : null
+    return { title: sectionTitle || `Multi-Discipline (${activeDisciplines.length} modules)` }
   }
 
   const badge = getDisciplineBadge()
 
-  const designItems = ALL_DISCIPLINES
-    .filter(d => activeDisciplines.includes(d.id))
-    .map(d => ({
-      id: d.id,
-      label: d.name,
-      href: d.ready ? `/projects/${projectId}/${d.href}` : '#',
-      active: d.ready && pathname === `/projects/${projectId}/${d.href}`,
-      disabled: !d.ready,
-      icon: d.icon,
-    }))
+  // Not-ready modules still get a real link to their "Under construction"
+  // stub page — visible AND clickable, per Marcelo's ask that the full
+  // scope of the product line be obvious even before a module is built.
+  const toNavItem = (d: (typeof ALL_DISCIPLINES)[number]) => ({
+    id: d.id,
+    label: d.name,
+    href: `/projects/${projectId}/${d.href}`,
+    active: pathname === `/projects/${projectId}/${d.href}`,
+    disabled: false,
+    icon: d.icon,
+  })
+
+  const activeItems = ALL_DISCIPLINES.filter(d => activeDisciplines.includes(d.id))
+  const designItems = activeItems.filter(d => !d.group).map(toNavItem)
+  const constructionItems = activeItems.filter(d => d.group === 'construction').map(toNavItem)
+  const maintenanceItems = activeItems.filter(d => d.group === 'maintenance').map(toNavItem)
 
   const categories = [
     {
-      label: 'VISTA PRINCIPAL',
+      label: 'MAIN VIEW',
       items: [
         {
           id: 'overview',
-          label: 'Dashboard del Proyecto',
+          label: 'Project Dashboard',
           href: `/projects/${projectId}/overview`,
           active: pathname === `/projects/${projectId}/overview` || pathname === `/projects/${projectId}`,
           icon: (
@@ -133,7 +149,7 @@ export default function ProjectSidebar({ projectId, projectName, disciplines }: 
         },
         {
           id: 'maps',
-          label: 'Mapa GIS Interactivo',
+          label: 'Interactive GIS Map',
           href: `/projects/${projectId}/maps`,
           active: pathname === `/projects/${projectId}/maps`,
           icon: (
@@ -151,10 +167,18 @@ export default function ProjectSidebar({ projectId, projectName, disciplines }: 
         },
       ]
     },
-    {
+    ...(designItems.length > 0 ? [{
       label: 'PROJECT MODULES',
       items: designItems
-    },
+    }] : []),
+    ...(constructionItems.length > 0 ? [{
+      label: 'CONSTRUCTION',
+      items: constructionItems
+    }] : []),
+    ...(maintenanceItems.length > 0 ? [{
+      label: 'MAINTENANCE',
+      items: maintenanceItems
+    }] : []),
     {
       label: 'OPERATIONS & DELIVERABLES',
       items: [
@@ -277,12 +301,9 @@ export default function ProjectSidebar({ projectId, projectName, disciplines }: 
                   <button
                     key={d.id}
                     type="button"
-                    onClick={() => d.ready && toggleDiscipline(d.id)}
-                    disabled={!d.ready}
+                    onClick={() => toggleDiscipline(d.id)}
                     className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] transition-all cursor-pointer ${
-                      !d.ready
-                        ? 'text-[var(--text-tertiary)] opacity-50 cursor-not-allowed'
-                        : active
+                      active
                         ? 'bg-[var(--accent-soft)] text-[var(--accent-text)] font-semibold'
                         : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]'
                     }`}
