@@ -6,8 +6,10 @@ import * as maplibregl from 'maplibre-gl'
  * el de encima tapa a los demas por completo -- en la practica, "se esconde
  * el icono de la camara". Este modulo agrupa visualmente los marcadores que
  * quedan a menos de CLUSTER_PIXEL_THRESHOLD px entre si en una burbuja con
- * contador; al pasar el mouse o hacer clic, se abren en abanico alrededor
- * del punto para que cada uno sea clickeable por separado (los listeners de
+ * contador; al hacer clic en la burbuja se abren en abanico alrededor del
+ * punto para que cada uno sea clickeable por separado, y quedan abiertos
+ * hasta que se hace clic de nuevo (en la burbuja, otro grupo, o el mapa
+ * vacio) -- no hay comportamiento de hover (los listeners de
  * clic originales de cada marcador se mantienen intactos: solo movemos su
  * offset en pantalla via marker.setOffset(), nunca reemplazamos el elemento
  * ni tocamos su transform directamente).
@@ -21,7 +23,6 @@ import * as maplibregl from 'maplibre-gl'
  */
 
 const CLUSTER_PIXEL_THRESHOLD = 22
-const COLLAPSE_DELAY_MS = 350
 
 type Point = { x: number; y: number }
 
@@ -78,14 +79,11 @@ const COUNT_COLOR = '#f59e0b'
 
 export function attachMarkerFanOut(map: maplibregl.Map): () => void {
   const badgesByKey = new Map<string, HTMLDivElement>()
-  const badgeEnterHandlers = new WeakMap<HTMLDivElement, () => void>()
+  // El grupo abierto se mantiene abierto hasta que el usuario hace clic de
+  // nuevo (en la burbuja ya abierta, en otro grupo, o en un punto vacio del
+  // mapa). No hay comportamiento de hover: el mouse pasando por encima no
+  // abre ni cierra nada, solo el clic.
   let expandedKey: string | null = null
-  // 'click' se mantiene abierto hasta que el usuario hace clic de nuevo (en
-  // la burbuja, en otro grupo, o en un punto vacio del mapa). 'hover' se
-  // cierra solo, un rato despues de que el mouse sale del grupo.
-  let expandedBy: 'click' | 'hover' | null = null
-  let hoverDepth = 0
-  let collapseTimer: ReturnType<typeof setTimeout> | null = null
   let syncScheduled = false
   let syncTimer: ReturnType<typeof setInterval> | null = null
 
@@ -105,43 +103,6 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
   spokesSvg.style.overflow = 'visible'
   container.appendChild(spokesSvg)
 
-  const cancelCollapse = () => {
-    if (collapseTimer) {
-      clearTimeout(collapseTimer)
-      collapseTimer = null
-    }
-  }
-
-  const scheduleCollapse = () => {
-    // Un clic deja el grupo abierto a proposito: no lo cierra el mouse
-    // saliendo, solo otro clic (en la burbuja, otro grupo, o el mapa vacio).
-    if (expandedBy === 'click') return
-    cancelCollapse()
-    collapseTimer = setTimeout(() => {
-      if (hoverDepth <= 0) {
-        expandedKey = null
-        expandedBy = null
-        sync()
-      }
-    }, COLLAPSE_DELAY_MS)
-  }
-
-  const onClusterEnter = (key: string) => {
-    hoverDepth++
-    cancelCollapse()
-    // Pasar el mouse por encima tambien abre el abanico, aunque no se haga
-    // clic (para grupos que todavia no estan abiertos por clic).
-    if (expandedKey !== key) {
-      expandedKey = key
-      expandedBy = 'hover'
-      sync()
-    }
-  }
-  const onClusterLeave = () => {
-    hoverDepth = Math.max(0, hoverDepth - 1)
-    scheduleCollapse()
-  }
-
   function ensureBadge(key: string, count: number): HTMLDivElement {
     let badge = badgesByKey.get(key)
     if (badge) return badge
@@ -156,7 +117,7 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
     badge.style.cursor = 'pointer'
     badge.style.pointerEvents = 'auto'
     badge.style.userSelect = 'none'
-    badge.title = 'Multiple items here - click or hover to expand'
+    badge.title = 'Multiple items here - click to expand'
 
     // Circulo principal con degrade + icono de "capas" (varios elementos
     // en un mismo punto), y un contador tipo notificacion en la esquina.
@@ -182,26 +143,11 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
         box-shadow:0 1px 4px rgba(0,0,0,0.35);
       ">${count}</div>
     `
-    const enterHandler = () => onClusterEnter(key)
-    badgeEnterHandlers.set(badge, enterHandler)
-    badge.addEventListener('mouseenter', enterHandler)
-    badge.addEventListener('mouseleave', onClusterLeave)
     badge.addEventListener('click', (e) => {
       e.stopPropagation()
-      // Un mouse real dispara "mouseenter" (que ya abre el grupo en modo
-      // 'hover') justo antes del "click". Si solo comparamos contra
-      // expandedKey, el clic ve que "ya esta abierto" y lo cierra al
-      // toque - exactamente el bug reportado. Por eso el cierre por clic
-      // solo pasa si YA estaba abierto en modo 'click' (un clic anterior
-      // real, no el hover automatico que acaba de ocurrir); si estaba
-      // abierto por hover, el clic lo "confirma" como abierto y pegajoso.
-      if (expandedKey === key && expandedBy === 'click') {
-        expandedKey = null
-        expandedBy = null
-      } else {
-        expandedKey = key
-        expandedBy = 'click'
-      }
+      // Toggle simple: un clic en una burbuja ya abierta la cierra, un
+      // clic en cualquier otra la abre (y cierra la anterior si habia una).
+      expandedKey = expandedKey === key ? null : key
       sync()
     })
     container.appendChild(badge)
@@ -212,23 +158,10 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
   function removeUnusedBadges(activeKeys: Set<string>) {
     badgesByKey.forEach((badge, key) => {
       if (!activeKeys.has(key)) {
-        const enterHandler = badgeEnterHandlers.get(badge)
-        if (enterHandler) badge.removeEventListener('mouseenter', enterHandler)
-        badgeEnterHandlers.delete(badge)
-        badge.removeEventListener('mouseleave', onClusterLeave)
         badge.remove()
         badgesByKey.delete(key)
       }
     })
-  }
-
-  const hoverBoundEls = new WeakSet<HTMLElement>()
-  function bindMemberHover(marker: maplibregl.Marker, key: string) {
-    const el = marker.getElement()
-    if (hoverBoundEls.has(el)) return
-    hoverBoundEls.add(el)
-    el.addEventListener('mouseenter', () => onClusterEnter(key))
-    el.addEventListener('mouseleave', onClusterLeave)
   }
 
   function sync() {
@@ -314,7 +247,6 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
         const offsets = fanOffsets(group.length)
         group.forEach((marker, i) => {
           const el = marker.getElement()
-          bindMemberHover(marker, key)
           if (isExpanded) {
             el.style.visibility = ''
             el.style.pointerEvents = ''
@@ -354,7 +286,6 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
       removeUnusedBadges(activeKeys)
       if (expandedKey && !activeKeys.has(expandedKey)) {
         expandedKey = null
-        expandedBy = null
       }
     } catch (err) {
       // Nunca dejar que un fallo aca rompa el resto del mapa.
@@ -379,7 +310,6 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
   const collapseOnMapClick = () => {
     if (expandedKey) {
       expandedKey = null
-      expandedBy = null
       sync()
     }
   }
@@ -398,7 +328,6 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
     map.off('resize', scheduleSync)
     map.off('render', scheduleSync)
     map.off('click', collapseOnMapClick)
-    cancelCollapse()
     badgesByKey.forEach(badge => badge.remove())
     badgesByKey.clear()
     spokesSvg.remove()
