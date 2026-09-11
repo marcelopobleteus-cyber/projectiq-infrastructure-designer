@@ -68,6 +68,35 @@ function haversineDistanceFeet(lat1: number, lon1: number, lat2: number, lon2: n
 
 // ─── 1. Get fiber design data ────────────────────────────────────────────────
 
+// PostgREST/Supabase caps a single select() at a default max-rows limit
+// (1000). Projects with dense fiber routes can easily have more segments
+// than that (e.g. 1800+), so a plain .select('*') silently truncates the
+// result and several routes end up with zero segments returned — they
+// simply don't draw on the map, with no error anywhere. This paginates
+// through with .range() until a page comes back short of the page size.
+async function fetchAllFiberRouteSegments(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  projectId: string
+) {
+  const pageSize = 1000
+  let allRows: any[] = []
+  let from = 0
+  while (true) {
+    const { data, error }: { data: any[] | null; error: any } = await (supabase
+      .from('fiber_route_segments') as any)
+      .select('*')
+      .eq('project_id', projectId)
+      .order('segment_index')
+      .range(from, from + pageSize - 1)
+
+    if (error) return { data: allRows, error }
+    allRows = allRows.concat(data ?? [])
+    if (!data || data.length < pageSize) break
+    from += pageSize
+  }
+  return { data: allRows, error: null }
+}
+
 export async function getFiberDesignData(projectId: string) {
   const supabase = await createClient()
 
@@ -97,7 +126,7 @@ export async function getFiberDesignData(projectId: string) {
   ] = await Promise.all([
     supabase.from('fiber_nodes').select('*').eq('project_id', projectId).order('node_tag'),
     supabase.from('fiber_routes').select('*').eq('project_id', projectId).order('route_id_tag'),
-    supabase.from('fiber_route_segments').select('*').eq('project_id', projectId).order('segment_index'),
+    fetchAllFiberRouteSegments(supabase, projectId),
     supabase.from('fiber_cables').select('*').eq('project_id', projectId).order('cable_tag'),
     supabase.from('fiber_strands').select('*').eq('project_id', projectId).order('strand_number'),
     supabase.from('fiber_enclosures').select('*').eq('project_id', projectId).order('enclosure_tag'),

@@ -1565,15 +1565,28 @@ export default function ProjectMapCanvas({
         const segs = fiberRouteSegments.filter(s => s.route_id === route.id)
         const points: [number, number][] = []
         segs.forEach(s => {
-          points.push([s.start_longitude, s.start_latitude])
-          points.push([s.end_longitude, s.end_latitude])
+          // Un segmento con coordenadas nulas rompia el LineString y tiraba
+          // toda la capa de rutas abajo (ninguna ruta se dibujaba, no solo
+          // esta). MapPolylineRenderer.tsx ya filtraba esto; esta copia no.
+          if (s.start_latitude !== null && s.start_longitude !== null) {
+            points.push([s.start_longitude, s.start_latitude])
+          }
+          if (s.end_latitude !== null && s.end_longitude !== null) {
+            points.push([s.end_longitude, s.end_latitude])
+          }
         })
 
         if (points.length === 0) return
 
         const strokeCol = getRouteColor(route)
         const layerId = `fiber-route-${route.id}`
-        addLineLayer(map, layerId, points, strokeCol, { width: 4, opacity: 0.8 })
+        try {
+          addLineLayer(map, layerId, points, strokeCol, { width: 4, opacity: 0.8 })
+        } catch (err) {
+          // Una ruta con geometria invalida no debe tumbar las demas.
+          console.error('Failed to draw fiber route', route.id, err)
+          return
+        }
 
         map.on('click', layerId, (e: maplibregl.MapMouseEvent) => {
           const cable = fiberCables.find(c => c.route_id === route.id)
