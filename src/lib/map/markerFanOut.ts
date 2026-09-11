@@ -188,7 +188,14 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
     badge.addEventListener('mouseleave', onClusterLeave)
     badge.addEventListener('click', (e) => {
       e.stopPropagation()
-      if (expandedKey === key) {
+      // Un mouse real dispara "mouseenter" (que ya abre el grupo en modo
+      // 'hover') justo antes del "click". Si solo comparamos contra
+      // expandedKey, el clic ve que "ya esta abierto" y lo cierra al
+      // toque - exactamente el bug reportado. Por eso el cierre por clic
+      // solo pasa si YA estaba abierto en modo 'click' (un clic anterior
+      // real, no el hover automatico que acaba de ocurrir); si estaba
+      // abierto por hover, el clic lo "confirma" como abierto y pegajoso.
+      if (expandedKey === key && expandedBy === 'click') {
         expandedKey = null
         expandedBy = null
       } else {

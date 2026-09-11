@@ -1,0 +1,1297 @@
+diff --git a/marker-fanout-v4.patch b/marker-fanout-v4.patch
+deleted file mode 100644
+index adb14b2..0000000
+--- a/marker-fanout-v4.patch
++++ /dev/null
+@@ -1,1271 +0,0 @@
+-diff --git a/marker-fanout-v3.patch b/marker-fanout-v3.patch
+-deleted file mode 100644
+-index a20be37..0000000
+---- a/marker-fanout-v3.patch
+-+++ /dev/null
+-@@ -1,1105 +0,0 @@
+--diff --git a/marker-fanout-v2.patch b/marker-fanout-v2.patch
+--deleted file mode 100644
+--index 36b0850..0000000
+----- a/marker-fanout-v2.patch
+--+++ /dev/null
+--@@ -1,979 +0,0 @@
+---diff --git a/fiber-route-fix.patch b/fiber-route-fix.patch
+---deleted file mode 100644
+---index d1e642a..0000000
+------ a/fiber-route-fix.patch
+---+++ /dev/null
+---@@ -1,85 +0,0 @@
+----diff --git a/src/app/projects/[projectId]/ProjectMapCanvas.tsx b/src/app/projects/[projectId]/ProjectMapCanvas.tsx
+----index 6be507b..68fb03b 100644
+------- a/src/app/projects/[projectId]/ProjectMapCanvas.tsx
+----+++ b/src/app/projects/[projectId]/ProjectMapCanvas.tsx
+----@@ -1565,15 +1565,28 @@ export default function ProjectMapCanvas({
+----         const segs = fiberRouteSegments.filter(s => s.route_id === route.id)
+----         const points: [number, number][] = []
+----         segs.forEach(s => {
+-----          points.push([s.start_longitude, s.start_latitude])
+-----          points.push([s.end_longitude, s.end_latitude])
+----+          // Un segmento con coordenadas nulas rompia el LineString y tiraba
+----+          // toda la capa de rutas abajo (ninguna ruta se dibujaba, no solo
+----+          // esta). MapPolylineRenderer.tsx ya filtraba esto; esta copia no.
+----+          if (s.start_latitude !== null && s.start_longitude !== null) {
+----+            points.push([s.start_longitude, s.start_latitude])
+----+          }
+----+          if (s.end_latitude !== null && s.end_longitude !== null) {
+----+            points.push([s.end_longitude, s.end_latitude])
+----+          }
+----         })
+---- 
+----         if (points.length === 0) return
+---- 
+----         const strokeCol = getRouteColor(route)
+----         const layerId = `fiber-route-${route.id}`
+-----        addLineLayer(map, layerId, points, strokeCol, { width: 4, opacity: 0.8 })
+----+        try {
+----+          addLineLayer(map, layerId, points, strokeCol, { width: 4, opacity: 0.8 })
+----+        } catch (err) {
+----+          // Una ruta con geometria invalida no debe tumbar las demas.
+----+          console.error('Failed to draw fiber route', route.id, err)
+----+          return
+----+        }
+---- 
+----         map.on('click', layerId, (e: maplibregl.MapMouseEvent) => {
+----           const cable = fiberCables.find(c => c.route_id === route.id)
+----diff --git a/src/app/projects/actions-fiber.ts b/src/app/projects/actions-fiber.ts
+----index e3c56a7..8eac57c 100644
+------- a/src/app/projects/actions-fiber.ts
+----+++ b/src/app/projects/actions-fiber.ts
+----@@ -68,6 +68,35 @@ function haversineDistanceFeet(lat1: number, lon1: number, lat2: number, lon2: n
+---- 
+---- // ─── 1. Get fiber design data ────────────────────────────────────────────────
+---- 
+----+// PostgREST/Supabase caps a single select() at a default max-rows limit
+----+// (1000). Projects with dense fiber routes can easily have more segments
+----+// than that (e.g. 1800+), so a plain .select('*') silently truncates the
+----+// result and several routes end up with zero segments returned — they
+----+// simply don't draw on the map, with no error anywhere. This paginates
+----+// through with .range() until a page comes back short of the page size.
+----+async function fetchAllFiberRouteSegments(
+----+  supabase: Awaited<ReturnType<typeof createClient>>,
+----+  projectId: string
+----+) {
+----+  const pageSize = 1000
+----+  let allRows: any[] = []
+----+  let from = 0
+----+  while (true) {
+----+    const { data, error }: { data: any[] | null; error: any } = await (supabase
+----+      .from('fiber_route_segments') as any)
+----+      .select('*')
+----+      .eq('project_id', projectId)
+----+      .order('segment_index')
+----+      .range(from, from + pageSize - 1)
+----+
+----+    if (error) return { data: allRows, error }
+----+    allRows = allRows.concat(data ?? [])
+----+    if (!data || data.length < pageSize) break
+----+    from += pageSize
+----+  }
+----+  return { data: allRows, error: null }
+----+}
+----+
+---- export async function getFiberDesignData(projectId: string) {
+----   const supabase = await createClient()
+---- 
+----@@ -97,7 +126,7 @@ export async function getFiberDesignData(projectId: string) {
+----   ] = await Promise.all([
+----     supabase.from('fiber_nodes').select('*').eq('project_id', projectId).order('node_tag'),
+----     supabase.from('fiber_routes').select('*').eq('project_id', projectId).order('route_id_tag'),
+-----    supabase.from('fiber_route_segments').select('*').eq('project_id', projectId).order('segment_index'),
+----+    fetchAllFiberRouteSegments(supabase, projectId),
+----     supabase.from('fiber_cables').select('*').eq('project_id', projectId).order('cable_tag'),
+----     supabase.from('fiber_strands').select('*').eq('project_id', projectId).order('strand_number'),
+----     supabase.from('fiber_enclosures').select('*').eq('project_id', projectId).order('enclosure_tag'),
+---diff --git a/marker-fanout.patch b/marker-fanout.patch
+---deleted file mode 100644
+---index 8373aa6..0000000
+------ a/marker-fanout.patch
+---+++ /dev/null
+---@@ -1,466 +0,0 @@
+----diff --git a/fiber-route-fix.patch b/fiber-route-fix.patch
+----deleted file mode 100644
+----index d1e642a..0000000
+------- a/fiber-route-fix.patch
+----+++ /dev/null
+----@@ -1,85 +0,0 @@
+-----diff --git a/src/app/projects/[projectId]/ProjectMapCanvas.tsx b/src/app/projects/[projectId]/ProjectMapCanvas.tsx
+-----index 6be507b..68fb03b 100644
+-------- a/src/app/projects/[projectId]/ProjectMapCanvas.tsx
+-----+++ b/src/app/projects/[projectId]/ProjectMapCanvas.tsx
+-----@@ -1565,15 +1565,28 @@ export default function ProjectMapCanvas({
+-----         const segs = fiberRouteSegments.filter(s => s.route_id === route.id)
+-----         const points: [number, number][] = []
+-----         segs.forEach(s => {
+------          points.push([s.start_longitude, s.start_latitude])
+------          points.push([s.end_longitude, s.end_latitude])
+-----+          // Un segmento con coordenadas nulas rompia el LineString y tiraba
+-----+          // toda la capa de rutas abajo (ninguna ruta se dibujaba, no solo
+-----+          // esta). MapPolylineRenderer.tsx ya filtraba esto; esta copia no.
+-----+          if (s.start_latitude !== null && s.start_longitude !== null) {
+-----+            points.push([s.start_longitude, s.start_latitude])
+-----+          }
+-----+          if (s.end_latitude !== null && s.end_longitude !== null) {
+-----+            points.push([s.end_longitude, s.end_latitude])
+-----+          }
+-----         })
+----- 
+-----         if (points.length === 0) return
+----- 
+-----         const strokeCol = getRouteColor(route)
+-----         const layerId = `fiber-route-${route.id}`
+------        addLineLayer(map, layerId, points, strokeCol, { width: 4, opacity: 0.8 })
+-----+        try {
+-----+          addLineLayer(map, layerId, points, strokeCol, { width: 4, opacity: 0.8 })
+-----+        } catch (err) {
+-----+          // Una ruta con geometria invalida no debe tumbar las demas.
+-----+          console.error('Failed to draw fiber route', route.id, err)
+-----+          return
+-----+        }
+----- 
+-----         map.on('click', layerId, (e: maplibregl.MapMouseEvent) => {
+-----           const cable = fiberCables.find(c => c.route_id === route.id)
+-----diff --git a/src/app/projects/actions-fiber.ts b/src/app/projects/actions-fiber.ts
+-----index e3c56a7..8eac57c 100644
+-------- a/src/app/projects/actions-fiber.ts
+-----+++ b/src/app/projects/actions-fiber.ts
+-----@@ -68,6 +68,35 @@ function haversineDistanceFeet(lat1: number, lon1: number, lat2: number, lon2: n
+----- 
+----- // ─── 1. Get fiber design data ────────────────────────────────────────────────
+----- 
+-----+// PostgREST/Supabase caps a single select() at a default max-rows limit
+-----+// (1000). Projects with dense fiber routes can easily have more segments
+-----+// than that (e.g. 1800+), so a plain .select('*') silently truncates the
+-----+// result and several routes end up with zero segments returned — they
+-----+// simply don't draw on the map, with no error anywhere. This paginates
+-----+// through with .range() until a page comes back short of the page size.
+-----+async function fetchAllFiberRouteSegments(
+-----+  supabase: Awaited<ReturnType<typeof createClient>>,
+-----+  projectId: string
+-----+) {
+-----+  const pageSize = 1000
+-----+  let allRows: any[] = []
+-----+  let from = 0
+-----+  while (true) {
+-----+    const { data, error }: { data: any[] | null; error: any } = await (supabase
+-----+      .from('fiber_route_segments') as any)
+-----+      .select('*')
+-----+      .eq('project_id', projectId)
+-----+      .order('segment_index')
+-----+      .range(from, from + pageSize - 1)
+-----+
+-----+    if (error) return { data: allRows, error }
+-----+    allRows = allRows.concat(data ?? [])
+-----+    if (!data || data.length < pageSize) break
+-----+    from += pageSize
+-----+  }
+-----+  return { data: allRows, error: null }
+-----+}
+-----+
+----- export async function getFiberDesignData(projectId: string) {
+-----   const supabase = await createClient()
+----- 
+-----@@ -97,7 +126,7 @@ export async function getFiberDesignData(projectId: string) {
+-----   ] = await Promise.all([
+-----     supabase.from('fiber_nodes').select('*').eq('project_id', projectId).order('node_tag'),
+-----     supabase.from('fiber_routes').select('*').eq('project_id', projectId).order('route_id_tag'),
+------    supabase.from('fiber_route_segments').select('*').eq('project_id', projectId).order('segment_index'),
+-----+    fetchAllFiberRouteSegments(supabase, projectId),
+-----     supabase.from('fiber_cables').select('*').eq('project_id', projectId).order('cable_tag'),
+-----     supabase.from('fiber_strands').select('*').eq('project_id', projectId).order('strand_number'),
+-----     supabase.from('fiber_enclosures').select('*').eq('project_id', projectId).order('enclosure_tag'),
+----diff --git a/src/app/projects/[projectId]/ProjectMapCanvas.tsx b/src/app/projects/[projectId]/ProjectMapCanvas.tsx
+----index 68fb03b..99d8bbd 100644
+------- a/src/app/projects/[projectId]/ProjectMapCanvas.tsx
+----+++ b/src/app/projects/[projectId]/ProjectMapCanvas.tsx
+----@@ -3,6 +3,7 @@
+---- import React, { useEffect, useRef, useState, useTransition } from 'react'
+---- import * as maplibregl from 'maplibre-gl'
+---- import 'maplibre-gl/dist/maplibre-gl.css'
+----+import { attachMarkerFanOut } from '@/lib/map/markerFanOut'
+---- import { Database } from '@/types/supabase'
+---- import {
+----   createCameraLocation,
+----@@ -686,6 +687,11 @@ export default function ProjectMapCanvas({
+----     el.style.width = `${size[0]}px`
+----     el.style.height = `${size[1]}px`
+----     el.style.cursor = cursor
+----+    // Marca este marcador para el sistema de "abanico": cuando varios
+----+    // elementos (camara, nodo de fibra, dispositivo de red) caen en el
+----+    // mismo punto del mapa, se agrupan en una burbuja con contador en vez
+----+    // de taparse unos a otros. Ver src/lib/map/markerFanOut.ts.
+----+    el.setAttribute('data-fanout', 'true')
+----     el.innerHTML = svg
+----     const svgEl = el.firstElementChild as SVGElement | null
+----     if (svgEl) {
+----@@ -782,15 +788,22 @@ export default function ProjectMapCanvas({
+----       })
+----     })
+---- 
+----+    let detachFanOut: (() => void) | null = null
+----     newMap.on('load', () => {
+----       setMap(newMap)
+----       // Arranca plegada (solo el boton "i"): el credito sigue disponible a un
+----       // clic, que es lo que exigen las licencias, sin ocupar la esquina.
+----       const attrib = newMap.getContainer().querySelector('.maplibregl-ctrl-attrib')
+----       attrib?.classList.remove('maplibregl-compact-show')
+----+
+----+      // Cuando varios marcadores (camara, nodo de fibra, dispositivo) caen
+----+      // en el mismo punto, se agrupan en una burbuja con contador que se
+----+      // abre en abanico al pasar el mouse o hacer clic.
+----+      detachFanOut = attachMarkerFanOut(newMap)
+----     })
+---- 
+----     return () => {
+----+      detachFanOut?.()
+----       newMap.remove()
+----       setMap(null)
+----     }
+----diff --git a/src/lib/map/markerFanOut.ts b/src/lib/map/markerFanOut.ts
+----new file mode 100644
+----index 0000000..09abcc5
+------- /dev/null
+----+++ b/src/lib/map/markerFanOut.ts
+----@@ -0,0 +1,322 @@
+----+import * as maplibregl from 'maplibre-gl'
+----+
+----+/**
+----+ * Cuando dos o mas marcadores (camara, nodo de fibra, dispositivo de red...)
+----+ * caen en el mismo punto del mapa satelital, MapLibre los dibuja apilados y
+----+ * el de encima tapa a los demas por completo -- en la practica, "se esconde
+----+ * el icono de la camara". Este modulo agrupa visualmente los marcadores que
+----+ * quedan a menos de CLUSTER_PIXEL_THRESHOLD px entre si en una burbuja con
+----+ * contador; al pasar el mouse o hacer clic, se abren en abanico alrededor
+----+ * del punto para que cada uno sea clickeable por separado (los listeners de
+----+ * clic originales de cada marcador se mantienen intactos: solo movemos su
+----+ * offset en pantalla, nunca reemplazamos el elemento).
+----+ *
+----+ * Cualquier marcador creado con `buildMarkerElement` en ProjectMapCanvas.tsx
+----+ * queda automaticamente incluido (se marca con `data-fanout="true"`), sin
+----+ * necesidad de tocar cada sitio donde se crea un marcador: aqui se
+----+ * "parchea" una sola vez `maplibregl.Marker.prototype.addTo/remove` para
+----+ * llevar un registro por mapa de los marcadores taggeados.
+----+ */
+----+
+----+const FANOUT_ATTR = 'data-fanout'
+----+const CLUSTER_PIXEL_THRESHOLD = 22
+----+const COLLAPSE_DELAY_MS = 350
+----+
+----+type Point = { x: number; y: number }
+----+
+----+const registryByMap = new WeakMap<maplibregl.Map, Set<maplibregl.Marker>>()
+----+let patched = false
+----+
+----+function ensurePatched() {
+----+  if (patched) return
+----+  patched = true
+----+  const proto = maplibregl.Marker.prototype as any
+----+  const originalAddTo = proto.addTo
+----+  const originalRemove = proto.remove
+----+
+----+  proto.addTo = function (map: maplibregl.Map) {
+----+    const result = originalAddTo.call(this, map)
+----+    this.__fanOutMap = map
+----+    const el: HTMLElement | undefined = typeof this.getElement === 'function' ? this.getElement() : undefined
+----+    if (el && el.getAttribute(FANOUT_ATTR) === 'true') {
+----+      let set = registryByMap.get(map)
+----+      if (!set) {
+----+        set = new Set()
+----+        registryByMap.set(map, set)
+----+      }
+----+      set.add(this)
+----+    }
+----+    return result
+----+  }
+----+
+----+  proto.remove = function () {
+----+    const map: maplibregl.Map | undefined = this.__fanOutMap
+----+    if (map) {
+----+      registryByMap.get(map)?.delete(this)
+----+    }
+----+    return originalRemove.call(this)
+----+  }
+----+}
+----+
+----+let markerIdCounter = 0
+----+const markerIds = new WeakMap<maplibregl.Marker, string>()
+----+function idOf(marker: maplibregl.Marker): string {
+----+  let id = markerIds.get(marker)
+----+  if (!id) {
+----+    id = `fo-${++markerIdCounter}`
+----+    markerIds.set(marker, id)
+----+  }
+----+  return id
+----+}
+----+
+----+const baseOffsets = new WeakMap<maplibregl.Marker, [number, number]>()
+----+function baseOffsetOf(marker: maplibregl.Marker): [number, number] {
+----+  let base = baseOffsets.get(marker)
+----+  if (!base) {
+----+    const raw = marker.getOffset()
+----+    base = [raw?.x ?? 0, raw?.y ?? 0]
+----+    baseOffsets.set(marker, base)
+----+  }
+----+  return base
+----+}
+----+
+----+function fanOffsets(count: number): Array<[number, number]> {
+----+  const radius = 32 + Math.max(0, count - 4) * 6
+----+  const offsets: Array<[number, number]> = []
+----+  for (let i = 0; i < count; i++) {
+----+    const angle = -Math.PI / 2 + (i * 2 * Math.PI) / count
+----+    offsets.push([Math.round(Math.cos(angle) * radius), Math.round(Math.sin(angle) * radius)])
+----+  }
+----+  return offsets
+----+}
+----+
+----+export function attachMarkerFanOut(map: maplibregl.Map): () => void {
+----+  ensurePatched()
+----+
+----+  const badgesByKey = new Map<string, HTMLDivElement>()
+----+  let expandedKey: string | null = null
+----+  let hoverDepth = 0
+----+  let collapseTimer: ReturnType<typeof setTimeout> | null = null
+----+  let syncScheduled = false
+----+
+----+  const container = map.getContainer()
+----+
+----+  const cancelCollapse = () => {
+----+    if (collapseTimer) {
+----+      clearTimeout(collapseTimer)
+----+      collapseTimer = null
+----+    }
+----+  }
+----+
+----+  const scheduleCollapse = () => {
+----+    cancelCollapse()
+----+    collapseTimer = setTimeout(() => {
+----+      if (hoverDepth <= 0) {
+----+        expandedKey = null
+----+        sync()
+----+      }
+----+    }, COLLAPSE_DELAY_MS)
+----+  }
+----+
+----+  const onClusterEnter = () => {
+----+    hoverDepth++
+----+    cancelCollapse()
+----+  }
+----+  const onClusterLeave = () => {
+----+    hoverDepth = Math.max(0, hoverDepth - 1)
+----+    scheduleCollapse()
+----+  }
+----+
+----+  function ensureBadge(key: string): HTMLDivElement {
+----+    let badge = badgesByKey.get(key)
+----+    if (badge) return badge
+----+    badge = document.createElement('div')
+----+    badge.className = 'nextq-fanout-badge'
+----+    badge.style.position = 'absolute'
+----+    badge.style.zIndex = '5'
+----+    badge.style.display = 'flex'
+----+    badge.style.alignItems = 'center'
+----+    badge.style.justifyContent = 'center'
+----+    badge.style.minWidth = '24px'
+----+    badge.style.height = '24px'
+----+    badge.style.padding = '0 6px'
+----+    badge.style.borderRadius = '999px'
+----+    badge.style.background = '#0f172a'
+----+    badge.style.border = '2px solid #fbbf24'
+----+    badge.style.color = '#fbbf24'
+----+    badge.style.fontFamily = 'sans-serif'
+----+    badge.style.fontSize = '11px'
+----+    badge.style.fontWeight = '800'
+----+    badge.style.cursor = 'pointer'
+----+    badge.style.boxShadow = '0 2px 8px rgba(0,0,0,0.5)'
+----+    badge.style.pointerEvents = 'auto'
+----+    badge.style.userSelect = 'none'
+----+    badge.style.transform = 'translate(-50%, -50%)'
+----+    badge.title = 'Multiple items here - click or hover to expand'
+----+    badge.addEventListener('mouseenter', onClusterEnter)
+----+    badge.addEventListener('mouseleave', onClusterLeave)
+----+    badge.addEventListener('click', (e) => {
+----+      e.stopPropagation()
+----+      expandedKey = expandedKey === key ? null : key
+----+      sync()
+----+    })
+----+    container.appendChild(badge)
+----+    badgesByKey.set(key, badge)
+----+    return badge
+----+  }
+----+
+----+  function removeUnusedBadges(activeKeys: Set<string>) {
+----+    badgesByKey.forEach((badge, key) => {
+----+      if (!activeKeys.has(key)) {
+----+        badge.removeEventListener('mouseenter', onClusterEnter)
+----+        badge.removeEventListener('mouseleave', onClusterLeave)
+----+        badge.remove()
+----+        badgesByKey.delete(key)
+----+      }
+----+    })
+----+  }
+----+
+----+  function bindMemberHover(marker: maplibregl.Marker) {
+----+    const el = marker.getElement()
+----+    if ((el as any).__fanOutHoverBound) return
+----+    ;(el as any).__fanOutHoverBound = true
+----+    el.addEventListener('mouseenter', onClusterEnter)
+----+    el.addEventListener('mouseleave', onClusterLeave)
+----+  }
+----+
+----+  function sync() {
+----+    const set = registryByMap.get(map)
+----+    const markers = set ? Array.from(set) : []
+----+
+----+    // Posicion visual aproximada de cada marcador (proyeccion + offset base).
+----+    const positions = new Map<maplibregl.Marker, Point>()
+----+    markers.forEach(marker => {
+----+      const el = marker.getElement()
+----+      if (!el.isConnected) return
+----+      const base = baseOffsetOf(marker)
+----+      const pt = map.project(marker.getLngLat())
+----+      positions.set(marker, { x: pt.x + base[0], y: pt.y + base[1] })
+----+    })
+----+
+----+    // Agrupa por cercania en pantalla (BFS simple sobre el umbral de pixeles).
+----+    const visited = new Set<maplibregl.Marker>()
+----+    const clusters: maplibregl.Marker[][] = []
+----+    const entries = Array.from(positions.entries())
+----+    entries.forEach(([marker]) => {
+----+      if (visited.has(marker)) return
+----+      const group: maplibregl.Marker[] = [marker]
+----+      visited.add(marker)
+----+      let frontier = [marker]
+----+      while (frontier.length) {
+----+        const next: maplibregl.Marker[] = []
+----+        frontier.forEach(m => {
+----+          const p1 = positions.get(m)!
+----+          entries.forEach(([other]) => {
+----+            if (visited.has(other)) return
+----+            const p2 = positions.get(other)!
+----+            const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y)
+----+            if (dist <= CLUSTER_PIXEL_THRESHOLD) {
+----+              visited.add(other)
+----+              group.push(other)
+----+              next.push(other)
+----+            }
+----+          })
+----+        })
+----+        frontier = next
+----+      }
+----+      clusters.push(group)
+----+    })
+----+
+----+    const activeKeys = new Set<string>()
+----+
+----+    clusters.forEach(group => {
+----+      if (group.length === 1) {
+----+        const marker = group[0]
+----+        const el = marker.getElement()
+----+        el.style.visibility = ''
+----+        el.style.pointerEvents = ''
+----+        marker.setOffset(baseOffsetOf(marker))
+----+        return
+----+      }
+----+
+----+      const sortedIds = group.map(idOf).sort()
+----+      const key = sortedIds.join('|')
+----+      activeKeys.add(key)
+----+
+----+      const isExpanded = expandedKey === key
+----+      const centroid = group.reduce(
+----+        (acc, m) => {
+----+          const p = positions.get(m)!
+----+          return { x: acc.x + p.x / group.length, y: acc.y + p.y / group.length }
+----+        },
+----+        { x: 0, y: 0 }
+----+      )
+----+
+----+      const badge = ensureBadge(key)
+----+      badge.style.left = `${centroid.x}px`
+----+      badge.style.top = `${centroid.y}px`
+----+      badge.textContent = String(group.length)
+----+      badge.style.opacity = isExpanded ? '0' : '1'
+----+      badge.style.pointerEvents = isExpanded ? 'none' : 'auto'
+----+
+----+      const offsets = fanOffsets(group.length)
+----+      group.forEach((marker, i) => {
+----+        const el = marker.getElement()
+----+        bindMemberHover(marker)
+----+        if (isExpanded) {
+----+          el.style.visibility = ''
+----+          el.style.pointerEvents = ''
+----+          const base = baseOffsetOf(marker)
+----+          const [dx, dy] = offsets[i]
+----+          marker.setOffset([base[0] + dx, base[1] + dy])
+----+        } else {
+----+          el.style.visibility = 'hidden'
+----+          el.style.pointerEvents = 'none'
+----+          marker.setOffset(baseOffsetOf(marker))
+----+        }
+----+      })
+----+    })
+----+
+----+    removeUnusedBadges(activeKeys)
+----+    if (expandedKey && !activeKeys.has(expandedKey)) {
+----+      expandedKey = null
+----+    }
+----+  }
+----+
+----+  function scheduleSync() {
+----+    if (syncScheduled) return
+----+    syncScheduled = true
+----+    requestAnimationFrame(() => {
+----+      syncScheduled = false
+----+      sync()
+----+    })
+----+  }
+----+
+----+  const observer = new MutationObserver(scheduleSync)
+----+  observer.observe(container, { childList: true, subtree: true })
+----+
+----+  map.on('move', scheduleSync)
+----+  map.on('zoom', scheduleSync)
+----+  map.on('resize', scheduleSync)
+----+
+----+  const collapseOnMapClick = () => {
+----+    if (expandedKey) {
+----+      expandedKey = null
+----+      sync()
+----+    }
+----+  }
+----+  map.on('click', collapseOnMapClick)
+----+
+----+  scheduleSync()
+----+
+----+  return () => {
+----+    observer.disconnect()
+----+    map.off('move', scheduleSync)
+----+    map.off('zoom', scheduleSync)
+----+    map.off('resize', scheduleSync)
+----+    map.off('click', collapseOnMapClick)
+----+    cancelCollapse()
+----+    badgesByKey.forEach(badge => badge.remove())
+----+    badgesByKey.clear()
+----+  }
+----+}
+---diff --git a/src/app/projects/[projectId]/ProjectMapCanvas.tsx b/src/app/projects/[projectId]/ProjectMapCanvas.tsx
+---index 68fb03b..613688e 100644
+------ a/src/app/projects/[projectId]/ProjectMapCanvas.tsx
+---+++ b/src/app/projects/[projectId]/ProjectMapCanvas.tsx
+---@@ -3,6 +3,7 @@
+--- import React, { useEffect, useRef, useState, useTransition } from 'react'
+--- import * as maplibregl from 'maplibre-gl'
+--- import 'maplibre-gl/dist/maplibre-gl.css'
+---+import { attachMarkerFanOut, registerFanOutMarker, unregisterFanOutMarker } from '@/lib/map/markerFanOut'
+--- import { Database } from '@/types/supabase'
+--- import {
+---   createCameraLocation,
+---@@ -686,6 +687,11 @@ export default function ProjectMapCanvas({
+---     el.style.width = `${size[0]}px`
+---     el.style.height = `${size[1]}px`
+---     el.style.cursor = cursor
+---+    // Marca este marcador para el sistema de "abanico": cuando varios
+---+    // elementos (camara, nodo de fibra, dispositivo de red) caen en el
+---+    // mismo punto del mapa, se agrupan en una burbuja con contador en vez
+---+    // de taparse unos a otros. Ver src/lib/map/markerFanOut.ts.
+---+    el.setAttribute('data-fanout', 'true')
+---     el.innerHTML = svg
+---     const svgEl = el.firstElementChild as SVGElement | null
+---     if (svgEl) {
+---@@ -782,15 +788,22 @@ export default function ProjectMapCanvas({
+---       })
+---     })
+--- 
+---+    let detachFanOut: (() => void) | null = null
+---     newMap.on('load', () => {
+---       setMap(newMap)
+---       // Arranca plegada (solo el boton "i"): el credito sigue disponible a un
+---       // clic, que es lo que exigen las licencias, sin ocupar la esquina.
+---       const attrib = newMap.getContainer().querySelector('.maplibregl-ctrl-attrib')
+---       attrib?.classList.remove('maplibregl-compact-show')
+---+
+---+      // Cuando varios marcadores (camara, nodo de fibra, dispositivo) caen
+---+      // en el mismo punto, se agrupan en una burbuja con contador que se
+---+      // abre en abanico al pasar el mouse o hacer clic.
+---+      detachFanOut = attachMarkerFanOut(newMap)
+---     })
+--- 
+---     return () => {
+---+      detachFanOut?.()
+---       newMap.remove()
+---       setMap(null)
+---     }
+---@@ -805,6 +818,7 @@ export default function ProjectMapCanvas({
+---     Object.keys(cameraMarkersRef.current).forEach(id => {
+---       const cam = cameras.find(c => c.id === id)
+---       if (!cam || !showCameras) {
+---+        unregisterFanOutMarker(map, cameraMarkersRef.current[id])
+---         cameraMarkersRef.current[id].remove()
+---         delete cameraMarkersRef.current[id]
+---         delete cameraMarkerStateRef.current[id]
+---@@ -849,6 +863,7 @@ export default function ProjectMapCanvas({
+---         })
+---           .setLngLat([cam.longitude, cam.latitude])
+---           .addTo(map)
+---+        registerFanOutMarker(map, marker)
+--- 
+---         cameraMarkerStateRef.current[cam.id] = { isSelected, status: cam.status, tag: cam.camera_id_tag }
+--- 
+---@@ -1258,6 +1273,7 @@ export default function ProjectMapCanvas({
+---       const dev = networkDevices.find(d => d.id === id)
+---       const hasCoords = dev && dev.latitude !== null && dev.longitude !== null
+---       if (!dev || !hasCoords || !showDevices) {
+---+        unregisterFanOutMarker(map, deviceMarkersRef.current[id])
+---         deviceMarkersRef.current[id].remove()
+---         delete deviceMarkersRef.current[id]
+---         delete deviceMarkerStateRef.current[id]
+---@@ -1301,6 +1317,7 @@ export default function ProjectMapCanvas({
+---         })
+---           .setLngLat([dev.longitude, dev.latitude])
+---           .addTo(map)
+---+        registerFanOutMarker(map, marker)
+--- 
+---         deviceMarkerStateRef.current[dev.id] = { isSelected, deviceType: dev.device_type, name: dev.name }
+--- 
+---@@ -1416,6 +1433,7 @@ export default function ProjectMapCanvas({
+--- 
+---     // 2. Clear old node markers
+---     Object.keys(fiberNodeMarkersRef.current).forEach(id => {
+---+      unregisterFanOutMarker(map, fiberNodeMarkersRef.current[id])
+---       fiberNodeMarkersRef.current[id].remove()
+---       delete fiberNodeMarkersRef.current[id]
+---     })
+---@@ -1522,6 +1540,7 @@ export default function ProjectMapCanvas({
+---         })
+---           .setLngLat([node.longitude, node.latitude])
+---           .addTo(map)
+---+        registerFanOutMarker(map, marker)
+--- 
+---         // Click Card
+---         el.addEventListener('click', (e: MouseEvent) => {
+---diff --git a/src/lib/map/markerFanOut.ts b/src/lib/map/markerFanOut.ts
+---new file mode 100644
+---index 0000000..df87533
+------ /dev/null
+---+++ b/src/lib/map/markerFanOut.ts
+---@@ -0,0 +1,315 @@
+---+import * as maplibregl from 'maplibre-gl'
+---+
+---+/**
+---+ * Cuando dos o mas marcadores (camara, nodo de fibra, dispositivo de red...)
+---+ * caen en el mismo punto del mapa satelital, MapLibre los dibuja apilados y
+---+ * el de encima tapa a los demas por completo -- en la practica, "se esconde
+---+ * el icono de la camara". Este modulo agrupa visualmente los marcadores que
+---+ * quedan a menos de CLUSTER_PIXEL_THRESHOLD px entre si en una burbuja con
+---+ * contador; al pasar el mouse o hacer clic, se abren en abanico alrededor
+---+ * del punto para que cada uno sea clickeable por separado (los listeners de
+---+ * clic originales de cada marcador se mantienen intactos: solo movemos su
+---+ * offset en pantalla via marker.setOffset(), nunca reemplazamos el elemento
+---+ * ni tocamos su transform directamente).
+---+ *
+---+ * A diferencia de una version anterior, este modulo NO parcha
+---+ * maplibregl.Marker.prototype (dificil de verificar en produccion sin poder
+---+ * loguearse a probarlo visualmente). En vez de eso, cada uno de los 3
+---+ * lugares donde se crea un marcador "de punto" en ProjectMapCanvas.tsx
+---+ * (camara, dispositivo de red, nodo de fibra) llama explicitamente a
+---+ * registerFanOutMarker()/unregisterFanOutMarker().
+---+ */
+---+
+---+const CLUSTER_PIXEL_THRESHOLD = 22
+---+const COLLAPSE_DELAY_MS = 350
+---+
+---+type Point = { x: number; y: number }
+---+
+---+const registryByMap = new WeakMap<maplibregl.Map, Set<maplibregl.Marker>>()
+---+
+---+export function registerFanOutMarker(map: maplibregl.Map, marker: maplibregl.Marker) {
+---+  let set = registryByMap.get(map)
+---+  if (!set) {
+---+    set = new Set()
+---+    registryByMap.set(map, set)
+---+  }
+---+  set.add(marker)
+---+}
+---+
+---+export function unregisterFanOutMarker(map: maplibregl.Map, marker: maplibregl.Marker) {
+---+  registryByMap.get(map)?.delete(marker)
+---+}
+---+
+---+let markerIdCounter = 0
+---+const markerIds = new WeakMap<maplibregl.Marker, string>()
+---+function idOf(marker: maplibregl.Marker): string {
+---+  let id = markerIds.get(marker)
+---+  if (!id) {
+---+    id = `fo-${++markerIdCounter}`
+---+    markerIds.set(marker, id)
+---+  }
+---+  return id
+---+}
+---+
+---+const baseOffsets = new WeakMap<maplibregl.Marker, [number, number]>()
+---+function baseOffsetOf(marker: maplibregl.Marker): [number, number] {
+---+  let base = baseOffsets.get(marker)
+---+  if (!base) {
+---+    const raw = marker.getOffset()
+---+    base = [raw?.x ?? 0, raw?.y ?? 0]
+---+    baseOffsets.set(marker, base)
+---+  }
+---+  return base
+---+}
+---+
+---+function fanOffsets(count: number): Array<[number, number]> {
+---+  const radius = 32 + Math.max(0, count - 4) * 6
+---+  const offsets: Array<[number, number]> = []
+---+  for (let i = 0; i < count; i++) {
+---+    const angle = -Math.PI / 2 + (i * 2 * Math.PI) / count
+---+    offsets.push([Math.round(Math.cos(angle) * radius), Math.round(Math.sin(angle) * radius)])
+---+  }
+---+  return offsets
+---+}
+---+
+---+export function attachMarkerFanOut(map: maplibregl.Map): () => void {
+---+  const badgesByKey = new Map<string, HTMLDivElement>()
+---+  let expandedKey: string | null = null
+---+  let hoverDepth = 0
+---+  let collapseTimer: ReturnType<typeof setTimeout> | null = null
+---+  let syncScheduled = false
+---+  let syncTimer: ReturnType<typeof setInterval> | null = null
+---+
+---+  const container = map.getContainer()
+---+
+---+  const cancelCollapse = () => {
+---+    if (collapseTimer) {
+---+      clearTimeout(collapseTimer)
+---+      collapseTimer = null
+---+    }
+---+  }
+---+
+---+  const scheduleCollapse = () => {
+---+    cancelCollapse()
+---+    collapseTimer = setTimeout(() => {
+---+      if (hoverDepth <= 0) {
+---+        expandedKey = null
+---+        sync()
+---+      }
+---+    }, COLLAPSE_DELAY_MS)
+---+  }
+---+
+---+  const onClusterEnter = () => {
+---+    hoverDepth++
+---+    cancelCollapse()
+---+  }
+---+  const onClusterLeave = () => {
+---+    hoverDepth = Math.max(0, hoverDepth - 1)
+---+    scheduleCollapse()
+---+  }
+---+
+---+  function ensureBadge(key: string): HTMLDivElement {
+---+    let badge = badgesByKey.get(key)
+---+    if (badge) return badge
+---+    badge = document.createElement('div')
+---+    badge.className = 'nextq-fanout-badge'
+---+    badge.style.position = 'absolute'
+---+    badge.style.left = '0'
+---+    badge.style.top = '0'
+---+    badge.style.zIndex = '5'
+---+    badge.style.display = 'flex'
+---+    badge.style.alignItems = 'center'
+---+    badge.style.justifyContent = 'center'
+---+    badge.style.minWidth = '24px'
+---+    badge.style.height = '24px'
+---+    badge.style.padding = '0 6px'
+---+    badge.style.borderRadius = '999px'
+---+    badge.style.background = '#0f172a'
+---+    badge.style.border = '2px solid #fbbf24'
+---+    badge.style.color = '#fbbf24'
+---+    badge.style.fontFamily = 'sans-serif'
+---+    badge.style.fontSize = '11px'
+---+    badge.style.fontWeight = '800'
+---+    badge.style.cursor = 'pointer'
+---+    badge.style.boxShadow = '0 2px 8px rgba(0,0,0,0.5)'
+---+    badge.style.pointerEvents = 'auto'
+---+    badge.style.userSelect = 'none'
+---+    badge.title = 'Multiple items here - click or hover to expand'
+---+    badge.addEventListener('mouseenter', onClusterEnter)
+---+    badge.addEventListener('mouseleave', onClusterLeave)
+---+    badge.addEventListener('click', (e) => {
+---+      e.stopPropagation()
+---+      expandedKey = expandedKey === key ? null : key
+---+      sync()
+---+    })
+---+    container.appendChild(badge)
+---+    badgesByKey.set(key, badge)
+---+    return badge
+---+  }
+---+
+---+  function removeUnusedBadges(activeKeys: Set<string>) {
+---+    badgesByKey.forEach((badge, key) => {
+---+      if (!activeKeys.has(key)) {
+---+        badge.removeEventListener('mouseenter', onClusterEnter)
+---+        badge.removeEventListener('mouseleave', onClusterLeave)
+---+        badge.remove()
+---+        badgesByKey.delete(key)
+---+      }
+---+    })
+---+  }
+---+
+---+  const hoverBoundEls = new WeakSet<HTMLElement>()
+---+  function bindMemberHover(marker: maplibregl.Marker) {
+---+    const el = marker.getElement()
+---+    if (hoverBoundEls.has(el)) return
+---+    hoverBoundEls.add(el)
+---+    el.addEventListener('mouseenter', onClusterEnter)
+---+    el.addEventListener('mouseleave', onClusterLeave)
+---+  }
+---+
+---+  function sync() {
+---+    try {
+---+      const set = registryByMap.get(map)
+---+      const markers = set ? Array.from(set) : []
+---+
+---+      // Posicion visual aproximada de cada marcador (proyeccion + offset base).
+---+      const positions = new Map<maplibregl.Marker, Point>()
+---+      markers.forEach(marker => {
+---+        const el = marker.getElement()
+---+        if (!el || !el.isConnected) return
+---+        const base = baseOffsetOf(marker)
+---+        const lngLat = marker.getLngLat()
+---+        if (!lngLat) return
+---+        const pt = map.project(lngLat)
+---+        if (!Number.isFinite(pt.x) || !Number.isFinite(pt.y)) return
+---+        positions.set(marker, { x: pt.x + base[0], y: pt.y + base[1] })
+---+      })
+---+
+---+      // Agrupa por cercania en pantalla (BFS simple sobre el umbral de pixeles).
+---+      const visited = new Set<maplibregl.Marker>()
+---+      const clusters: maplibregl.Marker[][] = []
+---+      const entries = Array.from(positions.entries())
+---+      entries.forEach(([marker]) => {
+---+        if (visited.has(marker)) return
+---+        const group: maplibregl.Marker[] = [marker]
+---+        visited.add(marker)
+---+        let frontier = [marker]
+---+        while (frontier.length) {
+---+          const next: maplibregl.Marker[] = []
+---+          frontier.forEach(m => {
+---+            const p1 = positions.get(m)!
+---+            entries.forEach(([other]) => {
+---+              if (visited.has(other)) return
+---+              const p2 = positions.get(other)!
+---+              const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y)
+---+              if (dist <= CLUSTER_PIXEL_THRESHOLD) {
+---+                visited.add(other)
+---+                group.push(other)
+---+                next.push(other)
+---+              }
+---+            })
+---+          })
+---+          frontier = next
+---+        }
+---+        clusters.push(group)
+---+      })
+---+
+---+      const activeKeys = new Set<string>()
+---+
+---+      clusters.forEach(group => {
+---+        if (group.length === 1) {
+---+          const marker = group[0]
+---+          const el = marker.getElement()
+---+          el.style.visibility = ''
+---+          el.style.pointerEvents = ''
+---+          marker.setOffset(baseOffsetOf(marker))
+---+          return
+---+        }
+---+
+---+        const sortedIds = group.map(idOf).sort()
+---+        const key = sortedIds.join('|')
+---+        activeKeys.add(key)
+---+
+---+        const isExpanded = expandedKey === key
+---+        const centroid = group.reduce(
+---+          (acc, m) => {
+---+            const p = positions.get(m)!
+---+            return { x: acc.x + p.x / group.length, y: acc.y + p.y / group.length }
+---+          },
+---+          { x: 0, y: 0 }
+---+        )
+---+
+---+        const badge = ensureBadge(key)
+---+        badge.style.transform = `translate(${centroid.x}px, ${centroid.y}px) translate(-50%, -50%)`
+---+        badge.textContent = String(group.length)
+---+        badge.style.opacity = isExpanded ? '0' : '1'
+---+        badge.style.pointerEvents = isExpanded ? 'none' : 'auto'
+---+
+---+        const offsets = fanOffsets(group.length)
+---+        group.forEach((marker, i) => {
+---+          const el = marker.getElement()
+---+          bindMemberHover(marker)
+---+          if (isExpanded) {
+---+            el.style.visibility = ''
+---+            el.style.pointerEvents = ''
+---+            const base = baseOffsetOf(marker)
+---+            const [dx, dy] = offsets[i]
+---+            marker.setOffset([base[0] + dx, base[1] + dy])
+---+          } else {
+---+            el.style.visibility = 'hidden'
+---+            el.style.pointerEvents = 'none'
+---+            marker.setOffset(baseOffsetOf(marker))
+---+          }
+---+        })
+---+      })
+---+
+---+      removeUnusedBadges(activeKeys)
+---+      if (expandedKey && !activeKeys.has(expandedKey)) {
+---+        expandedKey = null
+---+      }
+---+    } catch (err) {
+---+      // Nunca dejar que un fallo aca rompa el resto del mapa.
+---+      console.error('markerFanOut sync failed', err)
+---+    }
+---+  }
+---+
+---+  function scheduleSync() {
+---+    if (syncScheduled) return
+---+    syncScheduled = true
+---+    requestAnimationFrame(() => {
+---+      syncScheduled = false
+---+      sync()
+---+    })
+---+  }
+---+
+---+  map.on('move', scheduleSync)
+---+  map.on('zoom', scheduleSync)
+---+  map.on('resize', scheduleSync)
+---+  map.on('render', scheduleSync)
+---+
+---+  const collapseOnMapClick = () => {
+---+    if (expandedKey) {
+---+      expandedKey = null
+---+      sync()
+---+    }
+---+  }
+---+  map.on('click', collapseOnMapClick)
+---+
+---+  // Los marcadores se van agregando a medida que cada efecto de React
+---+  // (camaras, dispositivos, nodos de fibra) corre, no todos de una. Un
+---+  // polling liviano cada 500ms cubre eso sin depender de observar el DOM.
+---+  syncTimer = setInterval(scheduleSync, 500)
+---+  scheduleSync()
+---+
+---+  return () => {
+---+    if (syncTimer) clearInterval(syncTimer)
+---+    map.off('move', scheduleSync)
+---+    map.off('zoom', scheduleSync)
+---+    map.off('resize', scheduleSync)
+---+    map.off('render', scheduleSync)
+---+    map.off('click', collapseOnMapClick)
+---+    cancelCollapse()
+---+    badgesByKey.forEach(badge => badge.remove())
+---+    badgesByKey.clear()
+---+  }
+---+}
+--diff --git a/src/lib/map/markerFanOut.ts b/src/lib/map/markerFanOut.ts
+--index df87533..935136a 100644
+----- a/src/lib/map/markerFanOut.ts
+--+++ b/src/lib/map/markerFanOut.ts
+--@@ -74,7 +74,12 @@ function fanOffsets(count: number): Array<[number, number]> {
+-- 
+-- export function attachMarkerFanOut(map: maplibregl.Map): () => void {
+--   const badgesByKey = new Map<string, HTMLDivElement>()
+--+  const badgeEnterHandlers = new WeakMap<HTMLDivElement, () => void>()
+--   let expandedKey: string | null = null
+--+  // 'click' se mantiene abierto hasta que el usuario hace clic de nuevo (en
+--+  // la burbuja, en otro grupo, o en un punto vacio del mapa). 'hover' se
+--+  // cierra solo, un rato despues de que el mouse sale del grupo.
+--+  let expandedBy: 'click' | 'hover' | null = null
+--   let hoverDepth = 0
+--   let collapseTimer: ReturnType<typeof setTimeout> | null = null
+--   let syncScheduled = false
+--@@ -90,18 +95,29 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
+--   }
+-- 
+--   const scheduleCollapse = () => {
+--+    // Un clic deja el grupo abierto a proposito: no lo cierra el mouse
+--+    // saliendo, solo otro clic (en la burbuja, otro grupo, o el mapa vacio).
+--+    if (expandedBy === 'click') return
+--     cancelCollapse()
+--     collapseTimer = setTimeout(() => {
+--       if (hoverDepth <= 0) {
+--         expandedKey = null
+--+        expandedBy = null
+--         sync()
+--       }
+--     }, COLLAPSE_DELAY_MS)
+--   }
+-- 
+---  const onClusterEnter = () => {
+--+  const onClusterEnter = (key: string) => {
+--     hoverDepth++
+--     cancelCollapse()
+--+    // Pasar el mouse por encima tambien abre el abanico, aunque no se haga
+--+    // clic (para grupos que todavia no estan abiertos por clic).
+--+    if (expandedKey !== key) {
+--+      expandedKey = key
+--+      expandedBy = 'hover'
+--+      sync()
+--+    }
+--   }
+--   const onClusterLeave = () => {
+--     hoverDepth = Math.max(0, hoverDepth - 1)
+--@@ -135,11 +151,19 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
+--     badge.style.pointerEvents = 'auto'
+--     badge.style.userSelect = 'none'
+--     badge.title = 'Multiple items here - click or hover to expand'
+---    badge.addEventListener('mouseenter', onClusterEnter)
+--+    const enterHandler = () => onClusterEnter(key)
+--+    badgeEnterHandlers.set(badge, enterHandler)
+--+    badge.addEventListener('mouseenter', enterHandler)
+--     badge.addEventListener('mouseleave', onClusterLeave)
+--     badge.addEventListener('click', (e) => {
+--       e.stopPropagation()
+---      expandedKey = expandedKey === key ? null : key
+--+      if (expandedKey === key) {
+--+        expandedKey = null
+--+        expandedBy = null
+--+      } else {
+--+        expandedKey = key
+--+        expandedBy = 'click'
+--+      }
+--       sync()
+--     })
+--     container.appendChild(badge)
+--@@ -150,7 +174,9 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
+--   function removeUnusedBadges(activeKeys: Set<string>) {
+--     badgesByKey.forEach((badge, key) => {
+--       if (!activeKeys.has(key)) {
+---        badge.removeEventListener('mouseenter', onClusterEnter)
+--+        const enterHandler = badgeEnterHandlers.get(badge)
+--+        if (enterHandler) badge.removeEventListener('mouseenter', enterHandler)
+--+        badgeEnterHandlers.delete(badge)
+--         badge.removeEventListener('mouseleave', onClusterLeave)
+--         badge.remove()
+--         badgesByKey.delete(key)
+--@@ -159,11 +185,11 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
+--   }
+-- 
+--   const hoverBoundEls = new WeakSet<HTMLElement>()
+---  function bindMemberHover(marker: maplibregl.Marker) {
+--+  function bindMemberHover(marker: maplibregl.Marker, key: string) {
+--     const el = marker.getElement()
+--     if (hoverBoundEls.has(el)) return
+--     hoverBoundEls.add(el)
+---    el.addEventListener('mouseenter', onClusterEnter)
+--+    el.addEventListener('mouseenter', () => onClusterEnter(key))
+--     el.addEventListener('mouseleave', onClusterLeave)
+--   }
+-- 
+--@@ -248,7 +274,7 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
+--         const offsets = fanOffsets(group.length)
+--         group.forEach((marker, i) => {
+--           const el = marker.getElement()
+---          bindMemberHover(marker)
+--+          bindMemberHover(marker, key)
+--           if (isExpanded) {
+--             el.style.visibility = ''
+--             el.style.pointerEvents = ''
+--@@ -266,6 +292,7 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
+--       removeUnusedBadges(activeKeys)
+--       if (expandedKey && !activeKeys.has(expandedKey)) {
+--         expandedKey = null
+--+        expandedBy = null
+--       }
+--     } catch (err) {
+--       // Nunca dejar que un fallo aca rompa el resto del mapa.
+--@@ -290,6 +317,7 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
+--   const collapseOnMapClick = () => {
+--     if (expandedKey) {
+--       expandedKey = null
+--+      expandedBy = null
+--       sync()
+--     }
+--   }
+-diff --git a/src/lib/map/markerFanOut.ts b/src/lib/map/markerFanOut.ts
+-index 935136a..f2285a5 100644
+---- a/src/lib/map/markerFanOut.ts
+-+++ b/src/lib/map/markerFanOut.ts
+-@@ -72,6 +72,10 @@ function fanOffsets(count: number): Array<[number, number]> {
+-   return offsets
+- }
+- 
+-+const ACCENT = '#4f46e5'
+-+const ACCENT_DARK = '#3730a3'
+-+const COUNT_COLOR = '#f59e0b'
+-+
+- export function attachMarkerFanOut(map: maplibregl.Map): () => void {
+-   const badgesByKey = new Map<string, HTMLDivElement>()
+-   const badgeEnterHandlers = new WeakMap<HTMLDivElement, () => void>()
+-@@ -87,6 +91,20 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
+- 
+-   const container = map.getContainer()
+- 
+-+  // Capa SVG unica para las lineas que conectan la burbuja con cada icono
+-+  // cuando el abanico esta abierto (el detalle visual que faltaba: sin
+-+  // esto, los iconos separados no se leen como "parte del mismo grupo").
+-+  const spokesSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+-+  spokesSvg.setAttribute('width', '100%')
+-+  spokesSvg.setAttribute('height', '100%')
+-+  spokesSvg.style.position = 'absolute'
+-+  spokesSvg.style.left = '0'
+-+  spokesSvg.style.top = '0'
+-+  spokesSvg.style.zIndex = '3'
+-+  spokesSvg.style.pointerEvents = 'none'
+-+  spokesSvg.style.overflow = 'visible'
+-+  container.appendChild(spokesSvg)
+-+
+-   const cancelCollapse = () => {
+-     if (collapseTimer) {
+-       clearTimeout(collapseTimer)
+-@@ -124,7 +142,7 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
+-     scheduleCollapse()
+-   }
+- 
+--  function ensureBadge(key: string): HTMLDivElement {
+-+  function ensureBadge(key: string, count: number): HTMLDivElement {
+-     let badge = badgesByKey.get(key)
+-     if (badge) return badge
+-     badge = document.createElement('div')
+-@@ -133,24 +151,37 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
+-     badge.style.left = '0'
+-     badge.style.top = '0'
+-     badge.style.zIndex = '5'
+--    badge.style.display = 'flex'
+--    badge.style.alignItems = 'center'
+--    badge.style.justifyContent = 'center'
+--    badge.style.minWidth = '24px'
+--    badge.style.height = '24px'
+--    badge.style.padding = '0 6px'
+--    badge.style.borderRadius = '999px'
+--    badge.style.background = '#0f172a'
+--    badge.style.border = '2px solid #fbbf24'
+--    badge.style.color = '#fbbf24'
+--    badge.style.fontFamily = 'sans-serif'
+--    badge.style.fontSize = '11px'
+--    badge.style.fontWeight = '800'
+-+    badge.style.width = '36px'
+-+    badge.style.height = '36px'
+-     badge.style.cursor = 'pointer'
+--    badge.style.boxShadow = '0 2px 8px rgba(0,0,0,0.5)'
+-     badge.style.pointerEvents = 'auto'
+-     badge.style.userSelect = 'none'
+-     badge.title = 'Multiple items here - click or hover to expand'
+-+
+-+    // Circulo principal con degrade + icono de "capas" (varios elementos
+-+    // en un mismo punto), y un contador tipo notificacion en la esquina.
+-+    badge.innerHTML = `
+-+      <div style="
+-+        width:100%; height:100%; border-radius:50%;
+-+        background: radial-gradient(circle at 32% 28%, ${ACCENT} 0%, ${ACCENT_DARK} 100%);
+-+        border: 2px solid #ffffff;
+-+        box-shadow: 0 3px 10px rgba(55,48,163,0.5), 0 0 0 3px rgba(255,255,255,0.18);
+-+        display:flex; align-items:center; justify-content:center;
+-+      ">
+-+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+-+          <path d="M12 2 2 7l10 5 10-5-10-5Z" fill="#ffffff"/>
+-+          <path d="M2 12l10 5 10-5" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
+-+          <path d="M2 17l10 5 10-5" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
+-+        </svg>
+-+      </div>
+-+      <div class="nextq-fanout-count" style="
+-+        position:absolute; top:-5px; right:-5px; min-width:18px; height:18px;
+-+        border-radius:999px; background:${COUNT_COLOR}; border:2px solid #ffffff;
+-+        color:#ffffff; font-family:sans-serif; font-size:10px; font-weight:800;
+-+        display:flex; align-items:center; justify-content:center; padding:0 3px;
+-+        box-shadow:0 1px 4px rgba(0,0,0,0.35);
+-+      ">${count}</div>
+-+    `
+-     const enterHandler = () => onClusterEnter(key)
+-     badgeEnterHandlers.set(badge, enterHandler)
+-     badge.addEventListener('mouseenter', enterHandler)
+-@@ -241,6 +272,7 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
+-       })
+- 
+-       const activeKeys = new Set<string>()
+-+      while (spokesSvg.firstChild) spokesSvg.removeChild(spokesSvg.firstChild)
+- 
+-       clusters.forEach(group => {
+-         if (group.length === 1) {
+-@@ -265,9 +297,10 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
+-           { x: 0, y: 0 }
+-         )
+- 
+--        const badge = ensureBadge(key)
+-+        const badge = ensureBadge(key, group.length)
+-+        const countEl = badge.querySelector<HTMLDivElement>('.nextq-fanout-count')
+-+        if (countEl) countEl.textContent = String(group.length)
+-         badge.style.transform = `translate(${centroid.x}px, ${centroid.y}px) translate(-50%, -50%)`
+--        badge.textContent = String(group.length)
+-         badge.style.opacity = isExpanded ? '0' : '1'
+-         badge.style.pointerEvents = isExpanded ? 'none' : 'auto'
+- 
+-@@ -281,12 +314,34 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
+-             const base = baseOffsetOf(marker)
+-             const [dx, dy] = offsets[i]
+-             marker.setOffset([base[0] + dx, base[1] + dy])
+-+
+-+            // Linea que conecta el centro del grupo con este icono, para
+-+            // que se lea como abanico y no como iconos sueltos flotando.
+-+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line')
+-+            line.setAttribute('x1', String(centroid.x))
+-+            line.setAttribute('y1', String(centroid.y))
+-+            line.setAttribute('x2', String(centroid.x + dx))
+-+            line.setAttribute('y2', String(centroid.y + dy))
+-+            line.setAttribute('stroke', ACCENT)
+-+            line.setAttribute('stroke-width', '2')
+-+            line.setAttribute('stroke-linecap', 'round')
+-+            line.setAttribute('opacity', '0.55')
+-+            spokesSvg.appendChild(line)
+-           } else {
+-             el.style.visibility = 'hidden'
+-             el.style.pointerEvents = 'none'
+-             marker.setOffset(baseOffsetOf(marker))
+-           }
+-         })
+-+
+-+        if (isExpanded) {
+-+          const centerDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
+-+          centerDot.setAttribute('cx', String(centroid.x))
+-+          centerDot.setAttribute('cy', String(centroid.y))
+-+          centerDot.setAttribute('r', '3')
+-+          centerDot.setAttribute('fill', ACCENT)
+-+          spokesSvg.appendChild(centerDot)
+-+        }
+-       })
+- 
+-       removeUnusedBadges(activeKeys)
+-@@ -339,5 +394,6 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
+-     cancelCollapse()
+-     badgesByKey.forEach(badge => badge.remove())
+-     badgesByKey.clear()
+-+    spokesSvg.remove()
+-   }
+- }
+diff --git a/src/lib/map/markerFanOut.ts b/src/lib/map/markerFanOut.ts
+index f2285a5..a6cfc60 100644
+--- a/src/lib/map/markerFanOut.ts
++++ b/src/lib/map/markerFanOut.ts
+@@ -188,7 +188,14 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
+     badge.addEventListener('mouseleave', onClusterLeave)
+     badge.addEventListener('click', (e) => {
+       e.stopPropagation()
+-      if (expandedKey === key) {
++      // Un mouse real dispara "mouseenter" (que ya abre el grupo en modo
++      // 'hover') justo antes del "click". Si solo comparamos contra
++      // expandedKey, el clic ve que "ya esta abierto" y lo cierra al
++      // toque - exactamente el bug reportado. Por eso el cierre por clic
++      // solo pasa si YA estaba abierto en modo 'click' (un clic anterior
++      // real, no el hover automatico que acaba de ocurrir); si estaba
++      // abierto por hover, el clic lo "confirma" como abierto y pegajoso.
++      if (expandedKey === key && expandedBy === 'click') {
+         expandedKey = null
+         expandedBy = null
+       } else {
