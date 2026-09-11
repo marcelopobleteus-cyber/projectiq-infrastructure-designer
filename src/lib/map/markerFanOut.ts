@@ -74,7 +74,12 @@ function fanOffsets(count: number): Array<[number, number]> {
 
 export function attachMarkerFanOut(map: maplibregl.Map): () => void {
   const badgesByKey = new Map<string, HTMLDivElement>()
+  const badgeEnterHandlers = new WeakMap<HTMLDivElement, () => void>()
   let expandedKey: string | null = null
+  // 'click' se mantiene abierto hasta que el usuario hace clic de nuevo (en
+  // la burbuja, en otro grupo, o en un punto vacio del mapa). 'hover' se
+  // cierra solo, un rato despues de que el mouse sale del grupo.
+  let expandedBy: 'click' | 'hover' | null = null
   let hoverDepth = 0
   let collapseTimer: ReturnType<typeof setTimeout> | null = null
   let syncScheduled = false
@@ -90,18 +95,29 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
   }
 
   const scheduleCollapse = () => {
+    // Un clic deja el grupo abierto a proposito: no lo cierra el mouse
+    // saliendo, solo otro clic (en la burbuja, otro grupo, o el mapa vacio).
+    if (expandedBy === 'click') return
     cancelCollapse()
     collapseTimer = setTimeout(() => {
       if (hoverDepth <= 0) {
         expandedKey = null
+        expandedBy = null
         sync()
       }
     }, COLLAPSE_DELAY_MS)
   }
 
-  const onClusterEnter = () => {
+  const onClusterEnter = (key: string) => {
     hoverDepth++
     cancelCollapse()
+    // Pasar el mouse por encima tambien abre el abanico, aunque no se haga
+    // clic (para grupos que todavia no estan abiertos por clic).
+    if (expandedKey !== key) {
+      expandedKey = key
+      expandedBy = 'hover'
+      sync()
+    }
   }
   const onClusterLeave = () => {
     hoverDepth = Math.max(0, hoverDepth - 1)
@@ -135,11 +151,19 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
     badge.style.pointerEvents = 'auto'
     badge.style.userSelect = 'none'
     badge.title = 'Multiple items here - click or hover to expand'
-    badge.addEventListener('mouseenter', onClusterEnter)
+    const enterHandler = () => onClusterEnter(key)
+    badgeEnterHandlers.set(badge, enterHandler)
+    badge.addEventListener('mouseenter', enterHandler)
     badge.addEventListener('mouseleave', onClusterLeave)
     badge.addEventListener('click', (e) => {
       e.stopPropagation()
-      expandedKey = expandedKey === key ? null : key
+      if (expandedKey === key) {
+        expandedKey = null
+        expandedBy = null
+      } else {
+        expandedKey = key
+        expandedBy = 'click'
+      }
       sync()
     })
     container.appendChild(badge)
@@ -150,7 +174,9 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
   function removeUnusedBadges(activeKeys: Set<string>) {
     badgesByKey.forEach((badge, key) => {
       if (!activeKeys.has(key)) {
-        badge.removeEventListener('mouseenter', onClusterEnter)
+        const enterHandler = badgeEnterHandlers.get(badge)
+        if (enterHandler) badge.removeEventListener('mouseenter', enterHandler)
+        badgeEnterHandlers.delete(badge)
         badge.removeEventListener('mouseleave', onClusterLeave)
         badge.remove()
         badgesByKey.delete(key)
@@ -159,11 +185,11 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
   }
 
   const hoverBoundEls = new WeakSet<HTMLElement>()
-  function bindMemberHover(marker: maplibregl.Marker) {
+  function bindMemberHover(marker: maplibregl.Marker, key: string) {
     const el = marker.getElement()
     if (hoverBoundEls.has(el)) return
     hoverBoundEls.add(el)
-    el.addEventListener('mouseenter', onClusterEnter)
+    el.addEventListener('mouseenter', () => onClusterEnter(key))
     el.addEventListener('mouseleave', onClusterLeave)
   }
 
@@ -248,7 +274,7 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
         const offsets = fanOffsets(group.length)
         group.forEach((marker, i) => {
           const el = marker.getElement()
-          bindMemberHover(marker)
+          bindMemberHover(marker, key)
           if (isExpanded) {
             el.style.visibility = ''
             el.style.pointerEvents = ''
@@ -266,6 +292,7 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
       removeUnusedBadges(activeKeys)
       if (expandedKey && !activeKeys.has(expandedKey)) {
         expandedKey = null
+        expandedBy = null
       }
     } catch (err) {
       // Nunca dejar que un fallo aca rompa el resto del mapa.
@@ -290,6 +317,7 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
   const collapseOnMapClick = () => {
     if (expandedKey) {
       expandedKey = null
+      expandedBy = null
       sync()
     }
   }
