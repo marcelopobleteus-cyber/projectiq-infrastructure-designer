@@ -72,6 +72,10 @@ function fanOffsets(count: number): Array<[number, number]> {
   return offsets
 }
 
+const ACCENT = '#4f46e5'
+const ACCENT_DARK = '#3730a3'
+const COUNT_COLOR = '#f59e0b'
+
 export function attachMarkerFanOut(map: maplibregl.Map): () => void {
   const badgesByKey = new Map<string, HTMLDivElement>()
   const badgeEnterHandlers = new WeakMap<HTMLDivElement, () => void>()
@@ -86,6 +90,20 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
   let syncTimer: ReturnType<typeof setInterval> | null = null
 
   const container = map.getContainer()
+
+  // Capa SVG unica para las lineas que conectan la burbuja con cada icono
+  // cuando el abanico esta abierto (el detalle visual que faltaba: sin
+  // esto, los iconos separados no se leen como "parte del mismo grupo").
+  const spokesSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+  spokesSvg.setAttribute('width', '100%')
+  spokesSvg.setAttribute('height', '100%')
+  spokesSvg.style.position = 'absolute'
+  spokesSvg.style.left = '0'
+  spokesSvg.style.top = '0'
+  spokesSvg.style.zIndex = '3'
+  spokesSvg.style.pointerEvents = 'none'
+  spokesSvg.style.overflow = 'visible'
+  container.appendChild(spokesSvg)
 
   const cancelCollapse = () => {
     if (collapseTimer) {
@@ -124,7 +142,7 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
     scheduleCollapse()
   }
 
-  function ensureBadge(key: string): HTMLDivElement {
+  function ensureBadge(key: string, count: number): HTMLDivElement {
     let badge = badgesByKey.get(key)
     if (badge) return badge
     badge = document.createElement('div')
@@ -133,24 +151,37 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
     badge.style.left = '0'
     badge.style.top = '0'
     badge.style.zIndex = '5'
-    badge.style.display = 'flex'
-    badge.style.alignItems = 'center'
-    badge.style.justifyContent = 'center'
-    badge.style.minWidth = '24px'
-    badge.style.height = '24px'
-    badge.style.padding = '0 6px'
-    badge.style.borderRadius = '999px'
-    badge.style.background = '#0f172a'
-    badge.style.border = '2px solid #fbbf24'
-    badge.style.color = '#fbbf24'
-    badge.style.fontFamily = 'sans-serif'
-    badge.style.fontSize = '11px'
-    badge.style.fontWeight = '800'
+    badge.style.width = '36px'
+    badge.style.height = '36px'
     badge.style.cursor = 'pointer'
-    badge.style.boxShadow = '0 2px 8px rgba(0,0,0,0.5)'
     badge.style.pointerEvents = 'auto'
     badge.style.userSelect = 'none'
     badge.title = 'Multiple items here - click or hover to expand'
+
+    // Circulo principal con degrade + icono de "capas" (varios elementos
+    // en un mismo punto), y un contador tipo notificacion en la esquina.
+    badge.innerHTML = `
+      <div style="
+        width:100%; height:100%; border-radius:50%;
+        background: radial-gradient(circle at 32% 28%, ${ACCENT} 0%, ${ACCENT_DARK} 100%);
+        border: 2px solid #ffffff;
+        box-shadow: 0 3px 10px rgba(55,48,163,0.5), 0 0 0 3px rgba(255,255,255,0.18);
+        display:flex; align-items:center; justify-content:center;
+      ">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2 2 7l10 5 10-5-10-5Z" fill="#ffffff"/>
+          <path d="M2 12l10 5 10-5" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
+          <path d="M2 17l10 5 10-5" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
+        </svg>
+      </div>
+      <div class="nextq-fanout-count" style="
+        position:absolute; top:-5px; right:-5px; min-width:18px; height:18px;
+        border-radius:999px; background:${COUNT_COLOR}; border:2px solid #ffffff;
+        color:#ffffff; font-family:sans-serif; font-size:10px; font-weight:800;
+        display:flex; align-items:center; justify-content:center; padding:0 3px;
+        box-shadow:0 1px 4px rgba(0,0,0,0.35);
+      ">${count}</div>
+    `
     const enterHandler = () => onClusterEnter(key)
     badgeEnterHandlers.set(badge, enterHandler)
     badge.addEventListener('mouseenter', enterHandler)
@@ -241,6 +272,7 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
       })
 
       const activeKeys = new Set<string>()
+      while (spokesSvg.firstChild) spokesSvg.removeChild(spokesSvg.firstChild)
 
       clusters.forEach(group => {
         if (group.length === 1) {
@@ -265,9 +297,10 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
           { x: 0, y: 0 }
         )
 
-        const badge = ensureBadge(key)
+        const badge = ensureBadge(key, group.length)
+        const countEl = badge.querySelector<HTMLDivElement>('.nextq-fanout-count')
+        if (countEl) countEl.textContent = String(group.length)
         badge.style.transform = `translate(${centroid.x}px, ${centroid.y}px) translate(-50%, -50%)`
-        badge.textContent = String(group.length)
         badge.style.opacity = isExpanded ? '0' : '1'
         badge.style.pointerEvents = isExpanded ? 'none' : 'auto'
 
@@ -281,12 +314,34 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
             const base = baseOffsetOf(marker)
             const [dx, dy] = offsets[i]
             marker.setOffset([base[0] + dx, base[1] + dy])
+
+            // Linea que conecta el centro del grupo con este icono, para
+            // que se lea como abanico y no como iconos sueltos flotando.
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line')
+            line.setAttribute('x1', String(centroid.x))
+            line.setAttribute('y1', String(centroid.y))
+            line.setAttribute('x2', String(centroid.x + dx))
+            line.setAttribute('y2', String(centroid.y + dy))
+            line.setAttribute('stroke', ACCENT)
+            line.setAttribute('stroke-width', '2')
+            line.setAttribute('stroke-linecap', 'round')
+            line.setAttribute('opacity', '0.55')
+            spokesSvg.appendChild(line)
           } else {
             el.style.visibility = 'hidden'
             el.style.pointerEvents = 'none'
             marker.setOffset(baseOffsetOf(marker))
           }
         })
+
+        if (isExpanded) {
+          const centerDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
+          centerDot.setAttribute('cx', String(centroid.x))
+          centerDot.setAttribute('cy', String(centroid.y))
+          centerDot.setAttribute('r', '3')
+          centerDot.setAttribute('fill', ACCENT)
+          spokesSvg.appendChild(centerDot)
+        }
       })
 
       removeUnusedBadges(activeKeys)
@@ -339,5 +394,6 @@ export function attachMarkerFanOut(map: maplibregl.Map): () => void {
     cancelCollapse()
     badgesByKey.forEach(badge => badge.remove())
     badgesByKey.clear()
+    spokesSvg.remove()
   }
 }
