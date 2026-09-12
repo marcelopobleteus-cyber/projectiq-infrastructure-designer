@@ -236,7 +236,7 @@ export default function NetworkTopologyDiagram({
 
   // 3. Load layout from localStorage or fallback to default layout
   useEffect(() => {
-    const storageKey = `topology-layout-${projectId}`
+    const storageKey = `topology-layout-v2-${projectId}`
     const saved = localStorage.getItem(storageKey)
     if (saved) {
       try {
@@ -254,7 +254,7 @@ export default function NetworkTopologyDiagram({
 
   // 4. Save layout to localStorage
   const savePositions = (updated: PositionsMap) => {
-    const storageKey = `topology-layout-${projectId}`
+    const storageKey = `topology-layout-v2-${projectId}`
     localStorage.setItem(storageKey, JSON.stringify(updated))
   }
 
@@ -413,7 +413,7 @@ export default function NetworkTopologyDiagram({
   const handleResetLayout = () => {
     if (confirm('Are you sure you want to reset the visual layout to the default structure?')) {
       setPositions(defaultPositions)
-      const storageKey = `topology-layout-${projectId}`
+      const storageKey = `topology-layout-v2-${projectId}`
       localStorage.removeItem(storageKey)
     }
   }

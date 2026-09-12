@@ -1,0 +1,62 @@
+From 8649c0de9ea86651d7fba14bdb5e134230d631ca Mon Sep 17 00:00:00 2001
+From: "Marcelo Poblete (via Claude)" <marcelopoblete.us@gmail.com>
+Date: Sat, 12 Sep 2026 22:39:31 +0000
+Subject: [PATCH] fix: bump topology layout localStorage key so old saved
+ layouts don't clash with the new canvas sizing
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Live verification on the deployed non-overlapping topology layout showed
+all nodes clustered into a tiny corner of a much larger canvas. Root
+cause: this project had a layout saved in localStorage from before this
+change, computed for the old fixed 1000x600 canvas. The merge in the
+loader effect (`{...defaultPositions, ...parsed}`) let those stale
+coordinates override the newly-computed spread-out positions, while the
+canvas itself sized correctly to the new (much wider) content — so the
+old positions rendered as a tiny cluster inside the new, bigger canvas.
+
+Bumping the storage key to 'topology-layout-v2-<projectId>' makes any
+previously saved layout simply not be found, so the fresh non-overlapping
+default layout is used until a user intentionally drags nodes again.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01ScqTACWd5u51GDZPenDDdM
+---
+ .../projects/[projectId]/network/NetworkTopologyDiagram.tsx | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/src/app/projects/[projectId]/network/NetworkTopologyDiagram.tsx b/src/app/projects/[projectId]/network/NetworkTopologyDiagram.tsx
+index d891f9a..0ea4109 100644
+--- a/src/app/projects/[projectId]/network/NetworkTopologyDiagram.tsx
++++ b/src/app/projects/[projectId]/network/NetworkTopologyDiagram.tsx
+@@ -236,7 +236,7 @@ export default function NetworkTopologyDiagram({
+ 
+   // 3. Load layout from localStorage or fallback to default layout
+   useEffect(() => {
+-    const storageKey = `topology-layout-${projectId}`
++    const storageKey = `topology-layout-v2-${projectId}`
+     const saved = localStorage.getItem(storageKey)
+     if (saved) {
+       try {
+@@ -254,7 +254,7 @@ export default function NetworkTopologyDiagram({
+ 
+   // 4. Save layout to localStorage
+   const savePositions = (updated: PositionsMap) => {
+-    const storageKey = `topology-layout-${projectId}`
++    const storageKey = `topology-layout-v2-${projectId}`
+     localStorage.setItem(storageKey, JSON.stringify(updated))
+   }
+ 
+@@ -413,7 +413,7 @@ export default function NetworkTopologyDiagram({
+   const handleResetLayout = () => {
+     if (confirm('Are you sure you want to reset the visual layout to the default structure?')) {
+       setPositions(defaultPositions)
+-      const storageKey = `topology-layout-${projectId}`
++      const storageKey = `topology-layout-v2-${projectId}`
+       localStorage.removeItem(storageKey)
+     }
+   }
+-- 
+2.43.0
+
