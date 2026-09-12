@@ -108,7 +108,12 @@ export default function ProjectMapCanvas({
   const mapRectRef = useRef<DOMRect | null>(null)
   const [map, setMap] = useState<maplibregl.Map | null>(null)
   const [activeLayer, setActiveLayer] = useState<'hybrid' | 'roadmap' | 'satellite'>('roadmap')
-  
+  // Herramientas del mapa reubicadas en una barra de iconos vertical pegada
+  // al borde derecho (como en AXIS Site Designer) en vez de paneles siempre
+  // visibles: el icono de capas abre/cierra el panel de basemap + capas de
+  // fibra + coverage.
+  const [mapLayersPanelOpen, setMapLayersPanelOpen] = useState(false)
+
   // Elements states
   const router = useRouter()
   // Se libera UNA camara a la vez desde el menu contextual, en vez de un modo
@@ -2490,14 +2495,6 @@ export default function ProjectMapCanvas({
           >
             {addDeviceMode ? 'Exit Add Device' : '+ Device'}
           </button>
-
-          <button
-            onClick={handleFitToElements}
-            title="Fit map to all elements"
-            className="p-1.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-secondary)] shrink-0"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>
-          </button>
         </>
       )}
 
@@ -2738,113 +2735,159 @@ export default function ProjectMapCanvas({
             <span>Devices: <span className="text-[var(--text-primary)] font-bold">{networkDevices.length}</span></span>
           </div>
 
-          {/* Capas base del mapa. Vivian en el sidebar, pero solo aplican al
-              mapa GIS: mostrarlas junto a un plano subido confundia. */}
+          {/* Barra de herramientas del mapa: iconos verticales pegados al
+              borde derecho del lienzo, igual que en AXIS Site Designer
+              (sitedesigner.axis.com/userprojects), en vez de paneles
+              siempre visibles flotando arriba a la derecha. Solo aplica al
+              mapa GIS: en modo plano tapaba la barra del propio plano. */}
           {canvasMode === 'map' && (
-            <div className="absolute top-4 right-4 z-20 flex items-center gap-1 p-1 bg-[var(--surface-1)]/90 backdrop-blur-md border border-[var(--border)] rounded-xl shadow-xl">
-              {([
-                { key: 'roadmap', label: 'Road' },
-                { key: 'satellite', label: 'Sat' },
-                { key: 'hybrid', label: 'Hybrid' },
-              ] as const).map(opt => (
-                <button
-                  key={opt.key}
-                  onClick={() => handleLayerChange(opt.key)}
-                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                    activeLayer === opt.key
-                      ? 'bg-[var(--accent)] text-white shadow-xs'
-                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                  }`}
-                  title={`${opt.label} basemap`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* OSP Fiber Layer Overlay Checkboxes */}
-          {/* Solo aplica al mapa GIS: en modo plano tapaba e interceptaba los clics de la barra del plano. */}
-          {canvasMode === 'map' && (
-          <div className="absolute top-[68px] right-4 z-20 bg-[var(--surface-1)]/90 backdrop-blur-md border border-[var(--border)] p-2.5 rounded-xl shadow-xl flex flex-col gap-1.5 text-[10px] font-bold text-[var(--text-primary)] font-sans pointer-events-auto">
-            <div className="text-[9px] text-[var(--accent-text)] uppercase tracking-wider border-b border-[var(--border)] pb-1 mb-0.5">Fiber Layers</div>
-            <label className="flex items-center gap-2 cursor-pointer hover:text-[var(--text-primary)] transition-colors">
-              <input
-                type="checkbox"
-                checked={showFiberNodes}
-                onChange={() => setShowFiberNodes(!showFiberNodes)}
-                className="rounded border-[var(--border)] bg-[var(--surface-2)] text-[var(--accent-text)] focus:ring-0 focus:ring-offset-0 w-3 h-3 cursor-pointer"
-              />
-              Nodes (HH/MH/ENC)
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer hover:text-[var(--text-primary)] transition-colors">
-              <input
-                type="checkbox"
-                checked={showFiberRoutes}
-                onChange={() => setShowFiberRoutes(!showFiberRoutes)}
-                className="rounded border-[var(--border)] bg-[var(--surface-2)] text-[var(--accent-text)] focus:ring-0 focus:ring-offset-0 w-3 h-3 cursor-pointer"
-              />
-              Conduit & Drops
-            </label>
-
-            {/* Cono de vision (migracion 042) */}
-            <div className="text-[9px] text-[var(--accent-text)] uppercase tracking-wider border-b border-[var(--border)] pb-1 mb-0.5 mt-1.5">Coverage</div>
-            <label className="flex items-center gap-2 cursor-pointer hover:text-[var(--text-primary)] transition-colors">
-              <input
-                type="checkbox"
-                checked={showFovCones}
-                onChange={() => setShowFovCones(!showFovCones)}
-                className="rounded border-[var(--border)] bg-[var(--surface-2)] text-[var(--accent-text)] focus:ring-0 focus:ring-offset-0 w-3 h-3 cursor-pointer"
-              />
-              Field of view
-            </label>
-            <label
-              className={`flex items-center gap-2 transition-colors ${showFovCones ? 'cursor-pointer hover:text-[var(--text-primary)]' : 'opacity-40 cursor-not-allowed'}`}
-              title="Colors the cone by EN 62676-4 bands. Needs the camera resolution to be set."
-            >
-              <input
-                type="checkbox"
-                checked={showDori}
-                disabled={!showFovCones}
-                onChange={() => setShowDori(!showDori)}
-                className="rounded border-[var(--border)] bg-[var(--surface-2)] text-[var(--accent-text)] focus:ring-0 focus:ring-offset-0 w-3 h-3 cursor-pointer"
-              />
-              DORI bands
-            </label>
-            <label
-              className={`flex items-center gap-2 transition-colors ${showFovCones ? 'cursor-pointer hover:text-[var(--text-primary)]' : 'opacity-40 cursor-not-allowed'}`}
-              title="Replaces the cone range with the camera's IR illuminator range."
-            >
-              <input
-                type="checkbox"
-                checked={showNightIr}
-                disabled={!showFovCones}
-                onChange={() => setShowNightIr(!showNightIr)}
-                className="rounded border-[var(--border)] bg-[var(--surface-2)] text-[var(--accent-text)] focus:ring-0 focus:ring-offset-0 w-3 h-3 cursor-pointer"
-              />
-              Night / IR reach
-            </label>
-            {showFovCones && showNightIr && (
-              <div className="pt-1 mt-0.5 border-t border-[var(--border)] space-y-0.5 font-normal">
-                <div className="flex items-center gap-1.5 text-[9px] text-[var(--text-secondary)]">
-                  <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: '#a78bfa' }} /> IR reach
-                </div>
-                <div className="flex items-center gap-1.5 text-[9px] text-[var(--text-secondary)]">
-                  <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: '#64748b' }} /> No IR range on file
-                </div>
-              </div>
-            )}
-            {showFovCones && showDori && (
-              <div className="pt-1 mt-0.5 border-t border-[var(--border)] space-y-0.5 font-normal">
-                {DORI_THRESHOLDS.map(t => (
-                  <div key={t.key} className="flex items-center gap-1.5 text-[9px] text-[var(--text-secondary)]">
-                    <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: t.color }} />
-                    {t.label} <span className="text-[var(--text-tertiary)]">{t.ppm} px/m</span>
+            <div className="absolute top-4 right-4 bottom-4 z-20 flex items-start">
+              {mapLayersPanelOpen && (
+                <div className="mr-2 w-56 bg-[var(--surface-1)]/95 backdrop-blur-md border border-[var(--border)] rounded-xl shadow-xl p-2.5 flex flex-col gap-1.5 text-[10px] font-bold text-[var(--text-primary)] font-sans pointer-events-auto max-h-full overflow-y-auto">
+                  <div className="text-[9px] text-[var(--accent-text)] uppercase tracking-wider border-b border-[var(--border)] pb-1 mb-0.5">Basemap</div>
+                  <div className="flex items-center gap-1 p-1 bg-[var(--surface-2)] rounded-lg">
+                    {([
+                      { key: 'roadmap', label: 'Road' },
+                      { key: 'satellite', label: 'Sat' },
+                      { key: 'hybrid', label: 'Hybrid' },
+                    ] as const).map(opt => (
+                      <button
+                        key={opt.key}
+                        onClick={() => handleLayerChange(opt.key)}
+                        className={`flex-1 px-2 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                          activeLayer === opt.key
+                            ? 'bg-[var(--accent)] text-white shadow-xs'
+                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                        }`}
+                        title={`${opt.label} basemap`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
                   </div>
-                ))}
+
+                  <div className="text-[9px] text-[var(--accent-text)] uppercase tracking-wider border-b border-[var(--border)] pb-1 mb-0.5 mt-1.5">Fiber Layers</div>
+                  <label className="flex items-center gap-2 cursor-pointer hover:text-[var(--text-primary)] transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={showFiberNodes}
+                      onChange={() => setShowFiberNodes(!showFiberNodes)}
+                      className="rounded border-[var(--border)] bg-[var(--surface-2)] text-[var(--accent-text)] focus:ring-0 focus:ring-offset-0 w-3 h-3 cursor-pointer"
+                    />
+                    Nodes (HH/MH/ENC)
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer hover:text-[var(--text-primary)] transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={showFiberRoutes}
+                      onChange={() => setShowFiberRoutes(!showFiberRoutes)}
+                      className="rounded border-[var(--border)] bg-[var(--surface-2)] text-[var(--accent-text)] focus:ring-0 focus:ring-offset-0 w-3 h-3 cursor-pointer"
+                    />
+                    Conduit & Drops
+                  </label>
+
+                  {/* Cono de vision (migracion 042) */}
+                  <div className="text-[9px] text-[var(--accent-text)] uppercase tracking-wider border-b border-[var(--border)] pb-1 mb-0.5 mt-1.5">Coverage</div>
+                  <label className="flex items-center gap-2 cursor-pointer hover:text-[var(--text-primary)] transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={showFovCones}
+                      onChange={() => setShowFovCones(!showFovCones)}
+                      className="rounded border-[var(--border)] bg-[var(--surface-2)] text-[var(--accent-text)] focus:ring-0 focus:ring-offset-0 w-3 h-3 cursor-pointer"
+                    />
+                    Field of view
+                  </label>
+                  <label
+                    className={`flex items-center gap-2 transition-colors ${showFovCones ? 'cursor-pointer hover:text-[var(--text-primary)]' : 'opacity-40 cursor-not-allowed'}`}
+                    title="Colors the cone by EN 62676-4 bands. Needs the camera resolution to be set."
+                  >
+                    <input
+                      type="checkbox"
+                      checked={showDori}
+                      disabled={!showFovCones}
+                      onChange={() => setShowDori(!showDori)}
+                      className="rounded border-[var(--border)] bg-[var(--surface-2)] text-[var(--accent-text)] focus:ring-0 focus:ring-offset-0 w-3 h-3 cursor-pointer"
+                    />
+                    DORI bands
+                  </label>
+                  <label
+                    className={`flex items-center gap-2 transition-colors ${showFovCones ? 'cursor-pointer hover:text-[var(--text-primary)]' : 'opacity-40 cursor-not-allowed'}`}
+                    title="Replaces the cone range with the camera's IR illuminator range."
+                  >
+                    <input
+                      type="checkbox"
+                      checked={showNightIr}
+                      disabled={!showFovCones}
+                      onChange={() => setShowNightIr(!showNightIr)}
+                      className="rounded border-[var(--border)] bg-[var(--surface-2)] text-[var(--accent-text)] focus:ring-0 focus:ring-offset-0 w-3 h-3 cursor-pointer"
+                    />
+                    Night / IR reach
+                  </label>
+                  {showFovCones && showNightIr && (
+                    <div className="pt-1 mt-0.5 border-t border-[var(--border)] space-y-0.5 font-normal">
+                      <div className="flex items-center gap-1.5 text-[9px] text-[var(--text-secondary)]">
+                        <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: '#a78bfa' }} /> IR reach
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[9px] text-[var(--text-secondary)]">
+                        <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: '#64748b' }} /> No IR range on file
+                      </div>
+                    </div>
+                  )}
+                  {showFovCones && showDori && (
+                    <div className="pt-1 mt-0.5 border-t border-[var(--border)] space-y-0.5 font-normal">
+                      {DORI_THRESHOLDS.map(t => (
+                        <div key={t.key} className="flex items-center gap-1.5 text-[9px] text-[var(--text-secondary)]">
+                          <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: t.color }} />
+                          {t.label} <span className="text-[var(--text-tertiary)]">{t.ppm} px/m</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Columna de iconos, siempre visible, pegada al borde */}
+              <div className="flex flex-col items-center gap-1 p-1.5 bg-[var(--surface-1)]/95 backdrop-blur-md border border-[var(--border)] rounded-xl shadow-xl pointer-events-auto">
+                <button
+                  onClick={() => setMapLayersPanelOpen(v => !v)}
+                  title="Basemap & layers"
+                  className={`p-2 rounded-lg transition-colors ${
+                    mapLayersPanelOpen
+                      ? 'bg-[var(--accent)] text-white'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)]'
+                  }`}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5Z" /><path d="M2 12l10 5 10-5" /><path d="M2 17l10 5 10-5" /></svg>
+                </button>
+
+                <div className="w-full h-px bg-[var(--border)]" />
+
+                <button
+                  onClick={() => map?.zoomIn()}
+                  title="Zoom in"
+                  className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)] transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                </button>
+                <button
+                  onClick={() => map?.zoomOut()}
+                  title="Zoom out"
+                  className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)] transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                </button>
+
+                <div className="w-full h-px bg-[var(--border)]" />
+
+                <button
+                  onClick={handleFitToElements}
+                  title="Fit map to all elements"
+                  className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)] transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>
+                </button>
               </div>
-            )}
-          </div>
+            </div>
           )}
 
           {/* ── Camera Hover Info Card ── */}
