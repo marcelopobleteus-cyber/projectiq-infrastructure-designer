@@ -29,13 +29,19 @@ interface NetworkPortCanvasProps {
   networkDevices: NetworkDevice[]
   cameras: CameraLocation[]
   cameraModels: CameraModel[]
+  // Set (to a device id) by the parent when the Topology Diagram's "Edit"
+  // button is used to jump here with a specific switch/radio pre-selected.
+  focusDeviceId?: string | null
+  onFocusHandled?: () => void
 }
 
 export default function NetworkPortCanvas({
   projectId,
   networkDevices,
   cameras,
-  cameraModels
+  cameraModels,
+  focusDeviceId,
+  onFocusHandled,
 }: NetworkPortCanvasProps) {
   const [switches, setSwitches] = useState<NetworkDevice[]>([])
   const [selectedSwitchId, setSelectedSwitchId] = useState<string>('')
@@ -46,14 +52,29 @@ export default function NetworkPortCanvas({
   // Track select menus state for quick assignments
   const [quickAssignCam, setQuickAssignCam] = useState<{ [portId: string]: string }>({})
 
-  // Filter out switches only
+  // Port-assignable devices: switches and wireless radios (both hand out
+  // ports to cameras). Gateways/routers and passive equipment (patch
+  // panels, UPS, media converters) have no port matrix of their own.
   useEffect(() => {
-    const sws = networkDevices.filter(d => d.device_type === 'switch' || d.device_type === 'Industrial Switch')
+    const sws = networkDevices.filter(d =>
+      d.device_type === 'switch' || d.device_type === 'Industrial Switch' || d.device_type === 'Wireless Radio'
+    )
     setSwitches(sws)
     if (sws.length > 0 && !selectedSwitchId) {
       setSelectedSwitchId(sws[0].id)
     }
   }, [networkDevices])
+
+  // Jump to a specific device when asked to from the Topology Diagram's
+  // "Edit" button.
+  useEffect(() => {
+    if (!focusDeviceId) return
+    const exists = networkDevices.some(d =>
+      d.id === focusDeviceId && (d.device_type === 'switch' || d.device_type === 'Industrial Switch' || d.device_type === 'Wireless Radio')
+    )
+    if (exists) setSelectedSwitchId(focusDeviceId)
+    onFocusHandled?.()
+  }, [focusDeviceId, networkDevices, onFocusHandled])
 
   // Fetch ports when selected switch changes
   const loadPorts = async () => {

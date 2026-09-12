@@ -1804,6 +1804,27 @@ export default function ProjectMapCanvas({
     setSelectedCamera(cam)
   }
 
+  // Deep-link support: a "selectedCameraId" query param (used by the "Edit"
+  // button on the Network Topology diagram, mirroring how the fiber page
+  // opens a node via "selectedNodeId") opens that camera's detail panel
+  // directly and centers the map on it, instead of requiring a click.
+  const deepLinkAppliedRef = useRef(false)
+  useEffect(() => {
+    if (deepLinkAppliedRef.current) return
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const camId = params.get('selectedCameraId')
+    if (!camId) return
+    const cam = cameras.find(c => c.id === camId)
+    if (!cam) return
+
+    deepLinkAppliedRef.current = true
+    setSelectedCamera(cam)
+    if (map && cam.latitude && cam.longitude) {
+      map.flyTo({ center: [Number(cam.longitude), Number(cam.latitude)], zoom: 19 })
+    }
+  }, [cameras, map])
+
   /** Guarda y devuelve si tuvo exito. */
   const saveCameraNow = async (): Promise<boolean> => {
     await handleSaveCamera({ preventDefault: () => {} } as React.FormEvent)

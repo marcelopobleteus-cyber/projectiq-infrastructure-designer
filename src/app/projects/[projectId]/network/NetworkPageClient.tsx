@@ -23,6 +23,9 @@ export default function NetworkPageClient({
   cameraModels,
 }: NetworkPageClientProps) {
   const [activeTab, setActiveTab] = useState<'ports' | 'topology'>('ports')
+  // Set when the Topology Diagram's "Edit" button is used to jump to the
+  // Port Matrix with a specific switch/radio pre-selected.
+  const [focusDeviceId, setFocusDeviceId] = useState<string | null>(null)
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden h-full w-full font-sans bg-[var(--bg)]">
@@ -64,6 +67,8 @@ export default function NetworkPageClient({
             networkDevices={networkDevices}
             cameras={cameras}
             cameraModels={cameraModels}
+            focusDeviceId={focusDeviceId}
+            onFocusHandled={() => setFocusDeviceId(null)}
           />
         ) : (
           <NetworkTopologyDiagram
@@ -71,6 +76,10 @@ export default function NetworkPageClient({
             networkDevices={networkDevices}
             cameras={cameras}
             cameraModels={cameraModels}
+            onEditDevice={(deviceId) => {
+              setFocusDeviceId(deviceId)
+              setActiveTab('ports')
+            }}
           />
         )}
       </div>

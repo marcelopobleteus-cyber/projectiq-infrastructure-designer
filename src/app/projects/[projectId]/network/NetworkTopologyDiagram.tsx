@@ -12,6 +12,10 @@ interface NetworkTopologyDiagramProps {
   networkDevices: NetworkDevice[]
   cameras: CameraLocation[]
   cameraModels: CameraModel[]
+  // Called with a network device id when the "Edit" button is used on a
+  // switch/wireless radio node — the parent switches to the Port Matrix
+  // tab and pre-selects that device.
+  onEditDevice?: (deviceId: string) => void
 }
 
 interface NodePosition {
@@ -79,6 +83,7 @@ export default function NetworkTopologyDiagram({
   networkDevices,
   cameras,
   cameraModels,
+  onEditDevice,
 }: NetworkTopologyDiagramProps) {
   const canvasRef = useRef<SVGSVGElement | null>(null)
 
@@ -472,7 +477,13 @@ export default function NetworkTopologyDiagram({
         return acc + Number(model?.default_poe_draw || 7.50)
       }, 0)
 
+      // Only switches and wireless radios have a real editor (the Port
+      // Matrix); gateways/routers and passive gear (patch panels, UPS,
+      // media converters) have nowhere to send an "Edit" click yet.
+      const editable = dev.device_type === 'switch' || dev.device_type === 'Industrial Switch' || dev.device_type === 'Wireless Radio'
+
       return {
+        id: dev.id,
         type: 'device',
         name: dev.name,
         device_type: dev.device_type,
@@ -487,6 +498,7 @@ export default function NetworkTopologyDiagram({
         connectedCount: switchCams.length,
         connectedDevices: switchCams.map(c => c.camera_id_tag),
         isWireless: dev.device_type === 'Wireless Radio',
+        editable,
       }
     } else if (activeNodeId.startsWith('camera-')) {
       const id = activeNodeId.replace('camera-', '')
@@ -497,6 +509,7 @@ export default function NetworkTopologyDiagram({
       const sw = networkDevices.find(d => d.id === cam.assigned_network_device_id)
 
       return {
+        id: cam.id,
         type: 'camera',
         name: cam.camera_id_tag,
         device_type: 'Camera',
@@ -508,9 +521,11 @@ export default function NetworkTopologyDiagram({
         location: cam.address_reference || cam.structure_reference || 'Map Coordinate',
         parentSwitch: sw ? sw.name : 'Unassigned',
         isWireless: cam.communication_type === 'wireless',
+        editable: true,
       }
     } else if (activeNodeId === 'default-gateway') {
       return {
+        id: null,
         type: 'gateway',
         name: 'Core Router / Gateway',
         device_type: 'router',
@@ -522,6 +537,7 @@ export default function NetworkTopologyDiagram({
         connectedCount: switches.length + wirelessDevices.length,
         connectedDevices: [...switches, ...wirelessDevices].map(s => s.name),
         isWireless: false,
+        editable: false,
       }
     }
     return null
@@ -927,6 +943,22 @@ export default function NetworkTopologyDiagram({
               </div>
               <h4 className="text-lg font-black text-[var(--text-primary)] mt-2 tracking-tight">{selectedNodeDetails.name}</h4>
               <p className="text-xs text-[var(--text-secondary)] mt-1">{selectedNodeDetails.location || 'No physical location notes.'}</p>
+
+              {selectedNodeDetails.editable && selectedNodeDetails.id && (
+                <button
+                  onClick={() => {
+                    if (selectedNodeDetails.type === 'camera') {
+                      window.location.href = `/projects/${projectId}/maps?selectedCameraId=${selectedNodeDetails.id}`
+                    } else if (selectedNodeDetails.type === 'device') {
+                      onEditDevice?.(selectedNodeDetails.id as string)
+                    }
+                  }}
+                  className="mt-3 w-full px-3 py-1.5 rounded-lg text-[11px] font-bold bg-[var(--accent)] text-white hover:opacity-90 transition-all flex items-center justify-center gap-1.5"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+                  {selectedNodeDetails.type === 'camera' ? 'Edit Camera' : 'Edit in Port Matrix'}
+                </button>
+              )}
             </div>
 
             <div className="border-t border-[var(--border)] pt-4 space-y-3 text-xs">
