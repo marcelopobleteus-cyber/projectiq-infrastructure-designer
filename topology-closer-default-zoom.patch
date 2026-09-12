@@ -1,0 +1,71 @@
+From f413dadea079f13f527b3b46c343bc6a10edd08b Mon Sep 17 00:00:00 2001
+From: "Marcelo Poblete (via Claude)" <marcelopoblete.us@gmail.com>
+Date: Sat, 12 Sep 2026 23:24:24 +0000
+Subject: [PATCH] fix: start the topology diagram zoomed in closer instead of
+ fitting the whole wide canvas
+
+Default zoom=1 showed the entire canvas (which can be several thousand
+pixels wide on projects with many switches/cameras) shrunk to fit the
+container, making every icon tiny and far away. Now the initial view
+(and the 'reset view' button) zoom in so the visible width is roughly
+1150px, centered on the gateway at the top, so nodes read at close to
+their natural size on load; users can still zoom out with the - button
+or scroll wheel to see the whole diagram.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01ScqTACWd5u51GDZPenDDdM
+---
+ .../network/NetworkTopologyDiagram.tsx        | 30 +++++++++++++++++--
+ 1 file changed, 28 insertions(+), 2 deletions(-)
+
+diff --git a/src/app/projects/[projectId]/network/NetworkTopologyDiagram.tsx b/src/app/projects/[projectId]/network/NetworkTopologyDiagram.tsx
+index 0ea4109..2377067 100644
+--- a/src/app/projects/[projectId]/network/NetworkTopologyDiagram.tsx
++++ b/src/app/projects/[projectId]/network/NetworkTopologyDiagram.tsx
+@@ -258,6 +258,31 @@ export default function NetworkTopologyDiagram({
+     localStorage.setItem(storageKey, JSON.stringify(updated))
+   }
+ 
++  // Default view: showing the entire (often very wide) diagram at zoom 1
++  // rendered every icon tiny and far away. Instead, start zoomed in close
++  // enough that nodes read at roughly their natural size, centered on the
++  // gateway at the top — the user can then pan/zoom out to see the rest.
++  const TARGET_VIEW_WIDTH = 1150
++  const computeCloseView = () => {
++    const z = Math.min(ZOOM_MAX, Math.max(1, canvasWidth / TARGET_VIEW_WIDTH))
++    const vbW = canvasWidth / z
++    return { zoom: z, pan: { x: Math.max(0, canvasWidth / 2 - vbW / 2), y: 0 } }
++  }
++
++  const initialViewSetRef = useRef(false)
++  useEffect(() => {
++    initialViewSetRef.current = false
++  }, [projectId])
++
++  useEffect(() => {
++    if (!canvasWidth || initialViewSetRef.current) return
++    const view = computeCloseView()
++    setZoom(view.zoom)
++    setPan(view.pan)
++    initialViewSetRef.current = true
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [canvasWidth, canvasHeight])
++
+   // --- Coordinate helpers (account for pan + zoom) ---
+   const vbWidth = canvasWidth / zoom
+   const vbHeight = canvasHeight / zoom
+@@ -292,8 +317,9 @@ export default function NetworkTopologyDiagram({
+   }
+ 
+   const handleResetView = () => {
+-    setZoom(1)
+-    setPan({ x: 0, y: 0 })
++    const view = computeCloseView()
++    setZoom(view.zoom)
++    setPan(view.pan)
+   }
+ 
+   const handleWheel = (e: React.WheelEvent<SVGSVGElement>) => {
+-- 
+2.43.0
+

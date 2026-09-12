@@ -258,6 +258,31 @@ export default function NetworkTopologyDiagram({
     localStorage.setItem(storageKey, JSON.stringify(updated))
   }
 
+  // Default view: showing the entire (often very wide) diagram at zoom 1
+  // rendered every icon tiny and far away. Instead, start zoomed in close
+  // enough that nodes read at roughly their natural size, centered on the
+  // gateway at the top — the user can then pan/zoom out to see the rest.
+  const TARGET_VIEW_WIDTH = 1150
+  const computeCloseView = () => {
+    const z = Math.min(ZOOM_MAX, Math.max(1, canvasWidth / TARGET_VIEW_WIDTH))
+    const vbW = canvasWidth / z
+    return { zoom: z, pan: { x: Math.max(0, canvasWidth / 2 - vbW / 2), y: 0 } }
+  }
+
+  const initialViewSetRef = useRef(false)
+  useEffect(() => {
+    initialViewSetRef.current = false
+  }, [projectId])
+
+  useEffect(() => {
+    if (!canvasWidth || initialViewSetRef.current) return
+    const view = computeCloseView()
+    setZoom(view.zoom)
+    setPan(view.pan)
+    initialViewSetRef.current = true
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvasWidth, canvasHeight])
+
   // --- Coordinate helpers (account for pan + zoom) ---
   const vbWidth = canvasWidth / zoom
   const vbHeight = canvasHeight / zoom
@@ -292,8 +317,9 @@ export default function NetworkTopologyDiagram({
   }
 
   const handleResetView = () => {
-    setZoom(1)
-    setPan({ x: 0, y: 0 })
+    const view = computeCloseView()
+    setZoom(view.zoom)
+    setPan(view.pan)
   }
 
   const handleWheel = (e: React.WheelEvent<SVGSVGElement>) => {
