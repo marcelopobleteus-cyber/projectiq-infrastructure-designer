@@ -1,0 +1,41 @@
+From 82b264ff9680fb6ab66cf9c98c3b584a8b9af750 Mon Sep 17 00:00:00 2001
+From: "Marcelo Poblete (via Claude)" <marcelopoblete.us@gmail.com>
+Date: Sat, 12 Sep 2026 17:05:48 +0000
+Subject: [PATCH] fix: clicking a camera marker no longer opens the small hover
+ card, only the detail panel
+
+---
+ .../projects/[projectId]/ProjectMapCanvas.tsx    | 16 ++++------------
+ 1 file changed, 4 insertions(+), 12 deletions(-)
+
+diff --git a/src/app/projects/[projectId]/ProjectMapCanvas.tsx b/src/app/projects/[projectId]/ProjectMapCanvas.tsx
+index 613688e..900bb70 100644
+--- a/src/app/projects/[projectId]/ProjectMapCanvas.tsx
++++ b/src/app/projects/[projectId]/ProjectMapCanvas.tsx
+@@ -869,19 +869,11 @@ export default function ProjectMapCanvas({
+ 
+         el.addEventListener('click', (e: MouseEvent) => {
+           e.stopPropagation()
++          // Antes tambien abriamos la mini-tarjeta flotante (hover card) al
++          // hacer clic, ademas del panel de detalle grande de la derecha.
++          // Con las dos ventanas abiertas al mismo tiempo era redundante, asi
++          // que el clic ahora solo abre el panel grande.
+           requestSelectCamera(cam)
+-
+-          let rect = mapRectRef.current
+-          if (!rect && mapRef.current) {
+-            rect = mapRef.current.getBoundingClientRect()
+-            mapRectRef.current = rect
+-          }
+-          if (rect) {
+-            setHoverPosition({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+-          } else {
+-            setHoverPosition({ x: 300, y: 200 })
+-          }
+-          setHoveredCamera(cam)
+         })
+ 
+         marker.on('dragend', async () => {
+-- 
+2.43.0
+

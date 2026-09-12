@@ -869,8 +869,12 @@ export default function ProjectMapCanvas({
 
         el.addEventListener('click', (e: MouseEvent) => {
           e.stopPropagation()
-          requestSelectCamera(cam)
-
+          // Flujo original: un clic en el icono muestra la mini-tarjeta
+          // flotante con el resumen; el panel de detalle grande de la
+          // derecha solo se abre si el usuario aprieta "Edit Camera" dentro
+          // de esa tarjeta (ver el boton mas abajo, que llama a
+          // requestSelectCamera). El clic en el icono ya NO abre el panel
+          // grande directamente.
           let rect = mapRectRef.current
           if (!rect && mapRef.current) {
             rect = mapRef.current.getBoundingClientRect()
