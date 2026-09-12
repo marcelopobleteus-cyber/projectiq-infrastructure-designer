@@ -1,0 +1,956 @@
+From 4ceb5e77d085b6ed2fed00c37ba26fb227dad77a Mon Sep 17 00:00:00 2001
+From: "Marcelo Poblete (via Claude)" <marcelopoblete.us@gmail.com>
+Date: Sat, 12 Sep 2026 22:05:43 +0000
+Subject: [PATCH] feat: non-overlapping topology layout, zoom/pan/group-select,
+ legend, wireless links
+
+- Rework the topology diagram's default layout algorithm: switches and
+  wireless radios each get a reserved horizontal column sized to how
+  many cameras hang off them, laid out left-to-right, instead of
+  dividing a fixed-width canvas evenly. This is what was causing icons
+  to stack on top of each other once a project had more than a
+  handful of switches/cameras.
+- Cameras under each device are arranged in a small grid (up to 4 per
+  row) instead of one crowded row.
+- Add pan (drag background) and zoom (scroll wheel, +/- buttons,
+  reset-view button) to the topology canvas, docked as a right-edge
+  icon toolbar to match the map's controls.
+- Add a group-select tool (drag a marquee box to select multiple
+  nodes, then drag any of them to move the group together).
+- Add an on-canvas legend explaining node icons (gateway/switch/
+  wireless radio/camera), line styles (solid = wired, dashed orange =
+  wireless), and status dot colors.
+- Distinguish Wireless Radio devices and wireless-linked cameras with
+  a distinct radio-wave icon, orange accent, and dashed connection
+  lines, and surface a 'Wireless' badge in the detail panel.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01ScqTACWd5u51GDZPenDDdM
+---
+ .../network/NetworkTopologyDiagram.tsx        | 633 +++++++++++++-----
+ 1 file changed, 473 insertions(+), 160 deletions(-)
+
+diff --git a/src/app/projects/[projectId]/network/NetworkTopologyDiagram.tsx b/src/app/projects/[projectId]/network/NetworkTopologyDiagram.tsx
+index c3180fa..d891f9a 100644
+--- a/src/app/projects/[projectId]/network/NetworkTopologyDiagram.tsx
++++ b/src/app/projects/[projectId]/network/NetworkTopologyDiagram.tsx
+@@ -24,6 +24,56 @@ interface PositionsMap {
+   [nodeId: string]: NodePosition
+ }
+ 
++// Layout constants — shared between the position algorithm and the camera
++// grid so columns and camera clusters always agree on spacing (this is what
++// keeps icons from overlapping regardless of how many devices/cameras exist).
++const CANVAS_MARGIN = 70
++const NODE_COL_GAP = 46
++const CAM_W = 40
++const CAM_GAP = 16
++const DEV_W = 70
++const CAMS_PER_ROW = 4
++const CAM_ROW_GAP = 52
++const LEVEL_GAP = 100
++
++const ZOOM_MIN = 0.4
++const ZOOM_MAX = 2.5
++
++type NodeKind = 'gateway' | 'switch' | 'wireless' | 'camera'
++
++function iconPathsFor(kind: NodeKind): string[] {
++  switch (kind) {
++    case 'gateway':
++      return [
++        'M 12 2 A 10 10 0 1 0 22 12 A 10 10 0 0 0 12 2 Z',
++        'M 2 12 H 22',
++        'M 12 2 A 15.3 15.3 0 0 1 12 22 A 15.3 15.3 0 0 1 12 2 Z',
++      ]
++    case 'wireless':
++      // Signal/radio-wave icon — matches the Wireless Links iconography used
++      // elsewhere in the app (landing page, map asset markers).
++      return [
++        'M 12 20 H 12.01',
++        'M 8.111 16.404 A 5.5 5.5 0 0 1 15.889 16.404',
++        'M 5.283 13.576 A 9.5 9.5 0 0 1 18.717 13.576',
++      ]
++    case 'camera':
++      return ['M 23 7 L 16 12 L 23 17 Z', 'M 1 5 H 15 V 19 H 1 Z']
++    case 'switch':
++    default:
++      return [
++        'M 2 5 H 22 V 9 H 2 V 5 Z',
++        'M 2 15 H 22 V 19 H 2 V 15 Z',
++        'M 6 7 H 7',
++        'M 10 7 H 11',
++        'M 6 17 H 7',
++        'M 10 17 H 11',
++      ]
++  }
++}
++
++const WIRELESS_ACCENT = '#f97316'
++
+ export default function NetworkTopologyDiagram({
+   projectId,
+   networkDevices,
+@@ -31,118 +81,158 @@ export default function NetworkTopologyDiagram({
+   cameraModels,
+ }: NetworkTopologyDiagramProps) {
+   const canvasRef = useRef<SVGSVGElement | null>(null)
+-  
+-  // State for positions
++
++  // State for node positions
+   const [positions, setPositions] = useState<PositionsMap>({})
+   const [activeNodeId, setActiveNodeId] = useState<string | null>(null)
+   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null)
+-  const [draggingNode, setDraggingNode] = useState<{ id: string; startX: number; startY: number } | null>(null)
++  const [draggingNode, setDraggingNode] = useState<{ id: string; offsetX: number; offsetY: number } | null>(null)
++
++  // Pan / zoom state
++  const [zoom, setZoom] = useState(1)
++  const [pan, setPan] = useState({ x: 0, y: 0 })
++  const [panDrag, setPanDrag] = useState<{ startClientX: number; startClientY: number; startPanX: number; startPanY: number; scaleX: number; scaleY: number } | null>(null)
++
++  // Group-select ("marquee") state
++  const [selectMode, setSelectMode] = useState(false)
++  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
++  const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null)
+ 
+-  // 1. Separate devices by type
++  // 1. Separate devices by role
+   const routers = useMemo(() => networkDevices.filter(d => d.device_type === 'router'), [networkDevices])
+   const nvrs = useMemo(() => networkDevices.filter(d => d.device_type === 'nvr'), [networkDevices])
+   const switches = useMemo(() => networkDevices.filter(d => d.device_type === 'switch' || d.device_type === 'Industrial Switch'), [networkDevices])
+-  const others = useMemo(() => networkDevices.filter(d => d.device_type !== 'router' && d.device_type !== 'nvr' && d.device_type !== 'switch' && d.device_type !== 'Industrial Switch'), [networkDevices])
+-
+-  // 2. Generate default hierarchical positions
+-  const defaultPositions = useMemo(() => {
++  const wirelessDevices = useMemo(() => networkDevices.filter(d => d.device_type === 'Wireless Radio'), [networkDevices])
++  const others = useMemo(
++    () => networkDevices.filter(d => !['router', 'nvr', 'switch', 'Industrial Switch', 'Wireless Radio'].includes(d.device_type)),
++    [networkDevices]
++  )
++  const deviceById = useMemo(() => new Map(networkDevices.map(d => [d.id, d])), [networkDevices])
++
++  // 2. Generate default non-overlapping positions.
++  // Every "distribution" node (switch or wireless radio) gets its own reserved
++  // horizontal column sized to how many cameras hang off it, laid out left to
++  // right — instead of dividing the fixed canvas evenly, which is what caused
++  // icons to stack on top of each other once a project had more than a
++  // handful of switches/cameras.
++  const { positions: defaultPositions, canvasWidth, canvasHeight } = useMemo(() => {
+     const pos: PositionsMap = {}
+-    const canvasWidth = 1000
+-    const canvasHeight = 600
+-
+-    // Level 0: Routers
+-    const routerCount = routers.length
+-    const routerY = 60
+-    if (routerCount > 0) {
+-      routers.forEach((r, idx) => {
+-        pos[`device-${r.id}`] = {
+-          x: routerCount === 1 ? canvasWidth / 2 : (idx + 1) * (canvasWidth / (routerCount + 1)),
+-          y: routerY
+-        }
+-      })
+-    } else {
+-      // Create a default Core Gateway node if none defined
+-      pos['default-gateway'] = { x: canvasWidth / 2, y: routerY }
+-    }
+ 
+-    // Level 1: NVRs & Core equipment
+-    const nvrCount = nvrs.length
+-    const nvrY = 150
+-    nvrs.forEach((n, idx) => {
+-      pos[`device-${n.id}`] = {
+-        x: nvrCount === 1 ? canvasWidth / 3 : (idx + 1) * (canvasWidth / (nvrCount + 1)),
+-        y: nvrY
++    const camsByDevice = new Map<string, CameraLocation[]>()
++    const unassignedCams: CameraLocation[] = []
++    cameras.forEach(cam => {
++      if (cam.assigned_network_device_id) {
++        const list = camsByDevice.get(cam.assigned_network_device_id) || []
++        list.push(cam)
++        camsByDevice.set(cam.assigned_network_device_id, list)
++      } else {
++        unassignedCams.push(cam)
+       }
+     })
+ 
+-    // Level 2: Switches
+-    const switchCount = switches.length
+-    const switchY = 270
+-    switches.forEach((sw, idx) => {
+-      pos[`device-${sw.id}`] = {
+-        x: switchCount === 1 ? canvasWidth / 2 : (idx + 0.5) * (canvasWidth / switchCount),
+-        y: switchY
+-      }
+-    })
++    const colWidthForCount = (count: number) => {
++      if (count === 0) return DEV_W + NODE_COL_GAP
++      const perRow = Math.min(count, CAMS_PER_ROW)
++      return Math.max(DEV_W + NODE_COL_GAP, perRow * (CAM_W + CAM_GAP) + NODE_COL_GAP)
++    }
+ 
+-    // Level 3: Others (patch panels, UPS, etc.)
+-    const otherCount = others.length
+-    const otherY = 380
+-    others.forEach((o, idx) => {
+-      pos[`device-${o.id}`] = {
+-        x: otherCount === 1 ? canvasWidth / 2 : (idx + 1) * (canvasWidth / (otherCount + 1)),
+-        y: otherY
+-      }
++    const distributionNodes = [...switches, ...wirelessDevices]
++
++    let cursor = CANVAS_MARGIN
++    const columns: Array<{ id: string; x: number; colWidth: number; cams: CameraLocation[] }> = []
++    distributionNodes.forEach(node => {
++      const camList = camsByDevice.get(node.id) || []
++      const colWidth = colWidthForCount(camList.length)
++      const x = cursor + colWidth / 2
++      columns.push({ id: node.id, x, colWidth, cams: camList })
++      cursor += colWidth
+     })
+ 
+-    // Level 4: Cameras (clustered below their parent switch)
+-    const switchMap = new Map<string, CameraLocation[]>()
+-    const unassignedCams: CameraLocation[] = []
++    const unassignedColWidth = unassignedCams.length > 0 ? colWidthForCount(unassignedCams.length) : 0
++    const unassignedX = cursor + unassignedColWidth / 2
++    if (unassignedCams.length > 0) cursor += unassignedColWidth
+ 
+-    cameras.forEach((cam) => {
+-      if (cam.assigned_network_device_id) {
+-        const list = switchMap.get(cam.assigned_network_device_id) || []
+-        list.push(cam)
+-        switchMap.set(cam.assigned_network_device_id, list)
+-      } else {
+-        unassignedCams.push(cam)
+-      }
++    const canvasWidth = Math.max(1000, cursor + CANVAS_MARGIN)
++
++    // Level 0: Router / Gateway
++    let y = 70
++    const gatewayId = routers.length > 0 ? `device-${routers[0].id}` : 'default-gateway'
++    pos[gatewayId] = { x: canvasWidth / 2, y }
++    y += LEVEL_GAP
++
++    // Level 1: NVRs
++    if (nvrs.length > 0) {
++      nvrs.forEach((n, idx) => {
++        pos[`device-${n.id}`] = {
++          x: nvrs.length === 1 ? canvasWidth / 2 : (idx + 1) * (canvasWidth / (nvrs.length + 1)),
++          y,
++        }
++      })
++      y += LEVEL_GAP
++    }
++
++    // Level 2: Switches + Wireless Radios (each in its own reserved column)
++    const distributionY = y
++    columns.forEach(col => {
++      pos[`device-${col.id}`] = { x: col.x, y: distributionY }
+     })
++    y += LEVEL_GAP
++
++    // Level 2b: Other equipment (patch panels, UPS, media converters, etc.)
++    if (others.length > 0) {
++      others.forEach((o, idx) => {
++        pos[`device-${o.id}`] = {
++          x: others.length === 1 ? canvasWidth / 2 : (idx + 1) * (canvasWidth / (others.length + 1)),
++          y,
++        }
++      })
++      y += LEVEL_GAP
++    }
+ 
+-    const cameraY = 490
+-
+-    // Position cameras under their switch
+-    switches.forEach((sw) => {
+-      const swPos = pos[`device-${sw.id}`] || { x: canvasWidth / 2, y: switchY }
+-      const swCams = switchMap.get(sw.id) || []
+-      const M = swCams.length
+-
+-      if (M > 0) {
+-        swCams.forEach((cam, cIdx) => {
+-          // Center the cameras relative to parent switch X
+-          const spacing = Math.min(80, canvasWidth / (M + 1))
+-          const offset = (cIdx - (M - 1) / 2) * spacing
+-          pos[`camera-${cam.id}`] = {
+-            x: swPos.x + offset,
+-            y: cameraY
+-          }
+-        })
+-      }
++    // Level 3: Cameras, gridded within their parent's column
++    const cameraTopY = y + 20
++    let maxRows = 0
++    columns.forEach(col => {
++      const count = col.cams.length
++      if (count === 0) return
++      const rows = Math.ceil(count / CAMS_PER_ROW)
++      maxRows = Math.max(maxRows, rows)
++      col.cams.forEach((cam, idx) => {
++        const rowIdx = Math.floor(idx / CAMS_PER_ROW)
++        const rowStart = rowIdx * CAMS_PER_ROW
++        const rowCount = Math.min(count - rowStart, CAMS_PER_ROW)
++        const colIdx = idx - rowStart
++        const rowWidth = rowCount * (CAM_W + CAM_GAP) - CAM_GAP
++        const startX = col.x - rowWidth / 2 + CAM_W / 2
++        pos[`camera-${cam.id}`] = {
++          x: startX + colIdx * (CAM_W + CAM_GAP),
++          y: cameraTopY + rowIdx * CAM_ROW_GAP,
++        }
++      })
+     })
+ 
+-    // Position unassigned cameras on the bottom right/left
+-    const U = unassignedCams.length
+-    if (U > 0) {
++    if (unassignedCams.length > 0) {
++      const count = unassignedCams.length
++      const rows = Math.ceil(count / CAMS_PER_ROW)
++      maxRows = Math.max(maxRows, rows)
+       unassignedCams.forEach((cam, idx) => {
++        const rowIdx = Math.floor(idx / CAMS_PER_ROW)
++        const rowStart = rowIdx * CAMS_PER_ROW
++        const rowCount = Math.min(count - rowStart, CAMS_PER_ROW)
++        const colIdx = idx - rowStart
++        const rowWidth = rowCount * (CAM_W + CAM_GAP) - CAM_GAP
++        const startX = unassignedX - rowWidth / 2 + CAM_W / 2
+         pos[`camera-${cam.id}`] = {
+-          x: (idx + 1) * (canvasWidth / (U + 1)),
+-          y: cameraY + 40 // Slightly offset lower
++          x: startX + colIdx * (CAM_W + CAM_GAP),
++          y: cameraTopY + rowIdx * CAM_ROW_GAP,
+         }
+       })
+     }
+ 
+-    return pos
+-  }, [routers, nvrs, switches, others, cameras])
++    const canvasHeight = Math.max(560, cameraTopY + Math.max(1, maxRows) * CAM_ROW_GAP + 40)
++
++    return { positions: pos, canvasWidth, canvasHeight }
++  }, [routers, nvrs, switches, wirelessDevices, others, cameras])
+ 
+   // 3. Load layout from localStorage or fallback to default layout
+   useEffect(() => {
+@@ -151,7 +241,6 @@ export default function NetworkTopologyDiagram({
+     if (saved) {
+       try {
+         const parsed = JSON.parse(saved)
+-        // Merge saved positions with default positions for any new elements
+         const merged = { ...defaultPositions, ...parsed }
+         setPositions(merged)
+       } catch (err) {
+@@ -169,42 +258,135 @@ export default function NetworkTopologyDiagram({
+     localStorage.setItem(storageKey, JSON.stringify(updated))
+   }
+ 
+-  // Handle drag interactions
++  // --- Coordinate helpers (account for pan + zoom) ---
++  const vbWidth = canvasWidth / zoom
++  const vbHeight = canvasHeight / zoom
++
++  const clientToSvg = (clientX: number, clientY: number) => {
++    const rect = canvasRef.current?.getBoundingClientRect()
++    if (!rect) return { x: 0, y: 0 }
++    const scaleX = vbWidth / rect.width
++    const scaleY = vbHeight / rect.height
++    return { x: pan.x + (clientX - rect.left) * scaleX, y: pan.y + (clientY - rect.top) * scaleY }
++  }
++
++  const zoomAt = (clientX: number, clientY: number, factor: number) => {
++    const rect = canvasRef.current?.getBoundingClientRect()
++    if (!rect) return
++    const newZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom * factor))
++    if (newZoom === zoom) return
++    const ratioX = (clientX - rect.left) / rect.width
++    const ratioY = (clientY - rect.top) / rect.height
++    const focusX = pan.x + ratioX * vbWidth
++    const focusY = pan.y + ratioY * vbHeight
++    const newVbW = canvasWidth / newZoom
++    const newVbH = canvasHeight / newZoom
++    setZoom(newZoom)
++    setPan({ x: focusX - ratioX * newVbW, y: focusY - ratioY * newVbH })
++  }
++
++  const handleZoomButton = (factor: number) => {
++    const rect = canvasRef.current?.getBoundingClientRect()
++    if (!rect) return
++    zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, factor)
++  }
++
++  const handleResetView = () => {
++    setZoom(1)
++    setPan({ x: 0, y: 0 })
++  }
++
++  const handleWheel = (e: React.WheelEvent<SVGSVGElement>) => {
++    e.preventDefault()
++    zoomAt(e.clientX, e.clientY, e.deltaY > 0 ? 0.9 : 1.1)
++  }
++
++  // Handle node drag interactions (single node, or the whole group when the
++  // dragged node is part of a multi-selection made with the select tool)
+   const handleMouseDown = (nodeId: string, e: React.MouseEvent) => {
+     e.preventDefault()
+     e.stopPropagation()
+-    const rect = canvasRef.current?.getBoundingClientRect()
+-    if (!rect) return
+ 
+-    const mouseX = e.clientX - rect.left
+-    const mouseY = e.clientY - rect.top
+-    const nodePos = positions[nodeId] || { x: mouseX, y: mouseY }
++    if (selectMode) {
++      setSelectedIds(prev => {
++        const next = new Set(prev)
++        if (next.has(nodeId)) next.delete(nodeId)
++        else next.add(nodeId)
++        return next
++      })
++      setActiveNodeId(nodeId)
++      return
++    }
+ 
+-    setDraggingNode({
+-      id: nodeId,
+-      startX: mouseX - nodePos.x,
+-      startY: mouseY - nodePos.y
+-    })
++    const svgPoint = clientToSvg(e.clientX, e.clientY)
++    const nodePos = positions[nodeId] || { x: svgPoint.x, y: svgPoint.y }
++    setDraggingNode({ id: nodeId, offsetX: svgPoint.x - nodePos.x, offsetY: svgPoint.y - nodePos.y })
+     setActiveNodeId(nodeId)
+   }
+ 
+-  const handleMouseMove = (e: React.MouseEvent) => {
+-    if (!draggingNode) return
++  const handleCanvasMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
++    // Only fires when the background (not a node) is pressed, since node
++    // handlers call stopPropagation().
++    const svgPoint = clientToSvg(e.clientX, e.clientY)
++    if (selectMode) {
++      setMarquee({ x0: svgPoint.x, y0: svgPoint.y, x1: svgPoint.x, y1: svgPoint.y })
++      return
++    }
+     const rect = canvasRef.current?.getBoundingClientRect()
+     if (!rect) return
++    setPanDrag({
++      startClientX: e.clientX,
++      startClientY: e.clientY,
++      startPanX: pan.x,
++      startPanY: pan.y,
++      scaleX: vbWidth / rect.width,
++      scaleY: vbHeight / rect.height,
++    })
++  }
+ 
+-    const mouseX = e.clientX - rect.left
+-    const mouseY = e.clientY - rect.top
++  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
++    if (draggingNode) {
++      const svgPoint = clientToSvg(e.clientX, e.clientY)
++      const newX = Math.max(30, Math.min(canvasWidth - 30, svgPoint.x - draggingNode.offsetX))
++      const newY = Math.max(30, Math.min(canvasHeight - 30, svgPoint.y - draggingNode.offsetY))
++
++      const current = positions[draggingNode.id] || { x: newX, y: newY }
++      const deltaX = newX - current.x
++      const deltaY = newY - current.y
++
++      const movingGroup = selectedIds.has(draggingNode.id) && selectedIds.size > 1
++
++      setPositions(prev => {
++        const updated = { ...prev }
++        if (movingGroup) {
++          selectedIds.forEach(id => {
++            const p = prev[id]
++            if (!p) return
++            updated[id] = {
++              x: Math.max(30, Math.min(canvasWidth - 30, p.x + deltaX)),
++              y: Math.max(30, Math.min(canvasHeight - 30, p.y + deltaY)),
++              isCustom: true,
++            }
++          })
++        } else {
++          updated[draggingNode.id] = { x: newX, y: newY, isCustom: true }
++        }
++        return updated
++      })
++      return
++    }
+ 
+-    // Boundary constraints within the SVG canvas width (1000px) and height (600px)
+-    const newX = Math.max(30, Math.min(970, mouseX - draggingNode.startX))
+-    const newY = Math.max(30, Math.min(570, mouseY - draggingNode.startY))
++    if (panDrag) {
++      const dx = (e.clientX - panDrag.startClientX) * panDrag.scaleX
++      const dy = (e.clientY - panDrag.startClientY) * panDrag.scaleY
++      setPan({ x: panDrag.startPanX - dx, y: panDrag.startPanY - dy })
++      return
++    }
+ 
+-    const updated = {
+-      ...positions,
+-      [draggingNode.id]: { x: newX, y: newY, isCustom: true }
++    if (marquee) {
++      const svgPoint = clientToSvg(e.clientX, e.clientY)
++      setMarquee({ ...marquee, x1: svgPoint.x, y1: svgPoint.y })
+     }
+-    setPositions(updated)
+   }
+ 
+   const handleMouseUp = () => {
+@@ -212,6 +394,20 @@ export default function NetworkTopologyDiagram({
+       savePositions(positions)
+       setDraggingNode(null)
+     }
++    if (panDrag) {
++      setPanDrag(null)
++    }
++    if (marquee) {
++      const minX = Math.min(marquee.x0, marquee.x1)
++      const maxX = Math.max(marquee.x0, marquee.x1)
++      const minY = Math.min(marquee.y0, marquee.y1)
++      const maxY = Math.max(marquee.y0, marquee.y1)
++      const ids = Object.entries(positions)
++        .filter(([, p]) => p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY)
++        .map(([id]) => id)
++      setSelectedIds(new Set(ids))
++      setMarquee(null)
++    }
+   }
+ 
+   const handleResetLayout = () => {
+@@ -222,6 +418,13 @@ export default function NetworkTopologyDiagram({
+     }
+   }
+ 
++  const toggleSelectMode = () => {
++    setSelectMode(v => {
++      if (v) setSelectedIds(new Set())
++      return !v
++    })
++  }
++
+   // Helper to draw clean bezier path connecting nodes
+   const getCurvePath = (x1: number, y1: number, x2: number, y2: number) => {
+     const dy = y2 - y1
+@@ -237,7 +440,6 @@ export default function NetworkTopologyDiagram({
+       const dev = networkDevices.find(d => d.id === id)
+       if (!dev) return null
+ 
+-      // Calculate PoE draw if it is a switch
+       const switchCams = cameras.filter(c => c.assigned_network_device_id === dev.id)
+       const poeUsed = switchCams.reduce((acc, cam) => {
+         const model = cameraModels.find(m => m.id === cam.camera_model_id)
+@@ -257,7 +459,8 @@ export default function NetworkTopologyDiagram({
+         status: dev.status,
+         location: dev.location_reference,
+         connectedCount: switchCams.length,
+-        connectedDevices: switchCams.map(c => c.camera_id_tag)
++        connectedDevices: switchCams.map(c => c.camera_id_tag),
++        isWireless: dev.device_type === 'Wireless Radio',
+       }
+     } else if (activeNodeId.startsWith('camera-')) {
+       const id = activeNodeId.replace('camera-', '')
+@@ -277,7 +480,8 @@ export default function NetworkTopologyDiagram({
+         poe_draw: model?.default_poe_draw || 7.50,
+         status: cam.status,
+         location: cam.address_reference || cam.structure_reference || 'Map Coordinate',
+-        parentSwitch: sw ? sw.name : 'Unassigned'
++        parentSwitch: sw ? sw.name : 'Unassigned',
++        isWireless: cam.communication_type === 'wireless',
+       }
+     } else if (activeNodeId === 'default-gateway') {
+       return {
+@@ -289,12 +493,13 @@ export default function NetworkTopologyDiagram({
+         model_number: 'Enterprise Gateway',
+         status: 'Active',
+         location: 'Main Server Rack',
+-        connectedCount: switches.length,
+-        connectedDevices: switches.map(s => s.name)
++        connectedCount: switches.length + wirelessDevices.length,
++        connectedDevices: [...switches, ...wirelessDevices].map(s => s.name),
++        isWireless: false,
+       }
+     }
+     return null
+-  }, [activeNodeId, networkDevices, cameras, cameraModels, switches])
++  }, [activeNodeId, networkDevices, cameras, cameraModels, switches, wirelessDevices])
+ 
+   // Compute connections list (edges) to draw in background
+   const connections = useMemo(() => {
+@@ -307,13 +512,12 @@ export default function NetworkTopologyDiagram({
+       fromNodeId: string
+       toNodeId: string
+       isActive: boolean
++      isWireless: boolean
+     }> = []
+ 
+-    // Gateway ID
+     const gatewayId = routers.length > 0 ? `device-${routers[0].id}` : 'default-gateway'
+     const gatePos = positions[gatewayId]
+ 
+-    // Link NVRs to Gateway
+     if (gatePos) {
+       nvrs.forEach((nvr) => {
+         const nvrId = `device-${nvr.id}`
+@@ -327,23 +531,23 @@ export default function NetworkTopologyDiagram({
+             toY: nPos.y,
+             fromNodeId: gatewayId,
+             toNodeId: nvrId,
+-            isActive: hoveredNodeId === gatewayId || hoveredNodeId === nvrId
++            isActive: hoveredNodeId === gatewayId || hoveredNodeId === nvrId,
++            isWireless: false,
+           })
+         }
+       })
+ 
+-      // Link main switches directly to Router or NVR.
++      // Link switches and wireless radios directly to the Core Gateway.
+       //
+       // There used to be a branch here that linked a switch to a parent switch via
+       // `sw.assigned_switch_id`. That column does not exist on `network_devices`, so the
+       // value was always undefined and the branch never ran. It was removed rather than
+       // left as dead code. To support switch-to-switch links, add the column in a
+       // migration and reinstate this with a way to assign the parent in the UI.
+-      switches.forEach((sw) => {
++      ;[...switches, ...wirelessDevices].forEach((sw) => {
+         const swId = `device-${sw.id}`
+         const swPos = positions[swId]
+         if (swPos) {
+-          // Link switch to Core Gateway
+           list.push({
+             id: `link-gateway-switch-${sw.id}`,
+             fromX: gatePos.x,
+@@ -352,19 +556,21 @@ export default function NetworkTopologyDiagram({
+             toY: swPos.y,
+             fromNodeId: gatewayId,
+             toNodeId: swId,
+-            isActive: hoveredNodeId === gatewayId || hoveredNodeId === swId
++            isActive: hoveredNodeId === gatewayId || hoveredNodeId === swId,
++            isWireless: sw.device_type === 'Wireless Radio',
+           })
+         }
+       })
+     }
+ 
+-    // Link cameras to switches
++    // Link cameras to their assigned device (switch or wireless radio)
+     cameras.forEach((cam) => {
+       if (cam.assigned_network_device_id) {
+         const swId = `device-${cam.assigned_network_device_id}`
+         const camId = `camera-${cam.id}`
+         const swPos = positions[swId]
+         const camPos = positions[camId]
++        const parentDev = deviceById.get(cam.assigned_network_device_id)
+ 
+         if (swPos && camPos) {
+           list.push({
+@@ -375,28 +581,38 @@ export default function NetworkTopologyDiagram({
+             toY: camPos.y,
+             fromNodeId: swId,
+             toNodeId: camId,
+-            isActive: hoveredNodeId === swId || hoveredNodeId === camId
++            isActive: hoveredNodeId === swId || hoveredNodeId === camId,
++            isWireless: cam.communication_type === 'wireless' || parentDev?.device_type === 'Wireless Radio',
+           })
+         }
+       }
+     })
+ 
+     return list
+-  }, [positions, routers, nvrs, switches, cameras, hoveredNodeId])
++  }, [positions, routers, nvrs, switches, wirelessDevices, cameras, hoveredNodeId, deviceById])
+ 
+   return (
+     <div className="flex-1 flex flex-col md:flex-row overflow-hidden h-full w-full bg-[var(--surface-2)] font-sans">
+-      
++
+       {/* Topology Canvas Left Column */}
+       <div className="flex-1 flex flex-col overflow-hidden h-full p-6 relative">
+-        
++
+         {/* Canvas Toolbar Controls */}
+         <div className="flex items-center justify-between mb-4 z-20">
+           <div>
+             <h3 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider">Logical Network Topology</h3>
+-            <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">Drag and position switches or cameras to arrange the visual diagram.</p>
++            <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
++              {selectMode
++                ? 'Drag a box to select a group of nodes, then drag any of them to move the group together.'
++                : 'Drag to pan the canvas, or drag a node to reposition it. Scroll to zoom.'}
++            </p>
+           </div>
+           <div className="flex items-center gap-2">
++            {selectedIds.size > 0 && (
++              <span className="px-2 py-1 rounded-lg bg-[var(--accent)]/10 text-[var(--accent-text)] text-[10px] font-bold">
++                {selectedIds.size} selected
++              </span>
++            )}
+             <button
+               onClick={handleResetLayout}
+               className="px-2.5 py-1 bg-[var(--surface-1)] hover:bg-[var(--surface-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border)] rounded-lg text-[10px] font-bold transition-all"
+@@ -412,11 +628,13 @@ export default function NetworkTopologyDiagram({
+             ref={canvasRef}
+             width="100%"
+             height="100%"
+-            viewBox="0 0 1000 600"
+-            className="w-full h-full cursor-grab active:cursor-grabbing"
++            viewBox={`${pan.x} ${pan.y} ${vbWidth} ${vbHeight}`}
++            className={`w-full h-full ${selectMode ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing'}`}
++            onMouseDown={handleCanvasMouseDown}
+             onMouseMove={handleMouseMove}
+             onMouseUp={handleMouseUp}
+             onMouseLeave={handleMouseUp}
++            onWheel={handleWheel}
+           >
+             {/* Grid Pattern Definition */}
+             <defs>
+@@ -424,7 +642,7 @@ export default function NetworkTopologyDiagram({
+                 <circle cx="2" cy="2" r="1.5" fill="rgba(71, 85, 105, 0.18)" />
+               </pattern>
+             </defs>
+-            <rect width="100%" height="100%" fill="url(#canvas-grid)" />
++            <rect x={-2000} y={-2000} width={canvasWidth + 4000} height={canvasHeight + 4000} fill="url(#canvas-grid)" />
+ 
+             {/* Connection Lines (Edges) */}
+             <g>
+@@ -433,8 +651,9 @@ export default function NetworkTopologyDiagram({
+                   key={link.id}
+                   d={getCurvePath(link.fromX, link.fromY, link.toX, link.toY)}
+                   fill="none"
+-                  stroke={link.isActive ? '#6366f1' : '#1e293b'}
++                  stroke={link.isWireless ? WIRELESS_ACCENT : link.isActive ? '#6366f1' : '#1e293b'}
+                   strokeWidth={link.isActive ? 2.5 : 1.5}
++                  strokeDasharray={link.isWireless ? '6 4' : undefined}
+                   className="transition-all duration-200"
+                   style={{
+                     filter: link.isActive ? 'drop-shadow(0 0 4px rgba(99, 102, 241, 0.4))' : 'none'
+@@ -443,6 +662,20 @@ export default function NetworkTopologyDiagram({
+               ))}
+             </g>
+ 
++            {/* Marquee selection rectangle */}
++            {marquee && (
++              <rect
++                x={Math.min(marquee.x0, marquee.x1)}
++                y={Math.min(marquee.y0, marquee.y1)}
++                width={Math.abs(marquee.x1 - marquee.x0)}
++                height={Math.abs(marquee.y1 - marquee.y0)}
++                fill="rgba(99, 102, 241, 0.12)"
++                stroke="#6366f1"
++                strokeWidth={1}
++                strokeDasharray="4 3"
++              />
++            )}
++
+             {/* Nodes Layer */}
+             <g>
+               {Object.entries(positions).map(([id, pos]) => {
+@@ -453,18 +686,14 @@ export default function NetworkTopologyDiagram({
+                 let name = 'Unknown'
+                 let typeLabel = ''
+                 let status = 'Planned'
+-                let iconPaths: string[] = []
++                let isWirelessNode = false
++                let kind: NodeKind = 'switch'
+ 
+                 if (isGateway) {
+                   name = 'Gateway Router'
+                   typeLabel = 'router'
+                   status = 'Active'
+-                  // Globe Path
+-                  iconPaths = [
+-                    'M 12 2 A 10 10 0 1 0 22 12 A 10 10 0 0 0 12 2 Z',
+-                    'M 2 12 H 22',
+-                    'M 12 2 A 15.3 15.3 0 0 1 12 22 A 15.3 15.3 0 0 1 12 2 Z'
+-                  ]
++                  kind = 'gateway'
+                 } else if (isDevice) {
+                   const devId = id.replace('device-', '')
+                   const dev = networkDevices.find(d => d.id === devId)
+@@ -472,16 +701,10 @@ export default function NetworkTopologyDiagram({
+                     name = dev.name
+                     typeLabel = dev.device_type
+                     status = dev.status
++                    isWirelessNode = dev.device_type === 'Wireless Radio'
++                    kind = isWirelessNode ? 'wireless' : 'switch'
+                   }
+-                  // Server / Switch path
+-                  iconPaths = [
+-                    'M 2 5 H 22 V 9 H 2 V 5 Z',
+-                    'M 2 15 H 22 V 19 H 2 V 15 Z',
+-                    'M 6 7 H 7',
+-                    'M 10 7 H 11',
+-                    'M 6 17 H 7',
+-                    'M 10 17 H 11'
+-                  ]
++                  if (routers.some(r => `device-${r.id}` === id)) kind = 'gateway'
+                 } else if (isCamera) {
+                   const camId = id.replace('camera-', '')
+                   const cam = cameras.find(c => c.id === camId)
+@@ -489,24 +712,32 @@ export default function NetworkTopologyDiagram({
+                     name = cam.camera_id_tag
+                     typeLabel = 'camera'
+                     status = cam.status
++                    isWirelessNode = cam.communication_type === 'wireless'
+                   }
+-                  // Camera Path
+-                  iconPaths = [
+-                    'M 23 7 L 16 12 L 23 17 Z',
+-                    'M 1 5 H 15 V 19 H 1 Z'
+-                  ]
++                  kind = 'camera'
+                 }
+ 
++                const iconPaths = iconPathsFor(kind)
+                 const isActive = activeNodeId === id
+                 const isHovered = hoveredNodeId === id
+-                
+-                // Color codes
++                const isSelected = selectedIds.has(id)
++
+                 let statusColor = '#94a3b8' // gray
+                 if (status === 'Installed' || status === 'Active' || status === 'complete') statusColor = '#10b981' // green
+                 else if (status === 'Planned' || status === 'planned') statusColor = '#3b82f6' // blue
+                 else if (status === 'Blocked' || status === 'issue') statusColor = '#f43f5e' // red
+                 else if (status === 'in_progress') statusColor = '#f59e0b' // amber
+ 
++                const borderColor = isSelected
++                  ? '#6366f1'
++                  : isActive
++                  ? '#6366f1'
++                  : isHovered
++                  ? '#475569'
++                  : isWirelessNode
++                  ? WIRELESS_ACCENT
++                  : '#1e293b'
++
+                 return (
+                   <g
+                     key={id}
+@@ -521,17 +752,25 @@ export default function NetworkTopologyDiagram({
+                       width={isCamera ? 40 : 70}
+                       height={40}
+                       rx={8}
+-                      fill={isActive ? '#0f172a' : '#020617'}
+-                      stroke={isActive ? '#6366f1' : isHovered ? '#475569' : '#1e293b'}
+-                      strokeWidth={isActive ? 2 : 1}
++                      fill={isActive || isSelected ? '#0f172a' : '#020617'}
++                      stroke={borderColor}
++                      strokeWidth={isActive || isSelected ? 2 : 1}
++                      strokeDasharray={isSelected ? '3 2' : undefined}
+                       className="transition-all duration-150"
+                       style={{
+-                        filter: (isActive || isHovered) ? 'drop-shadow(0 0 6px rgba(99, 102, 241, 0.25))' : 'none'
++                        filter: (isActive || isHovered || isSelected) ? 'drop-shadow(0 0 6px rgba(99, 102, 241, 0.25))' : 'none'
+                       }}
+                     />
+ 
+                     {/* SVG Icon representation */}
+-                    <g transform={`translate(${isCamera ? 12 : 27}, 8) scale(0.65)`} stroke={isActive ? '#818cf8' : '#64748b'} strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
++                    <g
++                      transform={`translate(${isCamera ? 12 : 27}, 8) scale(0.65)`}
++                      stroke={isActive ? '#818cf8' : isWirelessNode ? WIRELESS_ACCENT : '#64748b'}
++                      strokeWidth="2.5"
++                      fill="none"
++                      strokeLinecap="round"
++                      strokeLinejoin="round"
++                    >
+                       {iconPaths.map((p, idx) => (
+                         <path key={idx} d={p} />
+                       ))}
+@@ -563,6 +802,75 @@ export default function NetworkTopologyDiagram({
+               })}
+             </g>
+           </svg>
++
++          {/* Icon dock: zoom, reset view, group-select — docked to the right edge like the map toolbar */}
++          <div className="absolute top-3 right-3 bottom-3 z-20 flex items-start pointer-events-none">
++            <div className="flex flex-col items-center gap-1 p-1.5 bg-[var(--surface-1)]/95 backdrop-blur-md border border-[var(--border)] rounded-xl shadow-xl pointer-events-auto">
++              <button
++                onClick={() => handleZoomButton(1.25)}
++                title="Zoom in"
++                className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] transition-all"
++              >
++                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /><path d="M11 8v6M8 11h6" /></svg>
++              </button>
++              <button
++                onClick={() => handleZoomButton(0.8)}
++                title="Zoom out"
++                className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] transition-all"
++              >
++                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /><path d="M8 11h6" /></svg>
++              </button>
++              <button
++                onClick={handleResetView}
++                title="Reset zoom & pan"
++                className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] transition-all"
++              >
++                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6" /><path d="M9 21H3v-6" /><path d="M21 3l-7 7" /><path d="M3 21l7-7" /></svg>
++              </button>
++              <div className="w-full h-px bg-[var(--border)]" />
++              <button
++                onClick={toggleSelectMode}
++                title="Select a group of nodes"
++                className={`p-1.5 rounded-lg transition-all ${selectMode ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]'}`}
++              >
++                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" strokeDasharray="4 3" /></svg>
++              </button>
++            </div>
++          </div>
++
++          {/* Legend */}
++          <div className="absolute bottom-3 left-3 z-20 bg-[var(--surface-1)]/95 backdrop-blur-md border border-[var(--border)] rounded-xl shadow-xl px-3 py-2.5 text-[10px] font-sans pointer-events-none">
++            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
++              <div className="flex items-center gap-1.5 text-[var(--text-secondary)]">
++                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">{iconPathsFor('gateway').map((p, i) => <path key={i} d={p} />)}</svg>
++                Gateway / Router
++              </div>
++              <div className="flex items-center gap-1.5 text-[var(--text-secondary)]">
++                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">{iconPathsFor('switch').map((p, i) => <path key={i} d={p} />)}</svg>
++                Switch
++              </div>
++              <div className="flex items-center gap-1.5 text-[var(--text-secondary)]">
++                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={WIRELESS_ACCENT} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">{iconPathsFor('wireless').map((p, i) => <path key={i} d={p} />)}</svg>
++                Wireless Radio
++              </div>
++              <div className="flex items-center gap-1.5 text-[var(--text-secondary)]">
++                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">{iconPathsFor('camera').map((p, i) => <path key={i} d={p} />)}</svg>
++                Camera
++              </div>
++              <div className="flex items-center gap-1.5 text-[var(--text-secondary)] col-span-2">
++                <svg width="18" height="10" viewBox="0 0 18 10"><line x1="0" y1="5" x2="18" y2="5" stroke="#1e293b" strokeWidth="2" /></svg>
++                Wired link
++                <svg width="18" height="10" viewBox="0 0 18 10" className="ml-2"><line x1="0" y1="5" x2="18" y2="5" stroke={WIRELESS_ACCENT} strokeWidth="2" strokeDasharray="4 3" /></svg>
++                Wireless link
++              </div>
++            </div>
++            <div className="border-t border-[var(--border)] mt-2 pt-1.5 flex items-center gap-3 flex-wrap">
++              <span className="flex items-center gap-1 text-[var(--text-tertiary)]"><span className="w-2 h-2 rounded-full bg-emerald-500" />Active</span>
++              <span className="flex items-center gap-1 text-[var(--text-tertiary)]"><span className="w-2 h-2 rounded-full bg-blue-500" />Planned</span>
++              <span className="flex items-center gap-1 text-[var(--text-tertiary)]"><span className="w-2 h-2 rounded-full bg-amber-500" />In Progress</span>
++              <span className="flex items-center gap-1 text-[var(--text-tertiary)]"><span className="w-2 h-2 rounded-full bg-rose-500" />Blocked</span>
++            </div>
++          </div>
+         </div>
+       </div>
+ 
+@@ -575,6 +883,11 @@ export default function NetworkTopologyDiagram({
+                 <span className="px-2 py-0.5 rounded-full text-[9px] font-mono uppercase bg-[var(--surface-1)] text-[var(--accent-text)] border border-[var(--accent)]/10">
+                   {selectedNodeDetails.device_type}
+                 </span>
++                {selectedNodeDetails.isWireless && (
++                  <span className="px-2 py-0.5 rounded-full text-[9px] font-mono uppercase bg-orange-500/10 text-orange-500 border border-orange-500/20">
++                    Wireless
++                  </span>
++                )}
+                 <span className={`w-2 h-2 rounded-full ${
+                   selectedNodeDetails.status === 'Installed' || selectedNodeDetails.status === 'Active' || selectedNodeDetails.status === 'complete'
+                     ? 'bg-emerald-500'
+-- 
+2.43.0
+
