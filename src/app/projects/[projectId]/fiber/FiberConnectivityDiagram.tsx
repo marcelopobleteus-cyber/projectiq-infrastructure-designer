@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { fiberColorHex } from '@/lib/fiberColors'
 
 /**
@@ -19,12 +19,16 @@ const COL_GAP = 190
 const ROW_GAP = 78
 const MARGIN = 60
 const ZOOM_MIN = 0.4
-const ZOOM_MAX = 2.5
+const ZOOM_MAX = 6
+// Nodes that are physically civil structures (handholes/manholes/pull
+// boxes) belong to the Ductería module visually — Fiber only needs to know
+// "there's a splice point here", not which kind of civil box it sits in.
+// Grouping them under one generic type keeps the Fiber legend/icon set
+// scoped to fiber concerns, per Marcelo's request to stop mixing the two.
+const CIVIL_STRUCTURE_TYPES = new Set(['Manhole', 'Handhole', 'Pull Box'])
 
 const NODE_TYPE_META: Record<string, { label: string; accent: string }> = {
-  Manhole: { label: 'Manhole', accent: '#64748b' },
-  Handhole: { label: 'Handhole', accent: '#64748b' },
-  'Pull Box': { label: 'Pull Box', accent: '#64748b' },
+  Structure: { label: 'Structure (see Ductería)', accent: '#64748b' },
   Cabinet: { label: 'Cabinet', accent: '#2563eb' },
   Pole: { label: 'Pole', accent: '#854d0e' },
   Building: { label: 'Building', accent: '#7c3aed' },
@@ -33,8 +37,12 @@ const NODE_TYPE_META: Record<string, { label: string; accent: string }> = {
   Custom: { label: 'Custom', accent: '#94a3b8' },
 }
 
+function nodeTypeKey(nodeType: string): string {
+  return CIVIL_STRUCTURE_TYPES.has(nodeType) ? 'Structure' : nodeType
+}
+
 function nodeIconPath(nodeType: string): string[] {
-  switch (nodeType) {
+  switch (nodeTypeKey(nodeType)) {
     case 'Cabinet':
       return ['M4 3h16v18H4z', 'M8 7h8', 'M8 11h8', 'M8 15h8']
     case 'Existing Fiber Source':
@@ -46,9 +54,9 @@ function nodeIconPath(nodeType: string): string[] {
     case 'Pole':
       return ['M12 2v20', 'M6 6h12', 'M8 10h8']
     default:
-      // Manhole / Handhole / Pull Box — same civil-structure glyph used on
-      // the Conduit section, so a crew recognizes it as the same object.
-      return ['M4 6h6a4 4 0 0 1 4 4v4a4 4 0 0 0 4 4h2', 'M4 6a2 2 0 1 0 0-.01', 'M20 18a2 2 0 1 0 0-.01']
+      // Structure (Manhole/Handhole/Pull Box) — a plain dot, deliberately
+      // generic: the civil detail lives in the Ductería module, not here.
+      return ['M12 12m-5 0a5 5 0 1 0 10 0a5 5 0 1 0 -10 0']
   }
 }
 
@@ -171,6 +179,24 @@ export default function FiberConnectivityDiagram({
     }
   }, [nodes, cables])
 
+  // Auto-fit the initial view: with many isolated nodes (sparse cable
+  // data) the layout stacks into one tall column, and starting at zoom=1
+  // squeezes the whole thing into the viewport — unreadable. Instead, start
+  // zoomed in enough to read ~14 rows, and let the user pan/scroll-zoom
+  // through the rest. Runs once per canvas size (i.e. once data loads).
+  const didAutoFit = useRef(false)
+  useEffect(() => {
+    if (didAutoFit.current) return
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect || rect.height === 0 || canvasHeight === 0) return
+    didAutoFit.current = true
+    const targetVisibleRows = 14
+    const targetVbHeight = targetVisibleRows * ROW_GAP
+    const fitZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, rect.height / Math.min(canvasHeight, targetVbHeight)))
+    setZoom(fitZoom)
+    setPan({ x: 0, y: 0 })
+  }, [canvasHeight])
+
   const vbWidth = canvasWidth / zoom
   const vbHeight = canvasHeight / zoom
 
@@ -214,7 +240,12 @@ export default function FiberConnectivityDiagram({
   const handleMouseUp = () => setPanDrag(null)
 
   const resetView = () => {
-    setZoom(1)
+    const rect = containerRef.current?.getBoundingClientRect()
+    const targetVbHeight = 14 * ROW_GAP
+    const fitZoom = rect && rect.height > 0 && canvasHeight > 0
+      ? Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, rect.height / Math.min(canvasHeight, targetVbHeight)))
+      : 1
+    setZoom(fitZoom)
     setPan({ x: 0, y: 0 })
   }
 
@@ -282,7 +313,7 @@ export default function FiberConnectivityDiagram({
             {nodes.map(node => {
               const pos = positions.get(node.id)
               if (!pos) return null
-              const meta = NODE_TYPE_META[node.node_type] ?? NODE_TYPE_META.Custom
+              const meta = NODE_TYPE_META[nodeTypeKey(node.node_type)] ?? NODE_TYPE_META.Custom
               const nodeEnclosures = enclosuresByNode.get(node.id) ?? []
               const isSelected = node.id === selectedNodeId
               return (
@@ -308,7 +339,12 @@ export default function FiberConnectivityDiagram({
                     {meta.label}
                   </text>
                   {nodeEnclosures.length > 0 && (
-                    <circle cx={NODE_W - 8} cy={8} r={4} fill="#f59e0b" />
+                    <g>
+                      <circle cx={NODE_W - 11} cy={11} r={9} fill="#f59e0b" stroke="var(--surface-2)" strokeWidth={2} />
+                      <text x={NODE_W - 11} y={14.5} textAnchor="middle" style={{ fontSize: 8.5, fontWeight: 800 }} fill="#1c1000">
+                        E
+                      </text>
+                    </g>
                   )}
                 </g>
               )
@@ -346,8 +382,8 @@ export default function FiberConnectivityDiagram({
             ))}
           </div>
           <div className="flex items-center gap-1.5 pt-1 border-t border-[var(--border)]">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
-            <span className="text-[var(--text-secondary)]">Node has an enclosure</span>
+            <span className="w-4 h-4 rounded-full bg-amber-500 shrink-0 flex items-center justify-center text-[7px] font-black text-[#1c1000]">E</span>
+            <span className="text-[var(--text-secondary)]">Splice enclosure at this node</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-4 h-0.5 bg-[var(--text-tertiary)] shrink-0" />
