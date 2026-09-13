@@ -91,6 +91,17 @@ interface ProjectMapCanvasProps {
   defaultLongitude: number
   defaultZoom: number
   initialCanvasMode?: 'map' | 'uploaded_plan'
+  /**
+   * Which module is showing this map. 'all' (the default) is the combined
+   * project map and behaves exactly as before. 'cctv' scopes the map to the
+   * CCTV module: only cameras are on at first, so the module map does not
+   * mix in other disciplines — see claude/plan-separacion-modulos.md.
+   */
+  moduleScope?: 'all' | 'cctv'
+  /** Select this camera on mount — used to jump here from the equipment list. */
+  focusCameraId?: string | null
+  /** Called once the focusCameraId has been consumed. */
+  onFocusHandled?: () => void
 }
 
 export default function ProjectMapCanvas({
@@ -101,8 +112,12 @@ export default function ProjectMapCanvas({
   defaultLatitude,
   defaultLongitude,
   defaultZoom,
-  initialCanvasMode
+  initialCanvasMode,
+  moduleScope = 'all',
+  focusCameraId,
+  onFocusHandled,
 }: ProjectMapCanvasProps) {
+  const isCctvScope = moduleScope === 'cctv'
   const [canvasMode, setCanvasMode] = useState<'map' | 'uploaded_plan'>(initialCanvasMode ?? 'map')
   const mapRef = useRef<HTMLDivElement>(null)
   const mapRectRef = useRef<DOMRect | null>(null)
@@ -179,11 +194,13 @@ export default function ProjectMapCanvas({
   const [showDori, setShowDori] = useState(false)
   // Simulacion nocturna: reemplaza el alcance del cono por el del iluminador IR.
   const [showNightIr, setShowNightIr] = useState(false)
-  const [showDevices, setShowDevices] = useState(true)
-  
+  // In the CCTV module map the other disciplines start off — you can still
+  // switch them on as reference, but the module opens showing its own data.
+  const [showDevices, setShowDevices] = useState(!isCctvScope)
+
   // Fiber Overlay & States
-  const [showFiberNodes, setShowFiberNodes] = useState(true)
-  const [showFiberRoutes, setShowFiberRoutes] = useState(true)
+  const [showFiberNodes, setShowFiberNodes] = useState(!isCctvScope)
+  const [showFiberRoutes, setShowFiberRoutes] = useState(!isCctvScope)
   const [fiberNodes, setFiberNodes] = useState<any[]>([])
   const [fiberRoutes, setFiberRoutes] = useState<any[]>([])
   const [fiberRouteSegments, setFiberRouteSegments] = useState<any[]>([])
@@ -201,7 +218,26 @@ export default function ProjectMapCanvas({
   // Selected drawers
   const [selectedCamera, setSelectedCamera] = useState<CameraLocation | null>(null)
   const [selectedDevice, setSelectedDevice] = useState<NetworkDevice | null>(null)
-  
+
+  // Arriving from the module's equipment list: select that camera and center
+  // on it, then tell the parent so it doesn't re-trigger on every render.
+  // Deferred out of the effect body so selecting doesn't cascade a second
+  // render pass while the map is still mounting.
+  useEffect(() => {
+    if (!focusCameraId || !map) return
+    const cam = cameras.find(c => c.id === focusCameraId)
+    if (!cam) return
+    const timer = window.setTimeout(() => {
+      setSelectedCamera(cam)
+      if (cam.latitude !== null && cam.longitude !== null) {
+        map.flyTo({ center: [cam.longitude, cam.latitude], zoom: 19 })
+      }
+      onFocusHandled?.()
+    }, 0)
+    return () => window.clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusCameraId, cameras, map])
+
   // Adding modes
   const [addCameraMode, setAddCameraMode] = useState(false)
   const [addDeviceMode, setAddDeviceMode] = useState(false)
