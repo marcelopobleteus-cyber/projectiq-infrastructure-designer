@@ -135,8 +135,8 @@ export const DISCIPLINES: Discipline[] = [
     subtitle: 'Duct bank, PVC/HDPE pipe and handholes',
     icon: '🏗️',
     color: 'border-amber-500/50 bg-amber-500/10 text-amber-400',
-    ready: false,
-    href: 'fiber',
+    ready: true,
+    href: 'conduit',
   },
 
   // ── Wireless & Tower Construction ───────────────────────────────────────

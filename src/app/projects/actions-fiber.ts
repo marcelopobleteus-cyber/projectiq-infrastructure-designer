@@ -192,6 +192,38 @@ export async function getFiberDesignData(projectId: string) {
   }
 }
 
+// ─── 2.1 Conduit & Duct Bank data (own top-level section, mirrors fiber) ────
+//
+// Structures (`conduit_structures`) and runs (`conduit_runs`) are created as
+// a civil-works "mirror" whenever a matching fiber node/route is created —
+// see createFiberNode / createFiberRoute above. This is a read-only fetch for
+// the standalone Conduit section; it does not create or edit rows.
+
+export async function getConduitData(projectId: string) {
+  const supabase = await createClient()
+
+  const [structuresRes, runsRes] = await Promise.all([
+    supabase
+      .from('conduit_structures')
+      .select('*, fiber_nodes(node_tag, node_type)')
+      .eq('project_id', projectId)
+      .order('structure_tag'),
+    supabase
+      .from('conduit_runs')
+      .select('*, fiber_routes(route_id_tag, route_purpose, installation_type)')
+      .eq('project_id', projectId)
+      .order('run_tag'),
+  ])
+
+  if (structuresRes.error) console.error('Failed to load conduit_structures:', structuresRes.error.message)
+  if (runsRes.error) console.error('Failed to load conduit_runs:', runsRes.error.message)
+
+  return {
+    structures: structuresRes.data ?? [],
+    runs: runsRes.data ?? [],
+  }
+}
+
 // ─── 3. Create fiber node ────────────────────────────────────────────────────
 
 export async function createFiberNode(params: {
