@@ -65,6 +65,117 @@ const STRUCTURE_TYPE_LABELS: Record<string, string> = {
   vault: 'Vault',
 }
 
+/**
+ * Duct bank cross-section — the dedicated design view the ductery gap
+ * analysis called out (`claude/gaps-fibra-ducteria-networking.md`, gap #1).
+ * Draws each way in the bank to scale; way 1 carries the route's recorded
+ * fill % (area-proportional, not linear — area scales with r²), the rest
+ * are shown as open/spare capacity for a future pull.
+ */
+function DuctCrossSection({ run, route }: { run: ConduitRun; route: ConduitRunRoute | null }) {
+  const ways = Math.max(1, run.ways ?? 1)
+  const diameterIn = Number(run.diameter_inches) || 2
+  const fillPct = route?.fill_percentage ?? 0
+
+  const cellSize = 96
+  const padding = 16
+  const width = ways * cellSize + padding * 2
+  const height = cellSize + padding * 2 + 28
+  const outerR = cellSize / 2 - 6
+
+  return (
+    <div className="space-y-2">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full" style={{ maxHeight: 180 }}>
+        {Array.from({ length: ways }).map((_, i) => {
+          const cx = padding + cellSize * i + cellSize / 2
+          const cy = padding + outerR + 6
+          const isOccupied = i === 0
+          // Area, not radius, scales with fill % — a 40% fill duct doesn't
+          // look 40% "full" if you just shrink the radius linearly.
+          const innerR = isOccupied ? outerR * Math.sqrt(Math.min(fillPct, 100) / 100) : 0
+          return (
+            <g key={i}>
+              <circle cx={cx} cy={cy} r={outerR} fill="var(--surface-2)" stroke="var(--border)" strokeWidth="1.5" />
+              {isOccupied && innerR > 0 && (
+                <circle cx={cx} cy={cy} r={innerR} fill={fillPct > FILL_WARN_THRESHOLD ? '#f59e0b' : '#10b981'} opacity="0.75" />
+              )}
+              <text x={cx} y={cy + outerR + 16} textAnchor="middle" className="fill-[var(--text-tertiary)]" style={{ fontSize: 9, fontWeight: 700 }}>
+                Way {i + 1}
+              </text>
+              <text x={cx} y={cy + 4} textAnchor="middle" className="fill-[var(--text-secondary)]" style={{ fontSize: 8, fontFamily: 'monospace' }}>
+                {isOccupied ? `${fillPct.toFixed(0)}%` : 'spare'}
+              </text>
+            </g>
+          )
+        })}
+      </svg>
+      <div className="text-[10.5px] text-[var(--text-secondary)] space-y-1 font-mono">
+        <div className="flex justify-between"><span className="text-[var(--text-tertiary)] font-sans">Ways in bank</span><span>{ways}</span></div>
+        <div className="flex justify-between"><span className="text-[var(--text-tertiary)] font-sans">Diameter / way</span><span>{diameterIn}&quot;</span></div>
+        <div className="flex justify-between"><span className="text-[var(--text-tertiary)] font-sans">Install method</span><span className="capitalize">{run.install_method}</span></div>
+        <div className="flex justify-between"><span className="text-[var(--text-tertiary)] font-sans">Route fill (Way 1)</span><span>{route ? `${fillPct.toFixed(0)}%` : '—'}</span></div>
+      </div>
+      {ways === 1 && (
+        <p className="text-[10px] text-[var(--text-tertiary)] leading-snug">
+          Single-way bank — no spare duct for a future pull without opening the trench again.
+        </p>
+      )}
+    </div>
+  )
+}
+
+/** Parses the "WxLxD" (inches) shorthand used for structure size_description. */
+function parseBoxDims(desc: string | null): { w: number; l: number; d: number } | null {
+  if (!desc) return null
+  const parts = desc.toLowerCase().split('x').map(p => parseFloat(p.trim()))
+  if (parts.length < 2 || parts.some(n => Number.isNaN(n))) return null
+  return { w: parts[0], l: parts[1], d: parts[2] ?? parts[1] }
+}
+
+function StructureCrossSection({ structure }: { structure: ConduitStructure }) {
+  const dims = parseBoxDims(structure.size_description)
+  const maxSide = dims ? Math.max(dims.w, dims.l) : null
+  const boxSize = 140
+
+  return (
+    <div className="space-y-2">
+      {dims && maxSide ? (
+        <svg viewBox="0 0 180 160" className="w-full" style={{ maxHeight: 160 }}>
+          {(() => {
+            const w = (dims.w / maxSide) * boxSize
+            const l = (dims.l / maxSide) * boxSize
+            const x = (180 - w) / 2
+            const y = (160 - l) / 2 - 6
+            return (
+              <>
+                <rect x={x} y={y} width={w} height={l} rx={3} fill="var(--surface-2)" stroke="var(--border)" strokeWidth="1.5" />
+                <text x={90} y={y - 6} textAnchor="middle" className="fill-[var(--text-secondary)]" style={{ fontSize: 9, fontFamily: 'monospace' }}>
+                  {dims.w}&quot;
+                </text>
+                <text x={x - 6} y={y + l / 2} textAnchor="end" className="fill-[var(--text-secondary)]" style={{ fontSize: 9, fontFamily: 'monospace' }}>
+                  {dims.l}&quot;
+                </text>
+                <text x={90} y={y + l + 20} textAnchor="middle" className="fill-[var(--text-tertiary)]" style={{ fontSize: 9, fontWeight: 700 }}>
+                  Plan view (top-down)
+                </text>
+              </>
+            )
+          })()}
+        </svg>
+      ) : (
+        <div className="h-24 flex items-center justify-center text-[10.5px] text-[var(--text-tertiary)]">
+          No parseable size on file
+        </div>
+      )}
+      <div className="text-[10.5px] text-[var(--text-secondary)] space-y-1 font-mono">
+        <div className="flex justify-between"><span className="text-[var(--text-tertiary)] font-sans">Size (W x L x D)</span><span>{structure.size_description ?? '—'}</span></div>
+        <div className="flex justify-between"><span className="text-[var(--text-tertiary)] font-sans">Depth</span><span>{structure.depth_ft ? `${structure.depth_ft} ft` : '—'}</span></div>
+        <div className="flex justify-between"><span className="text-[var(--text-tertiary)] font-sans">Cover rating</span><span>{structure.cover_rating ?? '—'}</span></div>
+      </div>
+    </div>
+  )
+}
+
 function ConditionPill({ condition }: { condition: AssetCondition }) {
   const styles: Record<AssetCondition, string> = {
     new: 'text-[var(--success)] bg-[var(--success-soft,rgba(34,197,94,0.1))] border-[var(--success)]/30',
@@ -95,6 +206,17 @@ function ScopePill({ scope }: { scope: WorkScope }) {
 
 export default function ConduitPageClient({ structures, runs }: ConduitPageClientProps) {
   const [tab, setTab] = useState<'runs' | 'structures'>('runs')
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
+  const [selectedStructureId, setSelectedStructureId] = useState<string | null>(null)
+
+  const switchTab = (next: 'runs' | 'structures') => {
+    setTab(next)
+    setSelectedRunId(null)
+    setSelectedStructureId(null)
+  }
+
+  const selectedRun = runs.find(r => r.id === selectedRunId) ?? null
+  const selectedStructure = structures.find(s => s.id === selectedStructureId) ?? null
 
   const metrics = useMemo(() => {
     const totalLengthFt = runs.reduce((acc, r) => acc + Number(r.length_feet || 0), 0)
@@ -169,7 +291,7 @@ export default function ConduitPageClient({ structures, runs }: ConduitPageClien
       {/* Tabs */}
       <div className="flex items-center gap-1 border-b border-[var(--border)] shrink-0">
         <button
-          onClick={() => setTab('runs')}
+          onClick={() => switchTab('runs')}
           className={`px-4 py-2 text-xs font-bold transition-all cursor-pointer border-b-2 -mb-px ${
             tab === 'runs'
               ? 'border-[var(--accent)] text-[var(--text-primary)]'
@@ -179,7 +301,7 @@ export default function ConduitPageClient({ structures, runs }: ConduitPageClien
           Duct Bank Runs ({runs.length})
         </button>
         <button
-          onClick={() => setTab('structures')}
+          onClick={() => switchTab('structures')}
           className={`px-4 py-2 text-xs font-bold transition-all cursor-pointer border-b-2 -mb-px ${
             tab === 'structures'
               ? 'border-[var(--accent)] text-[var(--text-primary)]'
@@ -191,6 +313,7 @@ export default function ConduitPageClient({ structures, runs }: ConduitPageClien
       </div>
 
       {/* Content */}
+      <div className="flex-1 min-h-0 flex gap-3">
       <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-[var(--border)] bg-[var(--surface-1)]">
         {tab === 'runs' ? (
           runs.length === 0 ? (
@@ -217,7 +340,13 @@ export default function ConduitPageClient({ structures, runs }: ConduitPageClien
                 {runs.map(run => {
                   const route = one(run.fiber_routes)
                   return (
-                    <tr key={run.id} className="hover:bg-[var(--surface-hover)] transition-colors">
+                    <tr
+                      key={run.id}
+                      onClick={() => setSelectedRunId(run.id)}
+                      className={`cursor-pointer transition-colors ${
+                        selectedRunId === run.id ? 'bg-[var(--accent-soft)]' : 'hover:bg-[var(--surface-hover)]'
+                      }`}
+                    >
                       <td className="px-3 py-2 font-bold text-[var(--text-primary)]">{run.run_tag}</td>
                       <td className="px-3 py-2 text-[var(--text-secondary)]">{route?.route_id_tag ?? '—'}</td>
                       <td className="px-3 py-2 text-[var(--text-secondary)] capitalize">{run.install_method}</td>
@@ -264,7 +393,13 @@ export default function ConduitPageClient({ structures, runs }: ConduitPageClien
               {structures.map(s => {
                 const node = one(s.fiber_nodes)
                 return (
-                  <tr key={s.id} className="hover:bg-[var(--surface-hover)] transition-colors">
+                  <tr
+                    key={s.id}
+                    onClick={() => setSelectedStructureId(s.id)}
+                    className={`cursor-pointer transition-colors ${
+                      selectedStructureId === s.id ? 'bg-[var(--accent-soft)]' : 'hover:bg-[var(--surface-hover)]'
+                    }`}
+                  >
                     <td className="px-3 py-2 font-bold text-[var(--text-primary)]">{s.structure_tag}</td>
                     <td className="px-3 py-2 text-[var(--text-secondary)]">
                       {STRUCTURE_TYPE_LABELS[s.structure_type] ?? s.structure_type}
@@ -287,6 +422,35 @@ export default function ConduitPageClient({ structures, runs }: ConduitPageClien
             </tbody>
           </table>
         )}
+      </div>
+
+      {/* Cross-section detail panel — the dedicated design view for the
+          selected run/structure, drawn to scale from real fields. */}
+      {(selectedRun || selectedStructure) && (
+        <div className="w-72 shrink-0 overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-3.5 space-y-3">
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">
+                Cross-Section
+              </span>
+              <span className="text-sm font-black text-[var(--text-primary)]">
+                {selectedRun?.run_tag ?? selectedStructure?.structure_tag}
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                setSelectedRunId(null)
+                setSelectedStructureId(null)
+              }}
+              className="w-6 h-6 rounded-lg flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors cursor-pointer"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          {selectedRun && <DuctCrossSection run={selectedRun} route={one(selectedRun.fiber_routes)} />}
+          {selectedStructure && <StructureCrossSection structure={selectedStructure} />}
+        </div>
+      )}
       </div>
     </div>
   )
