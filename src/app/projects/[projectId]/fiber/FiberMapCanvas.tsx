@@ -162,6 +162,12 @@ export default function FiberMapCanvas({
   const [routeIdTag, setRouteIdTag] = useState('')
   const [conduitDiameter, setConduitDiameter] = useState(2.0)
   const [routeSlackPercentage, setRouteSlackPercentage] = useState(10.0)
+  // Technical reserve (OZmap calls it "reserva técnica"): extra cable left
+  // coiled at each end of the route for splicing/rework room. Counted at
+  // BOTH ends per the industry convention OZmap documents — a 15ft reserve
+  // adds 30ft total — so it feeds into installed_length_feet on the server
+  // the same way slack % does.
+  const [routeTechnicalReserveFt, setRouteTechnicalReserveFt] = useState(15.0)
   const [installationType, setInstallationType] = useState<'underground' | 'aerial' | 'direct_buried'>('underground')
   const [selectedCatalogCableId, setSelectedCatalogCableId] = useState('')
   const [routeFiberCount, setRouteFiberCount] = useState(12)
@@ -378,6 +384,7 @@ export default function FiberMapCanvas({
         setRouteIdTag(route.route_id_tag || '')
         setConduitDiameter(Number(route.conduit_diameter_inches || 2.0))
         setRouteSlackPercentage(Number(route.slack_percentage || 10.0))
+        setRouteTechnicalReserveFt(Number(route.technical_reserve_ft ?? 15.0))
         setInstallationType(route.installation_type || 'underground')
         const seg = initialData.segments.find((s: any) => s.route_id === route.id)
         if (seg && map) {
@@ -420,6 +427,7 @@ export default function FiberMapCanvas({
         setRouteIdTag(route.route_id_tag || '')
         setConduitDiameter(Number(route.conduit_diameter_inches || 2.0))
         setRouteSlackPercentage(Number(route.slack_percentage || 10.0))
+        setRouteTechnicalReserveFt(Number(route.technical_reserve_ft ?? 15.0))
         setInstallationType(route.installation_type || 'underground')
         if (popupRef.current) popupRef.current.remove()
       }
@@ -690,6 +698,7 @@ export default function FiberMapCanvas({
         setRouteIdTag(route.route_id_tag || '')
         setConduitDiameter(Number(route.conduit_diameter_inches || 2.0))
         setRouteSlackPercentage(Number(route.slack_percentage || 10.0))
+        setRouteTechnicalReserveFt(Number(route.technical_reserve_ft ?? 15.0))
         setInstallationType(route.installation_type || 'underground')
 
         const cable = initialData.cables.find(c => c.route_id === route.id)
@@ -1197,6 +1206,7 @@ export default function FiberMapCanvas({
       routeIdTag: tag,
       conduitDiameterInches: conduitDiameter,
       slackPercentage: routeSlackPercentage,
+      technicalReserveFt: routeTechnicalReserveFt,
       installationType: installationType,
       segments,
       cableCatalogId: selectedCatalogCableId || undefined,
@@ -1384,6 +1394,7 @@ export default function FiberMapCanvas({
       routeIdTag,
       conduitDiameterInches: conduitDiameter,
       slackPercentage: routeSlackPercentage,
+      technicalReserveFt: routeTechnicalReserveFt,
       installationType: installationType,
       segments: segmentsPayload.length > 0 ? segmentsPayload : undefined
     })
@@ -2308,15 +2319,29 @@ export default function FiberMapCanvas({
                         </p>
                       </div>
 
-                      <div>
-                        <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Slack Loop (%)</label>
-                        <input
-                          type="number"
-                          value={routeSlackPercentage}
-                          onChange={e => setRouteSlackPercentage(Number(e.target.value))}
-                          className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none"
-                        />
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Slack Loop (%)</label>
+                          <input
+                            type="number"
+                            value={routeSlackPercentage}
+                            onChange={e => setRouteSlackPercentage(Number(e.target.value))}
+                            className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[var(--text-tertiary)] block font-semibold uppercase tracking-wide text-xs mb-1">Technical Reserve (ft/end)</label>
+                          <input
+                            type="number"
+                            value={routeTechnicalReserveFt}
+                            onChange={e => setRouteTechnicalReserveFt(Number(e.target.value))}
+                            className="w-full px-3.5 py-2.5.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none"
+                          />
+                        </div>
                       </div>
+                      <p className="text-[10px] text-[var(--text-tertiary)] -mt-1.5 leading-snug">
+                        Coiled cable left at each end for splicing/rework room — counted at both ends, so {routeTechnicalReserveFt} ft here adds {(routeTechnicalReserveFt * 2).toFixed(0)} ft total.
+                      </p>
 
                       <div className="grid grid-cols-3 gap-2 bg-[var(--surface-2)] p-2.5 rounded-xl border border-[var(--border)]">
                         <div className="space-y-0.5">

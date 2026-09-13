@@ -2513,6 +2513,7 @@ export type Database = {
           route_purpose: string
           slack_percentage: number
           spare_capacity: number
+          technical_reserve_ft: number
           updated_at: string | null
           work_scope: Database["public"]["Enums"]["work_scope"]
         }
@@ -2533,6 +2534,7 @@ export type Database = {
           route_purpose?: string
           slack_percentage?: number
           spare_capacity?: number
+          technical_reserve_ft?: number
           updated_at?: string | null
           work_scope?: Database["public"]["Enums"]["work_scope"]
         }
@@ -2553,6 +2555,7 @@ export type Database = {
           route_purpose?: string
           slack_percentage?: number
           spare_capacity?: number
+          technical_reserve_ft?: number
           updated_at?: string | null
           work_scope?: Database["public"]["Enums"]["work_scope"]
         }

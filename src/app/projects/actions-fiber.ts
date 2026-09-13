@@ -472,6 +472,13 @@ export async function createFiberRoute(params: {
   routePurpose?: RoutePurpose
   conduitDiameterInches?: number
   slackPercentage?: number
+  /**
+   * Reserva técnica (OZmap: "reserva técnica"): cable extra enrollado en
+   * CADA extremo de la ruta para empalme/rework. Se cuenta dos veces — un
+   * valor de 15ft aquí suma 30ft al largo instalado — igual a la regla que
+   * documenta OZmap ("reserves apply to each end of the cable").
+   */
+  technicalReserveFt?: number
   segments: {
     startLat: number
     startLng: number
@@ -501,6 +508,7 @@ export async function createFiberRoute(params: {
   const buysConduit = conduitWorkScope === 'install' || conduitWorkScope === 'replace'
 
   const slackPct = params.slackPercentage ?? 10.0
+  const technicalReserveFt = params.technicalReserveFt ?? 15.0
   let measuredLength = 0
   const segmentInserts: {
     segment_index: number
@@ -527,7 +535,7 @@ export async function createFiberRoute(params: {
   })
 
   const segmentSlack = params.segments.reduce((s, seg) => s + (seg.slackFeet ?? 0), 0)
-  const installedLength = measuredLength * (1 + slackPct / 100) + segmentSlack
+  const installedLength = measuredLength * (1 + slackPct / 100) + segmentSlack + technicalReserveFt * 2
 
   // Insert route
   const { data: newRoute, error: routeErr } = await supabase
@@ -538,6 +546,7 @@ export async function createFiberRoute(params: {
       route_id_tag: params.routeIdTag,
       measured_length_feet: Number(measuredLength.toFixed(2)),
       slack_percentage: slackPct,
+      technical_reserve_ft: technicalReserveFt,
       installed_length_feet: Number(installedLength.toFixed(2)),
       conduit_diameter_inches: params.conduitDiameterInches ?? 2.0,
       fill_percentage: 0.0,
@@ -1061,6 +1070,7 @@ export async function updateFiberRoute(params: {
   routeIdTag?: string
   conduitDiameterInches?: number
   slackPercentage?: number
+  technicalReserveFt?: number
   installationType?: 'underground' | 'aerial' | 'direct_buried'
   segments?: {
     startLat: number
@@ -1074,7 +1084,7 @@ export async function updateFiberRoute(params: {
   // First, find the route to get its current values
   const { data: route, error: fetchErr } = await supabase
     .from('fiber_routes')
-    .select('measured_length_feet')
+    .select('measured_length_feet, technical_reserve_ft')
     .eq('id', params.id)
     .single()
 
@@ -1124,6 +1134,9 @@ export async function updateFiberRoute(params: {
   // Re-calculate installed length if slack percentage is updated or if segments were updated
   let installedLength = undefined
   const slackPct = params.slackPercentage !== undefined ? params.slackPercentage : 10.0
+  const technicalReserveFt = params.technicalReserveFt !== undefined
+    ? params.technicalReserveFt
+    : Number(route.technical_reserve_ft ?? 15.0)
   if (measuredLength !== undefined) {
     const { data: segments } = await supabase
       .from('fiber_route_segments')
@@ -1131,7 +1144,7 @@ export async function updateFiberRoute(params: {
       .eq('route_id', params.id)
 
     const segmentSlack = segments ? segments.reduce((sum, seg) => sum + (seg.slack_feet ?? 0), 0) : 0
-    installedLength = Number((measuredLength * (1 + slackPct / 100) + segmentSlack).toFixed(2))
+    installedLength = Number((measuredLength * (1 + slackPct / 100) + segmentSlack + technicalReserveFt * 2).toFixed(2))
   }
 
   const { error } = await supabase
@@ -1140,6 +1153,7 @@ export async function updateFiberRoute(params: {
       route_id_tag: params.routeIdTag,
       conduit_diameter_inches: params.conduitDiameterInches,
       slack_percentage: params.slackPercentage,
+      technical_reserve_ft: technicalReserveFt,
       measured_length_feet: Number(measuredLength.toFixed(2)),
       installed_length_feet: installedLength,
       installation_type: params.installationType,
