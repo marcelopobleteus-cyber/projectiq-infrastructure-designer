@@ -210,7 +210,7 @@ export async function getConduitData(projectId: string) {
       .order('structure_tag'),
     supabase
       .from('conduit_runs')
-      .select('*, fiber_routes(route_id_tag, route_purpose, installation_type)')
+      .select('*, fiber_routes(route_id_tag, route_purpose, installation_type, fill_percentage, spare_capacity)')
       .eq('project_id', projectId)
       .order('run_tag'),
   ])

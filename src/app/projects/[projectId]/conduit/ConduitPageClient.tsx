@@ -7,8 +7,15 @@ import { ASSET_CONDITION_LABELS, WORK_SCOPE_LABELS, type AssetCondition, type Wo
 type ConduitStructure = Database['public']['Tables']['conduit_structures']['Row'] & {
   fiber_nodes?: { node_tag: string; node_type: string } | { node_tag: string; node_type: string }[] | null
 }
+type ConduitRunRoute = {
+  route_id_tag: string
+  route_purpose: string
+  installation_type: string
+  fill_percentage: number | null
+  spare_capacity: number | null
+}
 type ConduitRun = Database['public']['Tables']['conduit_runs']['Row'] & {
-  fiber_routes?: { route_id_tag: string; route_purpose: string; installation_type: string } | { route_id_tag: string; route_purpose: string; installation_type: string }[] | null
+  fiber_routes?: ConduitRunRoute | ConduitRunRoute[] | null
 }
 
 interface ConduitPageClientProps {
@@ -22,6 +29,33 @@ interface ConduitPageClientProps {
 function one<T>(rel: T | T[] | null | undefined): T | null {
   if (!rel) return null
   return Array.isArray(rel) ? rel[0] ?? null : rel
+}
+
+// NEC-style conduit fill guidance for communications cable: 40% is the
+// conventional ceiling that keeps a duct pullable without excessive
+// friction. Anything above that is flagged, not blocked — the field crew
+// makes the final call, this is a heads-up.
+const FILL_WARN_THRESHOLD = 40
+
+function FillBar({ percentage }: { percentage: number | null }) {
+  if (percentage === null) {
+    return <span className="text-[10px] text-[var(--text-tertiary)]">—</span>
+  }
+  const clamped = Math.min(percentage, 100)
+  const over = percentage > FILL_WARN_THRESHOLD
+  return (
+    <div className="flex items-center gap-2 min-w-[110px]">
+      <div className="flex-1 h-1.5 rounded-full bg-[var(--surface-2)] border border-[var(--border)] overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${over ? 'bg-amber-500' : 'bg-emerald-500'}`}
+          style={{ width: `${clamped}%` }}
+        />
+      </div>
+      <span className={`font-mono text-[10.5px] font-bold ${over ? 'text-amber-400' : 'text-[var(--text-secondary)]'}`}>
+        {percentage.toFixed(0)}%
+      </span>
+    </div>
+  )
 }
 
 const STRUCTURE_TYPE_LABELS: Record<string, string> = {
@@ -68,6 +102,13 @@ export default function ConduitPageClient({ structures, runs }: ConduitPageClien
     const existingStructures = structures.filter(s => s.asset_condition === 'existing').length
     const newRuns = runs.filter(r => r.asset_condition === 'new').length
     const existingRuns = runs.filter(r => r.asset_condition === 'existing').length
+
+    const fillValues = runs
+      .map(r => one(r.fiber_routes)?.fill_percentage)
+      .filter((v): v is number => v !== null && v !== undefined)
+    const avgFill = fillValues.length ? fillValues.reduce((a, b) => a + b, 0) / fillValues.length : null
+    const overFillCount = fillValues.filter(v => v > FILL_WARN_THRESHOLD).length
+
     return {
       totalRuns: runs.length,
       totalStructures: structures.length,
@@ -76,6 +117,8 @@ export default function ConduitPageClient({ structures, runs }: ConduitPageClien
       existingStructures,
       newRuns,
       existingRuns,
+      avgFill,
+      overFillCount,
     }
   }, [structures, runs])
 
@@ -83,6 +126,11 @@ export default function ConduitPageClient({ structures, runs }: ConduitPageClien
     { label: 'Duct Bank Runs', value: metrics.totalRuns },
     { label: 'Total Length', value: `${metrics.totalLengthFt.toLocaleString(undefined, { maximumFractionDigits: 0 })} ft` },
     { label: 'Structures', value: metrics.totalStructures },
+    {
+      label: 'Avg. Conduit Fill',
+      value: metrics.avgFill === null ? '—' : `${metrics.avgFill.toFixed(0)}%`,
+      warn: metrics.overFillCount > 0,
+    },
     { label: 'New (Runs / Structures)', value: `${metrics.newRuns} / ${metrics.newStructures}` },
     { label: 'Existing (Runs / Structures)', value: `${metrics.existingRuns} / ${metrics.existingStructures}` },
   ]
@@ -93,7 +141,9 @@ export default function ConduitPageClient({ structures, runs }: ConduitPageClien
         <h1 className="text-sm font-black text-[var(--text-primary)] tracking-tight">Conduit & Duct Bank</h1>
         <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5">
           Civil-works layer mirrored from the Fiber module — every duct run and structure below is generated
-          automatically when a matching fiber route or node is created.
+          automatically when a matching fiber route or node is created. Fill % is flagged above{' '}
+          {FILL_WARN_THRESHOLD}% (the conventional pullability ceiling for communications cable) — it&apos;s a
+          heads-up for the field crew, not a hard limit.
         </p>
       </div>
 
@@ -102,7 +152,11 @@ export default function ConduitPageClient({ structures, runs }: ConduitPageClien
         {summaryCards.map((m, idx) => (
           <div
             key={idx}
-            className="border rounded-xl p-3 flex flex-col justify-between h-20 shadow-xs text-[var(--text-primary)] border-[var(--border)] bg-[var(--surface-1)]"
+            className={`border rounded-xl p-3 flex flex-col justify-between h-20 shadow-xs ${
+              'warn' in m && m.warn
+                ? 'text-amber-400 border-amber-500/30 bg-amber-500/10'
+                : 'text-[var(--text-primary)] border-[var(--border)] bg-[var(--surface-1)]'
+            }`}
           >
             <span className="text-[9.5px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">
               {m.label}
@@ -153,6 +207,7 @@ export default function ConduitPageClient({ structures, runs }: ConduitPageClien
                   <th className="text-left font-bold px-3 py-2">Install Method</th>
                   <th className="text-right font-bold px-3 py-2">Diameter (in)</th>
                   <th className="text-right font-bold px-3 py-2">Length (ft)</th>
+                  <th className="text-left font-bold px-3 py-2">Fill %</th>
                   <th className="text-left font-bold px-3 py-2">Condition</th>
                   <th className="text-left font-bold px-3 py-2">Work Scope</th>
                   <th className="text-left font-bold px-3 py-2">Status</th>
@@ -169,6 +224,9 @@ export default function ConduitPageClient({ structures, runs }: ConduitPageClien
                       <td className="px-3 py-2 text-right font-mono text-[var(--text-secondary)]">{run.diameter_inches}</td>
                       <td className="px-3 py-2 text-right font-mono text-[var(--text-secondary)]">
                         {Number(run.length_feet).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      </td>
+                      <td className="px-3 py-2">
+                        <FillBar percentage={route?.fill_percentage ?? null} />
                       </td>
                       <td className="px-3 py-2">
                         <ConditionPill condition={run.asset_condition} />
