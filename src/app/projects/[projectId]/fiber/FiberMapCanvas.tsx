@@ -25,6 +25,7 @@ import {
   setAssetCondition
 } from '../../actions-fiber'
 import type { AssetCondition } from '@/lib/assetCondition'
+import { getFiberColor } from '@/lib/fiberColors'
 
 const haversineDistanceMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const R = 6371000 // Earth radius in meters
@@ -297,28 +298,6 @@ export default function FiberMapCanvas({
       if (mapInstance.getSource(id)) mapInstance.removeSource(id)
     })
   }
-
-  // Fiber colors list (TLA/EIA color codes)
-  const fiberColors = [
-    { name: 'Blue', hex: '#2563eb' },
-    { name: 'Orange', hex: '#ea580c' },
-    { name: 'Green', hex: '#16a34a' },
-    { name: 'Brown', hex: '#854d0e' },
-    { name: 'Slate', hex: '#64748b' },
-    { name: 'White', hex: '#ffffff' },
-    { name: 'Red', hex: '#dc2626' },
-    { name: 'Black', hex: '#000000' },
-    { name: 'Yellow', hex: '#ca8a04' },
-    { name: 'Violet', hex: '#7c3aed' },
-    { name: 'Rose', hex: '#db2777' },
-    { name: 'Aqua', hex: '#0d9488' }
-  ]
-
-  const getFiberColor = (num: number) => {
-    const idx = (num - 1) % fiberColors.length
-    return fiberColors[idx]
-  }
-
 
   // Synchronize form color and notes states on selection changes
   useEffect(() => {

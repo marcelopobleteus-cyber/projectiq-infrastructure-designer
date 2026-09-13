@@ -3,7 +3,7 @@ import { createClient } from '@/utils/supabase/server'
 import { BYPASS_AUTH } from '@/config/auth'
 import { DEMO_PROJECT } from '@/lib/demoData'
 import { getFiberCatalog, getFiberDesignData } from '../../actions-fiber'
-import FiberMapCanvas from './FiberMapCanvas'
+import FiberPageClient from './FiberPageClient'
 
 interface PageProps {
   params: Promise<{
@@ -56,7 +56,7 @@ export default async function ProjectFiberPage({ params }: PageProps) {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden h-full w-full">
-      <FiberMapCanvas
+      <FiberPageClient
         projectId={projectId}
         initialData={initialData}
         fiberCatalog={catalog}
