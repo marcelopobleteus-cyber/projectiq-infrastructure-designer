@@ -1,0 +1,147 @@
+From 4d309ff49f7464add53676ef65dbbd74521caa06 Mon Sep 17 00:00:00 2001
+From: "Marcelo Poblete (via Claude)" <marcelopoblete.us@gmail.com>
+Date: Sun, 13 Sep 2026 18:11:12 +0000
+Subject: [PATCH] fix: connectivity diagram viewBox follows the container, not
+ the canvas
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The previous "readable zoom" fix did not work, for two reasons:
+
+1. The fit formula was inverted — it computed
+   `rect.height / targetVbHeight`, which produced a zoom BELOW 1 and
+   therefore zoomed further OUT, the opposite of the intent.
+2. More fundamentally, the viewBox was derived from the canvas size,
+   so its aspect ratio was the canvas's. With sparse cable data the
+   layout stacks into one very tall, thin column (~500 x 12,600
+   units); letterboxed into a wide, short container that shape is
+   height-dominated, so nodes render a few pixels tall at ANY zoom.
+
+Now the viewBox is `pan.x pan.y (viewport.w / zoom) (viewport.h /
+zoom)`, with the container measured through a ResizeObserver. `zoom`
+now means screen pixels per canvas unit, so zoom = 1 is a 1:1 pixel
+mapping: node boxes at their natural 132x46 px with ~10 legible rows
+on screen. Reset View returns to that 1:1 top-left view, and the zoom
+range moves to [0.15, 4] so a long column can still be surveyed.
+
+Verified the geometry in an isolated Playwright harness rendering 160
+rows under both viewBox strategies before shipping.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01ScqTACWd5u51GDZPenDDdM
+---
+ .../fiber/FiberConnectivityDiagram.tsx        | 66 +++++++++++--------
+ 1 file changed, 37 insertions(+), 29 deletions(-)
+
+diff --git a/src/app/projects/[projectId]/fiber/FiberConnectivityDiagram.tsx b/src/app/projects/[projectId]/fiber/FiberConnectivityDiagram.tsx
+index 5e8a4fe..aa8f42a 100644
+--- a/src/app/projects/[projectId]/fiber/FiberConnectivityDiagram.tsx
++++ b/src/app/projects/[projectId]/fiber/FiberConnectivityDiagram.tsx
+@@ -18,8 +18,11 @@ const NODE_H = 46
+ const COL_GAP = 190
+ const ROW_GAP = 78
+ const MARGIN = 60
+-const ZOOM_MIN = 0.4
+-const ZOOM_MAX = 6
++// `zoom` is screen pixels per canvas unit (see the viewport note below), so
++// 1 = natural size. The floor goes well under 1 to allow an overview of a
++// very long column; the ceiling is for reading a crowded area up close.
++const ZOOM_MIN = 0.15
++const ZOOM_MAX = 4
+ // Nodes that are physically civil structures (handholes/manholes/pull
+ // boxes) belong to the Ductería module visually — Fiber only needs to know
+ // "there's a splice point here", not which kind of civil box it sits in.
+@@ -116,7 +119,7 @@ export default function FiberConnectivityDiagram({
+   }, [spliceRecords])
+ 
+   // ─── Layered layout: BFS depth from nodes with no incoming cable ───────
+-  const { positions, canvasWidth, canvasHeight } = useMemo(() => {
++  const { positions } = useMemo(() => {
+     const nodeIds = new Set(nodes.map(n => n.id))
+     const outgoing = new Map<string, string[]>()
+     const incomingCount = new Map<string, number>()
+@@ -179,26 +182,33 @@ export default function FiberConnectivityDiagram({
+     }
+   }, [nodes, cables])
+ 
+-  // Auto-fit the initial view: with many isolated nodes (sparse cable
+-  // data) the layout stacks into one tall column, and starting at zoom=1
+-  // squeezes the whole thing into the viewport — unreadable. Instead, start
+-  // zoomed in enough to read ~14 rows, and let the user pan/scroll-zoom
+-  // through the rest. Runs once per canvas size (i.e. once data loads).
+-  const didAutoFit = useRef(false)
++  // The viewBox follows the CONTAINER's aspect ratio, never the canvas's.
++  // Deriving it from the canvas was the bug behind the unreadable diagram:
++  // with sparse cable data the layout stacks into one very tall, thin column
++  // (e.g. 500 x 12,600 units), and a viewBox of that shape gets letterboxed
++  // into a wide, short container — the height always dominates, so every
++  // node renders a few pixels tall no matter the zoom value.
++  //
++  // With the container's own size driving the viewBox, `zoom` means exactly
++  // "screen pixels per canvas unit": at zoom = 1 a node box is its natural
++  // 132x46 px and ~10 rows are legible on screen, and the user pans/zooms
++  // from there.
++  const [viewport, setViewport] = useState({ w: 1000, h: 700 })
+   useEffect(() => {
+-    if (didAutoFit.current) return
+-    const rect = containerRef.current?.getBoundingClientRect()
+-    if (!rect || rect.height === 0 || canvasHeight === 0) return
+-    didAutoFit.current = true
+-    const targetVisibleRows = 14
+-    const targetVbHeight = targetVisibleRows * ROW_GAP
+-    const fitZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, rect.height / Math.min(canvasHeight, targetVbHeight)))
+-    setZoom(fitZoom)
+-    setPan({ x: 0, y: 0 })
+-  }, [canvasHeight])
++    const el = containerRef.current
++    if (!el) return
++    const measure = () => {
++      const r = el.getBoundingClientRect()
++      if (r.width > 0 && r.height > 0) setViewport({ w: r.width, h: r.height })
++    }
++    measure()
++    const ro = new ResizeObserver(measure)
++    ro.observe(el)
++    return () => ro.disconnect()
++  }, [])
+ 
+-  const vbWidth = canvasWidth / zoom
+-  const vbHeight = canvasHeight / zoom
++  const vbWidth = viewport.w / zoom
++  const vbHeight = viewport.h / zoom
+ 
+   const clientToSvg = (clientX: number, clientY: number) => {
+     const rect = containerRef.current?.getBoundingClientRect()
+@@ -212,8 +222,8 @@ export default function FiberConnectivityDiagram({
+   const zoomAt = (clientX: number, clientY: number, factor: number) => {
+     const before = clientToSvg(clientX, clientY)
+     const nextZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom * factor))
+-    const nextVbW = canvasWidth / nextZoom
+-    const nextVbH = canvasHeight / nextZoom
++    const nextVbW = viewport.w / nextZoom
++    const nextVbH = viewport.h / nextZoom
+     const rect = containerRef.current?.getBoundingClientRect()
+     const fracX = rect ? (clientX - rect.left) / rect.width : 0.5
+     const fracY = rect ? (clientY - rect.top) / rect.height : 0.5
+@@ -239,13 +249,11 @@ export default function FiberConnectivityDiagram({
+   }
+   const handleMouseUp = () => setPanDrag(null)
+ 
++  // Back to 1:1 pixels at the top-left of the diagram — the readable
++  // starting point, not a "fit everything" that would shrink a 160-row
++  // column back to nothing.
+   const resetView = () => {
+-    const rect = containerRef.current?.getBoundingClientRect()
+-    const targetVbHeight = 14 * ROW_GAP
+-    const fitZoom = rect && rect.height > 0 && canvasHeight > 0
+-      ? Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, rect.height / Math.min(canvasHeight, targetVbHeight)))
+-      : 1
+-    setZoom(fitZoom)
++    setZoom(1)
+     setPan({ x: 0, y: 0 })
+   }
+ 
+-- 
+2.43.0
+
