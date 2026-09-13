@@ -1,0 +1,291 @@
+From 492afe3b81deea355d902f155113a78079090123 Mon Sep 17 00:00:00 2001
+From: "Marcelo Poblete (via Claude)" <marcelopoblete.us@gmail.com>
+Date: Sun, 13 Sep 2026 17:24:01 +0000
+Subject: [PATCH] feat: fusion splice diagram detail view (per-strand splice
+ detail)
+
+Adds a "View fusion diagram" action to each enclosure in the
+Connectivity Diagram's node panel. Opens a full-width splice detail
+styled after the standard OSP splice-closure convention (as seen in
+tools like OZmap): each side cable drawn as a numbered, TIA-598
+color-coded strand stub, with a colored curve per splice record
+(fiber_splice_records: from_cable/from_strand -> to_cable/to_strand).
+Multiple records sharing one input strand read naturally as a
+splitter fan-out, no extra graphic required. Dashed/dimmed lines
+mark splices not yet completed (splice_status != 'Spliced').
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01ScqTACWd5u51GDZPenDDdM
+---
+ .../fiber/FiberConnectivityDiagram.tsx        | 218 +++++++++++++++++-
+ 1 file changed, 217 insertions(+), 1 deletion(-)
+
+diff --git a/src/app/projects/[projectId]/fiber/FiberConnectivityDiagram.tsx b/src/app/projects/[projectId]/fiber/FiberConnectivityDiagram.tsx
+index 54b2fd5..33d1bd0 100644
+--- a/src/app/projects/[projectId]/fiber/FiberConnectivityDiagram.tsx
++++ b/src/app/projects/[projectId]/fiber/FiberConnectivityDiagram.tsx
+@@ -72,8 +72,13 @@ export default function FiberConnectivityDiagram({
+   const [panDrag, setPanDrag] = useState<{ startX: number; startY: number; origin: { x: number; y: number } } | null>(null)
+   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+   const [selectedCableId, setSelectedCableId] = useState<string | null>(null)
++  const [selectedEnclosureId, setSelectedEnclosureId] = useState<string | null>(null)
+   const containerRef = useRef<HTMLDivElement>(null)
+ 
++  const strandsById = useMemo(() => new Map(strands.map(s => [s.id, s])), [strands])
++  const cablesById = useMemo(() => new Map(cables.map(c => [c.id, c])), [cables])
++  const enclosuresById = useMemo(() => new Map(enclosures.map(e => [e.id, e])), [enclosures])
++
+   const enclosuresByNode = useMemo(() => {
+     const map = new Map<string, any[]>()
+     for (const e of enclosures) {
+@@ -227,6 +232,15 @@ export default function FiberConnectivityDiagram({
+         onMouseLeave={handleMouseUp}
+         className="flex-1 min-w-0 relative rounded-xl border border-[var(--border)] bg-[var(--surface-1)] overflow-hidden cursor-grab active:cursor-grabbing"
+       >
++        {selectedEnclosureId && (
++          <FusionSpliceDiagram
++            enclosure={enclosuresById.get(selectedEnclosureId)}
++            records={spliceRecords.filter(r => r.enclosure_id === selectedEnclosureId)}
++            strandsById={strandsById}
++            cablesById={cablesById}
++            onClose={() => setSelectedEnclosureId(null)}
++          />
++        )}
+         {nodes.length === 0 ? (
+           <div className="h-full flex flex-col items-center justify-center text-center gap-2 px-8">
+             <span className="text-xs font-bold text-[var(--text-primary)]">No fiber nodes yet</span>
+@@ -351,6 +365,7 @@ export default function FiberConnectivityDiagram({
+               enclosures={enclosuresByNode.get(selectedNode.id) ?? []}
+               spliceCountByEnclosure={spliceCountByEnclosure}
+               onClose={() => setSelectedNodeId(null)}
++              onViewFusion={(enclosureId) => setSelectedEnclosureId(enclosureId)}
+             />
+           )}
+           {selectedCable && (
+@@ -366,7 +381,7 @@ export default function FiberConnectivityDiagram({
+   )
+ }
+ 
+-function NodeDetail({ node, enclosures, spliceCountByEnclosure, onClose }: { node: any; enclosures: any[]; spliceCountByEnclosure: Map<string, number>; onClose: () => void }) {
++function NodeDetail({ node, enclosures, spliceCountByEnclosure, onClose, onViewFusion }: { node: any; enclosures: any[]; spliceCountByEnclosure: Map<string, number>; onClose: () => void; onViewFusion: (enclosureId: string) => void }) {
+   return (
+     <div className="space-y-3">
+       <PanelHeader eyebrow="Node" title={node.node_tag} onClose={onClose} />
+@@ -392,6 +407,14 @@ function NodeDetail({ node, enclosures, spliceCountByEnclosure, onClose }: { nod
+                   <span>Capacity {e.capacity}</span>
+                   <span>{spliceCountByEnclosure.get(e.id) ?? 0} splices</span>
+                 </div>
++                {(spliceCountByEnclosure.get(e.id) ?? 0) > 0 && (
++                  <button
++                    onClick={() => onViewFusion(e.id)}
++                    className="w-full text-[9.5px] font-bold uppercase tracking-wide text-[var(--accent)] hover:underline cursor-pointer text-left pt-0.5"
++                  >
++                    View fusion diagram →
++                  </button>
++                )}
+               </div>
+             ))}
+           </div>
+@@ -432,6 +455,199 @@ function CableDetail({ cable, strands, onClose }: { cable: any; strands: any[];
+   )
+ }
+ 
++/**
++ * Fusion Splice Diagram — per-strand splice detail for one enclosure,
++ * styled after the standard OSP splice-closure diagram convention (as seen
++ * in tools like OZmap): each side cable drawn as a numbered, color-coded
++ * strand stub, with a straight line per splice colored by the source
++ * strand's TIA-598 color. Multiple splice records sharing the same input
++ * strand read as a splitter fan-out with no extra graphic needed.
++ */
++function FusionSpliceDiagram({
++  enclosure,
++  records,
++  strandsById,
++  cablesById,
++  onClose,
++}: {
++  enclosure: any
++  records: any[]
++  strandsById: Map<string, any>
++  cablesById: Map<string, any>
++  onClose: () => void
++}) {
++  const ROW_H = 22
++  const GROUP_GAP = 20
++  const TOP = 56
++  const LEFT_X = 140
++  const RIGHT_X = 560
++  const STUB_LEN = 26
++
++  const { leftGroups, rightGroups, leftY, rightY, height } = useMemo(() => {
++    const leftCableOrder: string[] = []
++    const rightCableOrder: string[] = []
++    const leftStrandsByCable = new Map<string, Set<string>>()
++    const rightStrandsByCable = new Map<string, Set<string>>()
++
++    for (const r of records) {
++      if (r.from_cable_id && r.from_strand_id) {
++        if (!leftStrandsByCable.has(r.from_cable_id)) {
++          leftStrandsByCable.set(r.from_cable_id, new Set())
++          leftCableOrder.push(r.from_cable_id)
++        }
++        leftStrandsByCable.get(r.from_cable_id)!.add(r.from_strand_id)
++      }
++      if (r.to_cable_id && r.to_strand_id) {
++        if (!rightStrandsByCable.has(r.to_cable_id)) {
++          rightStrandsByCable.set(r.to_cable_id, new Set())
++          rightCableOrder.push(r.to_cable_id)
++        }
++        rightStrandsByCable.get(r.to_cable_id)!.add(r.to_strand_id)
++      }
++    }
++
++    const buildGroups = (order: string[], map: Map<string, Set<string>>) =>
++      order.map(cableId => ({
++        cableId,
++        strandIds: Array.from(map.get(cableId) ?? []).sort((a, b) => {
++          const sa = strandsById.get(a)?.strand_number ?? 0
++          const sb = strandsById.get(b)?.strand_number ?? 0
++          return sa - sb
++        }),
++      }))
++
++    const leftGroups = buildGroups(leftCableOrder, leftStrandsByCable)
++    const rightGroups = buildGroups(rightCableOrder, rightStrandsByCable)
++
++    const assignY = (groups: { cableId: string; strandIds: string[] }[]) => {
++      const y = new Map<string, number>()
++      let cursor = TOP
++      for (const g of groups) {
++        cursor += GROUP_GAP
++        for (const sid of g.strandIds) {
++          y.set(sid, cursor)
++          cursor += ROW_H
++        }
++      }
++      return { y, bottom: cursor }
++    }
++
++    const left = assignY(leftGroups)
++    const right = assignY(rightGroups)
++
++    return {
++      leftGroups,
++      rightGroups,
++      leftY: left.y,
++      rightY: right.y,
++      height: Math.max(left.bottom, right.bottom, 200) + 24,
++    }
++  }, [records, strandsById])
++
++  return (
++    <div className="absolute inset-0 z-10 bg-[var(--surface-1)] flex flex-col">
++      <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--border)] shrink-0">
++        <div>
++          <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">
++            Fusion Splice Diagram
++          </span>
++          <span className="text-sm font-black text-[var(--text-primary)]">
++            {enclosure?.enclosure_tag ?? 'Enclosure'}
++            {enclosure?.enclosure_type ? ` — ${enclosure.enclosure_type}` : ''}
++          </span>
++        </div>
++        <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors cursor-pointer">
++          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
++        </button>
++      </div>
++      <div className="flex-1 overflow-auto p-4">
++        {records.length === 0 ? (
++          <p className="text-[11px] text-[var(--text-tertiary)]">No splice records at this enclosure yet.</p>
++        ) : (
++          <svg width={RIGHT_X + 140} height={height} className="select-none">
++            {/* Cable group labels + stub ticks */}
++            {leftGroups.map(g => {
++              const cable = cablesById.get(g.cableId)
++              const firstY = leftY.get(g.strandIds[0]) ?? TOP
++              return (
++                <g key={g.cableId}>
++                  <text x={LEFT_X - STUB_LEN - 6} y={firstY - 10} textAnchor="end" style={{ fontSize: 10.5, fontWeight: 700 }} className="fill-[var(--text-primary)]">
++                    {cable?.cable_tag ?? 'Cable'}
++                  </text>
++                  {g.strandIds.map(sid => {
++                    const s = strandsById.get(sid)
++                    const y = leftY.get(sid)!
++                    return (
++                      <g key={sid}>
++                        <line x1={LEFT_X - STUB_LEN} y1={y} x2={LEFT_X} y2={y} stroke="var(--border-strong, #475569)" strokeWidth={1.5} />
++                        <circle cx={LEFT_X} cy={y} r={7} fill="var(--surface-2)" stroke={fiberColorHex(s?.fiber_color)} strokeWidth={2} />
++                        <text x={LEFT_X} y={y + 3} textAnchor="middle" style={{ fontSize: 7.5, fontWeight: 700 }} className="fill-[var(--text-primary)]">
++                          {s?.strand_number ?? ''}
++                        </text>
++                        <text x={LEFT_X - STUB_LEN - 6} y={y + 3} textAnchor="end" style={{ fontSize: 8.5 }} className="fill-[var(--text-tertiary)]">
++                          {s?.fiber_color ?? ''}
++                        </text>
++                      </g>
++                    )
++                  })}
++                </g>
++              )
++            })}
++
++            {rightGroups.map(g => {
++              const cable = cablesById.get(g.cableId)
++              const firstY = rightY.get(g.strandIds[0]) ?? TOP
++              return (
++                <g key={g.cableId}>
++                  <text x={RIGHT_X + STUB_LEN + 6} y={firstY - 10} textAnchor="start" style={{ fontSize: 10.5, fontWeight: 700 }} className="fill-[var(--text-primary)]">
++                    {cable?.cable_tag ?? 'Cable'}
++                  </text>
++                  {g.strandIds.map(sid => {
++                    const s = strandsById.get(sid)
++                    const y = rightY.get(sid)!
++                    return (
++                      <g key={sid}>
++                        <line x1={RIGHT_X} y1={y} x2={RIGHT_X + STUB_LEN} y2={y} stroke="var(--border-strong, #475569)" strokeWidth={1.5} />
++                        <circle cx={RIGHT_X} cy={y} r={7} fill="var(--surface-2)" stroke={fiberColorHex(s?.fiber_color)} strokeWidth={2} />
++                        <text x={RIGHT_X} y={y + 3} textAnchor="middle" style={{ fontSize: 7.5, fontWeight: 700 }} className="fill-[var(--text-primary)]">
++                          {s?.strand_number ?? ''}
++                        </text>
++                        <text x={RIGHT_X + STUB_LEN + 6} y={y + 3 + 12} textAnchor="start" style={{ fontSize: 8.5 }} className="fill-[var(--text-tertiary)]">
++                          {s?.fiber_color ?? ''}
++                        </text>
++                      </g>
++                    )
++                  })}
++                </g>
++              )
++            })}
++
++            {/* Splice lines */}
++            {records.map(r => {
++              const y1 = leftY.get(r.from_strand_id)
++              const y2 = rightY.get(r.to_strand_id)
++              if (y1 === undefined || y2 === undefined) return null
++              const fromStrand = strandsById.get(r.from_strand_id)
++              const color = fiberColorHex(fromStrand?.fiber_color)
++              return (
++                <path
++                  key={r.id}
++                  d={`M ${LEFT_X} ${y1} C ${(LEFT_X + RIGHT_X) / 2} ${y1}, ${(LEFT_X + RIGHT_X) / 2} ${y2}, ${RIGHT_X} ${y2}`}
++                  fill="none"
++                  stroke={color}
++                  strokeWidth={2}
++                  opacity={r.splice_status === 'Spliced' ? 1 : 0.4}
++                  strokeDasharray={r.splice_status === 'Spliced' ? undefined : '4 3'}
++                />
++              )
++            })}
++          </svg>
++        )}
++      </div>
++    </div>
++  )
++}
++
+ function PanelHeader({ eyebrow, title, onClose }: { eyebrow: string; title: string; onClose: () => void }) {
+   return (
+     <div className="flex items-start justify-between">
+-- 
+2.43.0
+
