@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { fiberColorHex } from '@/lib/fiberColors'
+import { isForeignNodeType } from '@/lib/fiberNodeTypes'
 
 /**
  * Fiber Connectivity Diagram — the logical/unifilar view called for in
@@ -31,13 +32,22 @@ const ZOOM_MAX = 4
 const CIVIL_STRUCTURE_TYPES = new Set(['Manhole', 'Handhole', 'Pull Box'])
 
 const NODE_TYPE_META: Record<string, { label: string; accent: string }> = {
-  Structure: { label: 'Structure (see Ductería)', accent: '#64748b' },
+  // Fiber-native objects (what this module actually designs).
+  'Splice Closure': { label: 'Splice Closure (CE)', accent: '#0d9488' },
+  'Terminal Box': { label: 'Terminal Box (CTO)', accent: '#2563eb' },
+  Splitter: { label: 'Splitter', accent: '#7c3aed' },
+  ODF: { label: 'ODF / DIO', accent: '#db2777' },
+  Pigtail: { label: 'Pigtail', accent: '#ca8a04' },
+  'Fiber Slack': { label: 'Fiber Slack', accent: '#16a34a' },
+  'Existing Fiber Source': { label: 'Source', accent: '#16a34a' },
   Cabinet: { label: 'Cabinet', accent: '#2563eb' },
   Pole: { label: 'Pole', accent: '#854d0e' },
   Building: { label: 'Building', accent: '#7c3aed' },
-  'Existing Fiber Source': { label: 'Source', accent: '#16a34a' },
-  'Camera Location': { label: 'Camera', accent: '#ea580c' },
   Custom: { label: 'Custom', accent: '#94a3b8' },
+  // Other modules — only ever drawn when they carry fiber (see the node
+  // filter below), and then only as a reference.
+  Structure: { label: 'Structure (see Ductería)', accent: '#64748b' },
+  'Camera Location': { label: 'Camera (CCTV)', accent: '#ea580c' },
 }
 
 function nodeTypeKey(nodeType: string): string {
@@ -56,6 +66,22 @@ function nodeIconPath(nodeType: string): string[] {
       return ['M4 22V4h11v18', 'M15 9h5v13h-5', 'M7 8h1', 'M7 12h1', 'M7 16h1']
     case 'Pole':
       return ['M12 2v20', 'M6 6h12', 'M8 10h8']
+    case 'Splice Closure':
+      // Oval closure with the splice seam through it.
+      return ['M12 12m-9 0a9 6.5 0 1 0 18 0a9 6.5 0 1 0 -18 0', 'M3 12h18']
+    case 'Terminal Box':
+      // Box with drop ports along the bottom.
+      return ['M4 5h16v14H4z', 'M7 9h10', 'M8 16h.01', 'M12 16h.01', 'M16 16h.01']
+    case 'Splitter':
+      // 1:N triangle — the unifilar convention.
+      return ['M5 12L19 4v16z', 'M2 12h3']
+    case 'ODF':
+      return ['M5 3h14v18H5z', 'M8 7h8', 'M8 11h8', 'M8 15h8']
+    case 'Pigtail':
+      return ['M12 8h9v8h-9z', 'M12 12C8 12 8 6 4 6']
+    case 'Fiber Slack':
+      // Coiled reserve.
+      return ['M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0', 'M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0']
     default:
       // Structure (Manhole/Handhole/Pull Box) — a plain dot, deliberately
       // generic: the civil detail lives in the Ductería module, not here.
@@ -72,12 +98,30 @@ interface FiberConnectivityDiagramProps {
 }
 
 export default function FiberConnectivityDiagram({
-  nodes,
+  nodes: allNodes,
   cables,
   strands,
   enclosures,
   spliceRecords,
 }: FiberConnectivityDiagramProps) {
+  // Objects owned by other modules (civil structures, cameras) only belong in
+  // a FIBER diagram when they are actually part of the fiber topology — i.e.
+  // a cable lands on them, or they hold an enclosure. An isolated camera or
+  // handhole is Ductería/CCTV data and was just noise here: this project alone
+  // was padding the diagram with ~39 unconnected cameras. Per
+  // claude/plan-separacion-modulos.md, the cross-module reference is allowed
+  // exactly where connectivity is the point, and nowhere else.
+  const nodes = useMemo(() => {
+    const connected = new Set<string>()
+    for (const c of cables) {
+      if (c.from_node_id) connected.add(c.from_node_id)
+      if (c.to_node_id) connected.add(c.to_node_id)
+    }
+    for (const e of enclosures) {
+      if (e.node_id) connected.add(e.node_id)
+    }
+    return allNodes.filter(n => !isForeignNodeType(n.node_type) || connected.has(n.id))
+  }, [allNodes, cables, enclosures])
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [panDrag, setPanDrag] = useState<{ startX: number; startY: number; origin: { x: number; y: number } } | null>(null)

@@ -24,8 +24,10 @@ import {
   completeCameraFiberSplices,
   setAssetCondition
 } from '../../actions-fiber'
+import type { FiberNodeType } from '../../actions-fiber'
 import type { AssetCondition } from '@/lib/assetCondition'
 import { getFiberColor } from '@/lib/fiberColors'
+import { FIBER_NODE_TYPES, fiberNodeTypeDef, isForeignNodeType, owningModule } from '@/lib/fiberNodeTypes'
 
 const haversineDistanceMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const R = 6371000 // Earth radius in meters
@@ -132,8 +134,10 @@ export default function FiberMapCanvas({
   }
 
   // Map drawing mode state
-  // Modes: 'select' (default), 'Manhole', 'Handhole', 'Pull Box', 'Cabinet', 'Pole', 'Building', 'Existing Fiber Source', 'Camera Location', 'Custom', 'draw_route'
-  const [toolMode, setToolMode] = useState<'select' | 'Manhole' | 'Handhole' | 'Pull Box' | 'Cabinet' | 'Pole' | 'Building' | 'Existing Fiber Source' | 'Camera Location' | 'Custom' | 'draw_route'>('select')
+  // 'select' | 'draw_route' | one of FIBER_NODE_TYPES (src/lib/fiberNodeTypes.ts).
+  // Civil structures and cameras are NOT placeable here any more — they belong
+  // to Ductería and CCTV.
+  const [toolMode, setToolMode] = useState<'select' | 'draw_route' | string>('select')
   const [tempRoutePoints, setTempRoutePoints] = useState<{ lat: number; lng: number }[]>([])
 
   // Refs to avoid stale closures in map click listener
@@ -162,6 +166,10 @@ export default function FiberMapCanvas({
   const [routeIdTag, setRouteIdTag] = useState('')
   const [conduitDiameter, setConduitDiameter] = useState(2.0)
   const [routeSlackPercentage, setRouteSlackPercentage] = useState(10.0)
+  // Ductería structures and CCTV cameras are not fiber objects. They stay off
+  // the fiber map unless you turn on the reference layer — see
+  // claude/plan-separacion-modulos.md.
+  const [showContextLayer, setShowContextLayer] = useState(false)
   // Technical reserve (OZmap calls it "reserva técnica"): extra cable left
   // coiled at each end of the route for splicing/rework room. Counted at
   // BOTH ends per the industry convention OZmap documents — a 15ft reserve
@@ -742,11 +750,19 @@ export default function FiberMapCanvas({
 
     // Draw Nodes (markers)
     initialData.nodes.forEach(node => {
+      // Objects owned by other modules (civil structures -> Ductería,
+      // cameras -> CCTV) are not part of the fiber design. They are hidden by
+      // default and, when the reference layer is on, drawn dimmed and
+      // read-only so you can see which handhole a closure sits in without
+      // being able to edit Ductería's data from here.
+      const isForeign = isForeignNodeType(node.node_type)
+      if (isForeign && !showContextLayer) return
+
       const customNodeColor = getNodeCustomColor(node)
       const statusColor = customNodeColor || getStatusColor(node.status)
       let svgShape = ''
       const typeLower = node.node_type ? node.node_type.toLowerCase() : ''
-      
+
       if (typeLower === 'manhole') {
         // circular underground access icon
         svgShape = `
@@ -793,6 +809,51 @@ export default function FiberMapCanvas({
         svgShape = `
           <polygon points="12,2 15,9 22,9 17,14 19,21 12,17 5,21 7,14 2,9 9,9" fill="${statusColor}" stroke="#ffffff" stroke-width="1.5"/>
         `
+      } else if (typeLower === 'splice closure') {
+        // CE — oval closure with the splice seam across it
+        svgShape = `
+          <ellipse cx="12" cy="12" rx="9" ry="6.5" fill="${statusColor}" stroke="#ffffff" stroke-width="2"/>
+          <line x1="3" y1="12" x2="21" y2="12" stroke="#ffffff" stroke-width="1.5"/>
+          <circle cx="12" cy="12" r="2" fill="#ffffff"/>
+        `
+      } else if (typeLower === 'terminal box') {
+        // CTO — box with drop ports along the bottom
+        svgShape = `
+          <rect x="4" y="5" width="16" height="14" rx="2" fill="${statusColor}" stroke="#ffffff" stroke-width="2"/>
+          <circle cx="8" cy="16" r="1.3" fill="#ffffff"/>
+          <circle cx="12" cy="16" r="1.3" fill="#ffffff"/>
+          <circle cx="16" cy="16" r="1.3" fill="#ffffff"/>
+          <line x1="7" y1="9" x2="17" y2="9" stroke="#ffffff" stroke-width="1.5"/>
+        `
+      } else if (typeLower === 'splitter') {
+        // 1:N split — the triangle convention used in every unifilar drawing
+        svgShape = `
+          <polygon points="5,12 19,4 19,20" fill="${statusColor}" stroke="#ffffff" stroke-width="2"/>
+          <line x1="2" y1="12" x2="5" y2="12" stroke="#ffffff" stroke-width="1.5"/>
+        `
+      } else if (typeLower === 'odf') {
+        // ODF/DIO — rack frame with patch rows
+        svgShape = `
+          <rect x="5" y="3" width="14" height="18" rx="1.5" fill="${statusColor}" stroke="#ffffff" stroke-width="2"/>
+          <line x1="8" y1="7" x2="16" y2="7" stroke="#ffffff" stroke-width="1.5"/>
+          <line x1="8" y1="11" x2="16" y2="11" stroke="#ffffff" stroke-width="1.5"/>
+          <line x1="8" y1="15" x2="16" y2="15" stroke="#ffffff" stroke-width="1.5"/>
+        `
+      } else if (typeLower === 'pigtail') {
+        // pigtail — connector body with a tail
+        svgShape = `
+          <rect x="12" y="8" width="9" height="8" rx="1.5" fill="${statusColor}" stroke="#ffffff" stroke-width="2"/>
+          <path d="M12 12 C 8 12, 8 6, 4 6" fill="none" stroke="${statusColor}" stroke-width="2.5"/>
+          <path d="M12 12 C 8 12, 8 6, 4 6" fill="none" stroke="#ffffff" stroke-width="1"/>
+        `
+      } else if (typeLower === 'fiber slack') {
+        // slack/reserve — coiled cable
+        svgShape = `
+          <circle cx="12" cy="12" r="9" fill="none" stroke="${statusColor}" stroke-width="3"/>
+          <circle cx="12" cy="12" r="9" fill="none" stroke="#ffffff" stroke-width="1"/>
+          <circle cx="12" cy="12" r="5" fill="none" stroke="${statusColor}" stroke-width="3"/>
+          <circle cx="12" cy="12" r="5" fill="none" stroke="#ffffff" stroke-width="1"/>
+        `
       } else {
         // Fallback / Camera Location
         svgShape = `
@@ -815,18 +876,31 @@ export default function FiberMapCanvas({
       const nodeEl = document.createElement('div')
       nodeEl.style.width = '30px'
       nodeEl.style.height = '42px'
-      nodeEl.style.cursor = 'pointer'
       nodeEl.innerHTML = svgPin
-      nodeEl.title = `${node.node_tag} (${node.node_type.toUpperCase()})`
+      if (isForeign) {
+        // Reference only: faded, not clickable, not draggable.
+        nodeEl.style.cursor = 'default'
+        nodeEl.style.opacity = '0.35'
+        nodeEl.style.pointerEvents = 'none'
+        nodeEl.title = `${node.node_tag} — ${owningModule(node.node_type) === 'cctv' ? 'CCTV' : 'Ductería'} reference (read-only here)`
+      } else {
+        nodeEl.style.cursor = 'pointer'
+        nodeEl.title = `${node.node_tag} (${node.node_type.toUpperCase()})`
+      }
 
       const marker = new maplibregl.Marker({
         element: nodeEl,
-        draggable: true,
+        draggable: !isForeign,
         anchor: 'center',
         offset: [0, 6] // elementCenterY(21) - anchorY(15)
       })
         .setLngLat([node.longitude, node.latitude])
         .addTo(map)
+
+      if (isForeign) {
+        markersRef.current.push(marker)
+        return
+      }
 
       // Click to select node
       nodeEl.addEventListener('click', (evt: MouseEvent) => {
@@ -1050,7 +1124,9 @@ export default function FiberMapCanvas({
     return () => {
       removeLineLayers(map, lineLayerIdsRef.current)
     }
-  }, [map, initialData, selectedRoute])
+    // showContextLayer is a dependency so toggling the Ductería/CCTV reference
+    // layer redraws the markers.
+  }, [map, initialData, selectedRoute, showContextLayer])
 
   // 4. Temporary Polyline drawing synchronization
   const TEMP_ROUTE_LAYER_ID = 'fiber-temp-route-preview'
@@ -1101,17 +1177,15 @@ export default function FiberMapCanvas({
   const handleMapCanvasClick = async (lat: number, lng: number) => {
     if (toolMode === 'select' || toolMode === 'draw_route') return
 
-    // Auto calculate tag names
-    const typeLabel = 
-      toolMode === 'Manhole' ? 'MH'
-      : toolMode === 'Handhole' ? 'HH'
-      : toolMode === 'Pull Box' ? 'PB'
-      : toolMode === 'Cabinet' ? 'CAB'
-      : toolMode === 'Pole' ? 'POL'
-      : toolMode === 'Building' ? 'BLDG'
-      : toolMode === 'Existing Fiber Source' ? 'EXT'
-      : toolMode === 'Camera Location' ? 'CAM'
-      : 'NODE'
+    // Only fiber objects can be placed from this module. Anything else means
+    // stale UI state, so bail out rather than writing a foreign node type.
+    const typeDef = fiberNodeTypeDef(toolMode)
+    if (!typeDef) {
+      showNotification('error', 'That object is not placed from the Fiber module.')
+      return
+    }
+    // Tag prefix comes from the fiber catalog (CE-001, CTO-001, SPL-001...).
+    const typeLabel = typeDef.tagPrefix
 
     // Find the maximum index suffix among existing nodes of the same type/prefix to prevent collisions after deletions
     let maxNodeNum = 0
@@ -1126,22 +1200,21 @@ export default function FiberMapCanvas({
     })
     const tag = `${typeLabel}-${String(maxNodeNum + 1).padStart(3, '0')}`
 
+    // Fiber objects that get spliced carry a service loop; a pigtail or a
+    // plain source does not. A dedicated slack point is all loop.
     const defaultSlack =
-      toolMode === 'Handhole' || toolMode === 'Cabinet' ? 20.0
-      : toolMode === 'Building' ? 10.0
+      toolMode === 'Fiber Slack' ? 50.0
+      : typeDef.enclosure ? 20.0
       : 0.0
 
-    const defaultSize =
-      toolMode === 'Handhole' ? '24x36x36'
-      : toolMode === 'Manhole' ? '48x48x48'
-      : toolMode === 'Pull Box' ? '12x12x6'
-      : toolMode === 'Cabinet' ? 'Outdoor NEMA'
-      : 'Standard'
+    const defaultSize = typeDef.enclosure
+      ? `${typeDef.enclosure.capacity}F ${typeDef.label}`
+      : typeDef.label
 
     const res = await createFiberNode({
       projectId,
       nodeTag: tag,
-      nodeType: toolMode,
+      nodeType: typeDef.value as FiberNodeType,
       latitude: lat,
       longitude: lng,
       elevationFt: 0.0,
@@ -1805,28 +1878,23 @@ export default function FiberMapCanvas({
             <div className="flex items-center gap-1 bg-[var(--surface-2)] border border-[var(--border)] p-0.5 rounded-lg">
               <select
                 id="toolbar-node-type-select"
-                defaultValue="Handhole"
+                defaultValue={FIBER_NODE_TYPES[0].value}
                 onChange={(e) => {
-                  const newMode = e.target.value as any
-                  setToolMode(newMode)
+                  setToolMode(e.target.value)
                   setTempRoutePoints([])
                 }}
                 className="bg-transparent text-[10px] font-bold uppercase tracking-wide px-1.5 py-1 text-[var(--text-secondary)] focus:outline-none"
               >
-                <option value="Manhole" className="bg-[var(--surface-1)]">Manhole</option>
-                <option value="Handhole" className="bg-[var(--surface-1)]">Handhole</option>
-                <option value="Pull Box" className="bg-[var(--surface-1)]">Pull Box</option>
-                <option value="Cabinet" className="bg-[var(--surface-1)]">Cabinet</option>
-                <option value="Pole" className="bg-[var(--surface-1)]">Pole</option>
-                <option value="Building" className="bg-[var(--surface-1)]">Building</option>
-                <option value="Existing Fiber Source" className="bg-[var(--surface-1)]">Existing Fiber Source</option>
-                <option value="Camera Location" className="bg-[var(--surface-1)]">Camera Location</option>
-                <option value="Custom" className="bg-[var(--surface-1)]">Custom</option>
+                {FIBER_NODE_TYPES.map(t => (
+                  <option key={t.value} value={t.value} className="bg-[var(--surface-1)]">
+                    {t.label}
+                  </option>
+                ))}
               </select>
               <button
                 onClick={() => {
                   const selectEl = document.getElementById('toolbar-node-type-select') as HTMLSelectElement
-                  const val = selectEl ? (selectEl.value as any) : 'Handhole'
+                  const val = selectEl ? selectEl.value : FIBER_NODE_TYPES[0].value
                   setToolMode(val)
                   setTempRoutePoints([])
                 }}
@@ -1846,6 +1914,19 @@ export default function FiberMapCanvas({
               }`}
             >
               Draw Route
+            </button>
+
+            <div className="w-px h-4 bg-slate-800" />
+            {/* Ductería/CCTV objects are not fiber. Off by default; on, they
+                show dimmed and read-only just as spatial reference. */}
+            <button
+              onClick={() => setShowContextLayer(v => !v)}
+              title="Show Ductería structures and CCTV cameras dimmed, as read-only reference"
+              className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
+                showContextLayer ? 'bg-slate-700 text-[var(--text-primary)]' : 'bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              {showContextLayer ? 'Hide' : 'Show'} Context
             </button>
 
             {/* Route draw active buttons */}

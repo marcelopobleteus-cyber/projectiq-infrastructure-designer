@@ -7,19 +7,30 @@ import { DEMO_FIBER_DATA } from '@/lib/demoData'
 import type { Database } from '@/types/supabase'
 import { scopeBuysMaterial } from '@/lib/assetCondition'
 import type { AssetCondition, WorkScope } from '@/lib/assetCondition'
+import { fiberNodeTypeDef } from '@/lib/fiberNodeTypes'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export type FiberNodeType =
+  // Legacy / other-module types. Still valid for the rows that already exist
+  // (and for the Ductería + CCTV modules), but the Fiber placement menu no
+  // longer offers them — see src/lib/fiberNodeTypes.ts.
   | 'Manhole'
   | 'Handhole'
   | 'Pull Box'
   | 'Cabinet'
   | 'Pole'
   | 'Building'
-  | 'Existing Fiber Source'
   | 'Camera Location'
   | 'Custom'
+  // Fiber-native objects.
+  | 'Existing Fiber Source'
+  | 'Splice Closure'
+  | 'Terminal Box'
+  | 'Splitter'
+  | 'ODF'
+  | 'Pigtail'
+  | 'Fiber Slack'
 
 export type FiberNodeStatus = 'Planned' | 'Existing' | 'Installed' | 'Blocked' | 'Needs Survey' | 'Removed'
 
@@ -311,7 +322,32 @@ export async function createFiberNode(params: {
     'Building': { partNumber: 'BLDG-ENTRY-KIT', defaultDesc: 'Building Entrance Transition Kit', fallbackCost: 250.00 },
   }
 
-  // Espejo en la capa conduit para las estructuras civiles.
+  // Los objetos propios de fibra (CE, CTO, splitter, ODF) traen su enclosure
+  // de una vez: si no, quedan como un marcador vacio que no sirve en las
+  // vistas de empalme/fusion. Los tipos sin enclosure (pigtail, reserva,
+  // fuente existente) no crean nada extra.
+  const fiberTypeDef = fiberNodeTypeDef(params.nodeType)
+  if (fiberTypeDef?.enclosure) {
+    const { error: encErr } = await supabase.from('fiber_enclosures').insert({
+      project_id: params.projectId,
+      organization_id: '00000000-0000-0000-0000-000000000000', // trigger overrides
+      node_id: newNode.id,
+      enclosure_tag: `ENC-${params.nodeTag}`,
+      enclosure_type: fiberTypeDef.enclosure.enclosureType,
+      role: fiberTypeDef.enclosure.role,
+      capacity: fiberTypeDef.enclosure.capacity,
+      splice_count: 0,
+      latitude: params.latitude,
+      longitude: params.longitude,
+      installed_status: params.status ?? 'Planned',
+      asset_condition: assetCondition,
+      work_scope: workScope,
+    })
+    if (encErr) console.error('Failed to auto-create fiber enclosure:', encErr.message)
+  }
+
+  // Espejo en la capa conduit para las estructuras civiles. Los tipos nuevos
+  // de fibra no aparecen aqui a proposito: la obra civil se crea en Ducteria.
   const CONDUIT_STRUCTURE_TYPES: Record<string, string> = {
     'Handhole': 'handhole', 'Manhole': 'manhole', 'Pull Box': 'pull_box', 'Vault': 'vault',
   }
