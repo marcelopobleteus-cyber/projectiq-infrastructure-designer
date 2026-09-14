@@ -1,9 +1,16 @@
 'use client'
 
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { Database } from '@/types/supabase'
-import { ASSET_CONDITION_LABELS, WORK_SCOPE_LABELS, type AssetCondition, type WorkScope } from '@/lib/assetCondition'
+import { ASSET_CONDITION_LABELS, SCOPES_FOR_CONDITION, WORK_SCOPE_LABELS, type AssetCondition, type WorkScope } from '@/lib/assetCondition'
 import ConduitMapCanvas from './ConduitMapCanvas'
+import { CONDUIT_STRUCTURE_TYPES } from '@/lib/conduitStructureTypes'
+import {
+  createConduitStructure,
+  updateConduitStructure,
+  deleteConduitStructure,
+} from '../../actions-conduit'
 
 type ConduitStructure = Database['public']['Tables']['conduit_structures']['Row'] & {
   fiber_nodes?: { node_tag: string; node_type: string } | { node_tag: string; node_type: string }[] | null
@@ -219,7 +226,187 @@ function ScopePill({ scope }: { scope: WorkScope }) {
   )
 }
 
+/**
+ * Edit panel for a civil structure. This is the half that was missing: the
+ * Conduit map could show a manhole but never change one, because the only
+ * writer of `conduit_structures` lived in the Fiber module.
+ */
+function StructureEditor({
+  structure,
+  busy,
+  onSave,
+  onDelete,
+}: {
+  structure: ConduitStructure
+  busy: boolean
+  onSave: (patch: Record<string, unknown>) => void
+  onDelete: () => void
+}) {
+  const [structureType, setStructureType] = useState(structure.structure_type)
+  const [sizeDescription, setSizeDescription] = useState(structure.size_description ?? '')
+  const [depthFt, setDepthFt] = useState(structure.depth_ft === null ? '' : String(structure.depth_ft))
+  const [material, setMaterial] = useState(structure.material ?? '')
+  const [coverRating, setCoverRating] = useState(structure.cover_rating ?? '')
+  const [status, setStatus] = useState(structure.status)
+  const [assetCondition, setAssetCondition] = useState<AssetCondition>(structure.asset_condition)
+  const [workScope, setWorkScope] = useState<WorkScope>(structure.work_scope)
+  const [ownerOfRecord, setOwnerOfRecord] = useState(structure.owner_of_record ?? '')
+  const [notes, setNotes] = useState(structure.notes ?? '')
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+
+  // Only some scopes make sense for a given provenance — a brand-new structure
+  // can't be "reused", and an existing one isn't "installed".
+  const allowedScopes = SCOPES_FOR_CONDITION[assetCondition]
+  const effectiveScope = allowedScopes.includes(workScope) ? workScope : allowedScopes[0]
+
+  const field = 'w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-[11px] text-[var(--text-primary)]'
+  const label = 'block text-[9.5px] font-bold uppercase tracking-wider text-[var(--text-tertiary)] mb-1'
+
+  return (
+    <div className="space-y-2.5 border-t border-[var(--border)] pt-3">
+      <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">
+        Edit structure
+      </span>
+
+      <div>
+        <label className={label}>Type</label>
+        <select className={field} value={structureType} onChange={e => setStructureType(e.target.value)}>
+          {CONDUIT_STRUCTURE_TYPES.map(t => (
+            <option key={t.value} value={t.value}>{t.label}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className={label}>Size</label>
+          <input className={field} value={sizeDescription} onChange={e => setSizeDescription(e.target.value)} placeholder="24x36x36" />
+        </div>
+        <div>
+          <label className={label}>Depth (ft)</label>
+          <input className={field} value={depthFt} onChange={e => setDepthFt(e.target.value)} inputMode="decimal" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className={label}>Material</label>
+          <input className={field} value={material} onChange={e => setMaterial(e.target.value)} placeholder="Concrete" />
+        </div>
+        <div>
+          <label className={label}>Cover rating</label>
+          <input className={field} value={coverRating} onChange={e => setCoverRating(e.target.value)} placeholder="H-20" />
+        </div>
+      </div>
+
+      <div>
+        <label className={label}>Status</label>
+        <select className={field} value={status} onChange={e => setStatus(e.target.value)}>
+          {['Planned', 'In Progress', 'Installed', 'Verified'].map(v => (
+            <option key={v} value={v}>{v}</option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label className={label}>Condition</label>
+        <select
+          className={field}
+          value={assetCondition}
+          onChange={e => setAssetCondition(e.target.value as AssetCondition)}
+        >
+          {(Object.keys(ASSET_CONDITION_LABELS) as AssetCondition[]).map(v => (
+            <option key={v} value={v}>{ASSET_CONDITION_LABELS[v]}</option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label className={label}>Work scope</label>
+        <select
+          className={field}
+          value={effectiveScope}
+          onChange={e => setWorkScope(e.target.value as WorkScope)}
+        >
+          {allowedScopes.map(v => (
+            <option key={v} value={v}>{WORK_SCOPE_LABELS[v]}</option>
+          ))}
+        </select>
+        <p className="text-[9.5px] text-[var(--text-tertiary)] mt-1 leading-snug">
+          Only “Install new” and “Remove &amp; replace” buy material in the BOM.
+        </p>
+      </div>
+
+      <div>
+        <label className={label}>Owner of record</label>
+        <input className={field} value={ownerOfRecord} onChange={e => setOwnerOfRecord(e.target.value)} placeholder="City of Atlanta" />
+      </div>
+
+      <div>
+        <label className={label}>Notes</label>
+        <textarea className={field} rows={2} value={notes} onChange={e => setNotes(e.target.value)} />
+      </div>
+
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() =>
+          onSave({
+            structureType,
+            sizeDescription: sizeDescription.trim() || null,
+            depthFt: depthFt.trim() === '' ? null : Number(depthFt),
+            material: material.trim() || null,
+            coverRating: coverRating.trim() || null,
+            status,
+            assetCondition,
+            workScope: effectiveScope,
+            ownerOfRecord: ownerOfRecord.trim() || null,
+            notes: notes.trim() || null,
+          })
+        }
+        className="w-full px-3 py-2 bg-[var(--accent)] text-white text-[11px] font-bold rounded-xl transition cursor-pointer disabled:opacity-50"
+      >
+        {busy ? 'Saving…' : 'Save changes'}
+      </button>
+
+      {confirmingDelete ? (
+        <div className="space-y-1.5">
+          <p className="text-[10.5px] text-[var(--text-secondary)] leading-snug">
+            Remove {structure.structure_tag} and its material line? This cannot be undone.
+          </p>
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onDelete}
+              className="flex-1 px-3 py-1.5 bg-red-500/15 text-red-400 border border-red-500/25 text-[11px] font-bold rounded-xl cursor-pointer disabled:opacity-50"
+            >
+              Yes, remove
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmingDelete(false)}
+              className="flex-1 px-3 py-1.5 bg-[var(--surface-2)] border border-[var(--border)] text-[11px] font-bold rounded-xl cursor-pointer"
+            >
+              Keep
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setConfirmingDelete(true)}
+          className="w-full px-3 py-1.5 text-[11px] font-bold rounded-xl border border-[var(--border)] text-[var(--text-secondary)] hover:text-red-400 hover:border-red-500/30 transition cursor-pointer"
+        >
+          Remove structure
+        </button>
+      )}
+    </div>
+  )
+}
+
 export default function ConduitPageClient({
+  projectId,
   structures,
   runs,
   segments,
@@ -227,6 +414,11 @@ export default function ConduitPageClient({
   defaultLongitude,
   defaultZoom,
 }: ConduitPageClientProps) {
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+  // Which civil type the next map click drops. Null = the map just selects.
+  const [placingType, setPlacingType] = useState<string | null>(null)
+  const [notice, setNotice] = useState<{ text: string; kind: 'ok' | 'error' } | null>(null)
   const [view, setView] = useState<'overview' | 'map' | 'equipment'>('overview')
   const [tab, setTab] = useState<'runs' | 'structures'>('runs')
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
@@ -236,6 +428,55 @@ export default function ConduitPageClient({
     setTab(next)
     setSelectedRunId(null)
     setSelectedStructureId(null)
+  }
+
+  const refresh = () => router.refresh()
+
+  const report = (res: { error?: string; warning?: string }, okText: string) => {
+    if (res.error) setNotice({ text: res.error, kind: 'error' })
+    else if (res.warning) setNotice({ text: res.warning, kind: 'error' })
+    else setNotice({ text: okText, kind: 'ok' })
+  }
+
+  const handlePlace = (latitude: number, longitude: number) => {
+    if (!placingType) return
+    startTransition(async () => {
+      const res = await createConduitStructure({
+        projectId,
+        structureType: placingType as 'manhole' | 'handhole' | 'pull_box' | 'vault',
+        latitude,
+        longitude,
+      })
+      report(res, `${placingType.replace('_', ' ')} placed.`)
+      if (!res.error) refresh()
+    })
+  }
+
+  const handleMoveStructure = (id: string, latitude: number, longitude: number) => {
+    startTransition(async () => {
+      const res = await updateConduitStructure({ id, projectId, latitude, longitude })
+      report(res, 'Position updated.')
+      if (!res.error) refresh()
+    })
+  }
+
+  const handleUpdateStructure = (id: string, patch: Record<string, unknown>) => {
+    startTransition(async () => {
+      const res = await updateConduitStructure({ id, projectId, ...patch })
+      report(res, 'Structure updated.')
+      if (!res.error) refresh()
+    })
+  }
+
+  const handleDeleteStructure = (id: string) => {
+    startTransition(async () => {
+      const res = await deleteConduitStructure({ id, projectId })
+      report(res, 'Structure removed.')
+      if (!res.error) {
+        setSelectedStructureId(null)
+        refresh()
+      }
+    })
   }
 
   const selectedRun = runs.find(r => r.id === selectedRunId) ?? null
@@ -309,7 +550,52 @@ export default function ConduitPageClient({
 
       {view === 'map' ? (
         <div className="flex-1 min-h-0 flex">
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 relative">
+            {/* Placement toolbar. Civil works are created here, in Ductería —
+                the Fiber map no longer offers them. */}
+            <div className="absolute top-3 left-3 z-20 flex flex-col gap-2 items-start">
+              <div className="flex items-center gap-1 bg-[var(--surface-1)]/95 backdrop-blur border border-[var(--border)] rounded-xl p-1 shadow-lg">
+                <span className="px-2 text-[9.5px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">
+                  Place
+                </span>
+                {CONDUIT_STRUCTURE_TYPES.map(t => (
+                  <button
+                    key={t.value}
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => setPlacingType(placingType === t.value ? null : t.value)}
+                    className={`px-2.5 py-1.5 text-[11px] font-bold rounded-lg transition cursor-pointer disabled:opacity-50 ${
+                      placingType === t.value
+                        ? 'bg-[var(--accent)] text-white'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              {placingType && (
+                <div className="px-2.5 py-1.5 rounded-lg bg-[var(--accent)] text-white text-[11px] font-bold shadow-lg">
+                  Click the map to drop a {CONDUIT_STRUCTURE_TYPES.find(t => t.value === placingType)?.label}
+                  {' · '}
+                  <button type="button" onClick={() => setPlacingType(null)} className="underline cursor-pointer">
+                    cancel
+                  </button>
+                </div>
+              )}
+              {notice && (
+                <div
+                  className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold shadow-lg max-w-sm ${
+                    notice.kind === 'ok'
+                      ? 'bg-emerald-500/90 text-white'
+                      : 'bg-red-500/90 text-white'
+                  }`}
+                  onClick={() => setNotice(null)}
+                >
+                  {notice.text}
+                </div>
+              )}
+            </div>
             <ConduitMapCanvas
               structures={structures}
               runs={runs}
@@ -321,6 +607,9 @@ export default function ConduitPageClient({
               selectedRunId={selectedRunId}
               onSelectStructure={id => { setSelectedStructureId(id); setSelectedRunId(null) }}
               onSelectRun={id => { setSelectedRunId(id); setSelectedStructureId(null) }}
+              placingType={placingType}
+              onPlace={handlePlace}
+              onMoveStructure={handleMoveStructure}
             />
           </div>
           {(selectedRun || selectedStructure) && (
@@ -342,7 +631,18 @@ export default function ConduitPageClient({
                 </button>
               </div>
               {selectedRun && <DuctCrossSection run={selectedRun} route={one(selectedRun.fiber_routes)} />}
-              {selectedStructure && <StructureCrossSection structure={selectedStructure} />}
+              {selectedStructure && (
+                <>
+                  <StructureCrossSection structure={selectedStructure} />
+                  <StructureEditor
+                    key={selectedStructure.id}
+                    structure={selectedStructure}
+                    busy={isPending}
+                    onSave={patch => handleUpdateStructure(selectedStructure.id, patch)}
+                    onDelete={() => handleDeleteStructure(selectedStructure.id)}
+                  />
+                </>
+              )}
             </div>
           )}
         </div>
@@ -351,8 +651,9 @@ export default function ConduitPageClient({
       <div>
         <h1 className="text-sm font-black text-[var(--text-primary)] tracking-tight">Conduit & Duct Bank</h1>
         <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5">
-          Civil-works layer mirrored from the Fiber module — every duct run and structure below is generated
-          automatically when a matching fiber route or node is created. Fill % is flagged above{' '}
+          Civil works live here. Manholes, handholes, pull boxes and vaults are placed and edited from the Map
+          tab — Fiber only shows them as reference. Duct runs still mirror the fiber route they follow, so a run
+          appears when its route is drawn. Fill % is flagged above{' '}
           {FILL_WARN_THRESHOLD}% (the conventional pullability ceiling for communications cable) — it&apos;s a
           heads-up for the field crew, not a hard limit.
         </p>

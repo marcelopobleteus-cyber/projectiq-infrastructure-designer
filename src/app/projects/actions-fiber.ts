@@ -7,7 +7,7 @@ import { DEMO_FIBER_DATA } from '@/lib/demoData'
 import type { Database } from '@/types/supabase'
 import { scopeBuysMaterial } from '@/lib/assetCondition'
 import type { AssetCondition, WorkScope } from '@/lib/assetCondition'
-import { fiberNodeTypeDef } from '@/lib/fiberNodeTypes'
+import { CIVIL_NODE_TYPES, fiberNodeTypeDef } from '@/lib/fiberNodeTypes'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -280,6 +280,14 @@ export async function createFiberNode(params: {
   workScope?: WorkScope
   ownerOfRecord?: string
 }) {
+  // Ducteria es duena de la obra civil. Si algo intenta crear un manhole desde
+  // Fibra, se rechaza en vez de crear un objeto en el modulo equivocado.
+  if (CIVIL_NODE_TYPES.has(params.nodeType)) {
+    return {
+      error: `${params.nodeType} es obra civil: se crea desde el módulo de Ductería, no desde Fibra.`,
+    }
+  }
+
   const supabase = await createClient()
 
   const assetCondition = params.assetCondition ?? 'new'
@@ -417,33 +425,10 @@ export async function createFiberNode(params: {
     }
   }
 
-  // Espejo en la capa conduit para las estructuras civiles. Los tipos nuevos
-  // de fibra no aparecen aqui a proposito: la obra civil se crea en Ducteria.
-  const CONDUIT_STRUCTURE_TYPES: Record<string, string> = {
-    'Handhole': 'handhole', 'Manhole': 'manhole', 'Pull Box': 'pull_box', 'Vault': 'vault',
-  }
-  const structureType = CONDUIT_STRUCTURE_TYPES[params.nodeType]
-  if (structureType) {
-    const { error: structErr } = await supabase.from('conduit_structures').insert({
-      project_id: params.projectId,
-      organization_id: '00000000-0000-0000-0000-000000000000', // trigger overrides
-      node_id: newNode.id,
-      structure_tag: nodeTag,
-      structure_type: structureType,
-      latitude: params.latitude,
-      longitude: params.longitude,
-      size_description: params.sizeDescription,
-      depth_ft: params.structureDepthFt,
-      status: params.status ?? 'Planned',
-      asset_condition: assetCondition,
-      work_scope: workScope,
-      owner_of_record: params.ownerOfRecord,
-    })
-    if (structErr) {
-      console.error('Failed to mirror conduit structure:', structErr.message)
-      nodeMirrorWarning = `Node saved, but its Ductería structure could not be created: ${structErr.message}`
-    }
-  }
+  // La obra civil ya no se refleja desde aqui. Manholes, handholes, pull boxes
+  // y vaults se crean en Ducteria (actions-conduit.ts), que es su dueno; este
+  // espejo era lo que llenaba fiber_nodes de objetos civiles. El guard de
+  // arriba impide que lleguen por esta puerta.
 
   // Auto BOM por tipo de nodo.
   // Solo se compra material para lo que se instala. Una estructura existente

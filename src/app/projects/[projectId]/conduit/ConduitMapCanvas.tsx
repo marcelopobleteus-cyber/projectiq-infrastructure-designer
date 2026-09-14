@@ -33,6 +33,15 @@ interface ConduitMapCanvasProps {
   selectedRunId: string | null
   onSelectStructure: (id: string | null) => void
   onSelectRun: (id: string | null) => void
+  /**
+   * Ductería places its own civil works now. When a type is armed, the next
+   * click on the map drops one there; until then the map behaves as before.
+   */
+  placingType: string | null
+  onPlace: (latitude: number, longitude: number) => void
+  /** Dragging a structure to its surveyed position writes the new coordinates. */
+  onMoveStructure: (id: string, latitude: number, longitude: number) => void
+  readOnly?: boolean
 }
 
 const STRUCTURE_LABEL: Record<string, string> = {
@@ -64,6 +73,10 @@ export default function ConduitMapCanvas({
   selectedRunId,
   onSelectStructure,
   onSelectRun,
+  placingType,
+  onPlace,
+  onMoveStructure,
+  readOnly = false,
 }: ConduitMapCanvasProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const [map, setMap] = useState<maplibregl.Map | null>(null)
@@ -78,10 +91,16 @@ export default function ConduitMapCanvas({
   // re-creating every marker on each selection change.
   const onSelectStructureRef = useRef(onSelectStructure)
   const onSelectRunRef = useRef(onSelectRun)
+  const onPlaceRef = useRef(onPlace)
+  const onMoveStructureRef = useRef(onMoveStructure)
+  const placingTypeRef = useRef(placingType)
   useEffect(() => {
     onSelectStructureRef.current = onSelectStructure
     onSelectRunRef.current = onSelectRun
-  }, [onSelectStructure, onSelectRun])
+    onPlaceRef.current = onPlace
+    onMoveStructureRef.current = onMoveStructure
+    placingTypeRef.current = placingType
+  }, [onSelectStructure, onSelectRun, onPlace, onMoveStructure, placingType])
 
   // ── Map init ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -124,6 +143,14 @@ export default function ConduitMapCanvas({
       attributionControl: { compact: true, customAttribution: 'NextQ Designer' },
     })
     instance.on('load', () => setMap(instance))
+
+    // Placement. Reading the armed type from a ref keeps this handler
+    // registered once for the life of the map instead of being torn down and
+    // rebuilt every time the toolbar selection changes.
+    instance.on('click', evt => {
+      if (!placingTypeRef.current) return
+      onPlaceRef.current(evt.lngLat.lat, evt.lngLat.lng)
+    })
     return () => {
       instance.remove()
     }
@@ -168,6 +195,12 @@ export default function ConduitMapCanvas({
     const bounds = points.reduce((b, p) => b.extend(p), new maplibregl.LngLatBounds(points[0], points[0]))
     map.fitBounds(bounds, { padding: 60, maxZoom: 18 })
   }
+
+  // Crosshair while a type is armed, so it is obvious the next click places.
+  useEffect(() => {
+    if (!map) return
+    map.getCanvas().style.cursor = placingType ? 'crosshair' : ''
+  }, [map, placingType])
 
   // ── Draw runs + structures ────────────────────────────────────────────────
   useEffect(() => {
@@ -253,12 +286,24 @@ export default function ConduitMapCanvas({
         onSelectStructureRef.current(st.id)
       })
 
-      const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+      const marker = new maplibregl.Marker({
+        element: el,
+        anchor: 'center',
+        draggable: !readOnly,
+      })
         .setLngLat([Number(st.longitude), Number(st.latitude)])
         .addTo(map)
+
+      if (!readOnly) {
+        marker.on('dragend', () => {
+          const { lat, lng } = marker.getLngLat()
+          onMoveStructureRef.current(st.id, lat, lng)
+        })
+      }
+
       markersRef.current.push(marker)
     }
-  }, [map, structures, runs, segments, selectedStructureId, selectedRunId])
+  }, [map, structures, runs, segments, selectedStructureId, selectedRunId, readOnly])
 
   // Frame the civil works on first open. The project's default centre/zoom is
   // a project-wide setting and can easily leave the duct bank off-screen.
