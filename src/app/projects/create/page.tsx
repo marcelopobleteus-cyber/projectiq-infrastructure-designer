@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useTransition, useMemo } from 'react'
 import Link from 'next/link'
-import { createProject } from '../actions'
+import { createProject, suggestNextJobNumber } from '../actions'
 import { createClient } from '@/utils/supabase/client'
 import { PROJECT_SECTIONS, disciplinesForSection, type ProjectSection } from '@/lib/disciplines'
 
@@ -11,6 +11,17 @@ export default function CreateProjectPage() {
   const [error, setError] = useState<string | null>(null)
   const [purchasedModuleIds, setPurchasedModuleIds] = useState<string[] | null>(null)
   const [section, setSection] = useState<ProjectSection>('its')
+  const [jobNumber, setJobNumber] = useState('')
+  const [suggestedJobNumber, setSuggestedJobNumber] = useState('')
+
+  // Sugerencia, no imposicion: un proyecto migrado conserva su numero real.
+  useEffect(() => {
+    let alive = true
+    suggestNextJobNumber()
+      .then(res => { if (alive) setSuggestedJobNumber(res.suggestion) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [])
   const [selectedDisciplines, setSelectedDisciplines] = useState<string[]>([])
   const [isPending, startTransition] = useTransition()
 
@@ -254,6 +265,39 @@ export default function CreateProjectPage() {
                 Modules marked &ldquo;Under construction&rdquo; are saved to the project so its full scope is visible, but their work module is not built in the app yet.
               </p>
             )}
+          </div>
+
+          <div>
+            <label htmlFor="job_number" className="block text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider mb-2">
+              Job Number
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                id="job_number"
+                name="job_number"
+                type="text"
+                inputMode="numeric"
+                maxLength={20}
+                placeholder="26-001"
+                value={jobNumber}
+                onChange={e => setJobNumber(e.target.value)}
+                className="w-48 px-4 py-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] placeholder-slate-500 focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-indigo-500 transition-all text-sm font-mono"
+              />
+              {suggestedJobNumber && suggestedJobNumber !== jobNumber && (
+                <button
+                  type="button"
+                  onClick={() => setJobNumber(suggestedJobNumber)}
+                  className="px-3 py-2 text-xs font-bold rounded-xl border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition cursor-pointer"
+                >
+                  Use {suggestedJobNumber}
+                </button>
+              )}
+            </div>
+            <p className="text-[11px] text-[var(--text-tertiary)] mt-1.5 leading-snug">
+              Unique within your company. NGT jobs run year-sequential (26-012); a job for a prime keeps the
+              customer&apos;s own number (10016414). Type the number the job already has in Construction Foreman so
+              crews see the same one here. Optional — you can add it later.
+            </p>
           </div>
 
           <div>

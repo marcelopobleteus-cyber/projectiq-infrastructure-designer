@@ -19,6 +19,7 @@ export interface Project {
   tasksComplete?: number
   lastUpdatedBy?: string
   project_section?: string | null
+  job_number?: string | null
 }
 
 interface ProjectGridClientProps {
@@ -120,6 +121,7 @@ export default function ProjectGridClient({ initialProjects }: ProjectGridClient
       const q = searchQuery.toLowerCase().trim()
       result = result.filter(p =>
         p.name.toLowerCase().includes(q) ||
+        (p.job_number ?? '').toLowerCase().includes(q) ||
         (p.description && p.description.toLowerCase().includes(q))
       )
     }
@@ -345,6 +347,11 @@ export default function ProjectGridClient({ initialProjects }: ProjectGridClient
                 {/* Header: Project Name + Status Badge + ⋯ Options */}
                 <div className="flex justify-between items-start gap-2 mb-3 relative">
                   <div className="space-y-1 min-w-0">
+                    {project.job_number && (
+                      <span className="block font-mono text-[11px] font-bold text-[var(--text-tertiary)] tracking-wide">
+                        {project.job_number}
+                      </span>
+                    )}
                     <h3 className="font-extrabold text-[var(--text-primary)] text-base group-hover:text-[var(--accent-text)] transition-colors truncate">
                       {project.name}
                     </h3>
@@ -457,6 +464,11 @@ export default function ProjectGridClient({ initialProjects }: ProjectGridClient
               {/* Left Column: Project Name & Description */}
               <div className="flex-1 min-w-0 space-y-1">
                 <div className="flex items-center gap-3 flex-wrap">
+                  {project.job_number && (
+                    <span className="font-mono text-[11px] font-bold text-[var(--text-tertiary)] shrink-0">
+                      {project.job_number}
+                    </span>
+                  )}
                   <Link
                     href={`/projects/${project.id}/overview`}
                     className="font-extrabold text-sm text-[var(--text-primary)] hover:text-[var(--accent-text)] transition-colors truncate"

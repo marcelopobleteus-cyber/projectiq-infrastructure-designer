@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
+import { projectLabel } from '@/lib/projectLabel'
 import { BYPASS_AUTH } from '@/config/auth'
 
 export interface TimeClockProject {
@@ -78,11 +79,14 @@ export async function getTimeClockData(): Promise<TimeClockData> {
 
   const { data: projectRows } = await supabase
     .from('projects')
-    .select('id, name')
+    .select('id, name, job_number')
     .in('organization_id', orgIds)
     .order('name', { ascending: true })
 
-  const projects: TimeClockProject[] = (projectRows || []).map((p) => ({ id: p.id, name: p.name }))
+  const projects: TimeClockProject[] = (projectRows || []).map((p) => ({
+    id: p.id,
+    name: projectLabel(p.job_number, p.name),
+  }))
   const projectNameById = new Map(projects.map((p) => [p.id, p.name]))
   projectNameById.set('office', 'Office')
 

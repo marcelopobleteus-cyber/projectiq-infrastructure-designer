@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
+import { projectLabel } from '@/lib/projectLabel'
 import { BYPASS_AUTH } from '@/config/auth'
 
 export interface TimeTrackingProject {
@@ -86,11 +87,16 @@ export async function getTimeTrackingData(): Promise<TimeTrackingData> {
 
   const { data: projectRows } = await supabase
     .from('projects')
-    .select('id, name')
+    .select('id, name, job_number')
     .eq('organization_id', orgId)
     .order('name', { ascending: true })
 
-  const projects: TimeTrackingProject[] = (projectRows || []).map((p) => ({ id: p.id, name: p.name }))
+  // El numero de obra viaja junto al nombre: es como los equipos identifican
+  // el trabajo en el timecard, igual que en Construction Foreman.
+  const projects: TimeTrackingProject[] = (projectRows || []).map((p) => ({
+    id: p.id,
+    name: projectLabel(p.job_number, p.name),
+  }))
   const projectNameById = new Map(projects.map((p) => [p.id, p.name]))
 
   const { data: costCodeRows } = await supabase

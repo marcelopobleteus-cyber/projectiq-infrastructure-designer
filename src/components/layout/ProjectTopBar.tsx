@@ -9,12 +9,14 @@ import ConfirmModal from '@/components/ui/ConfirmModal'
 interface ProjectTopBarProps {
   projectId: string
   projectName: string
+  jobNumber?: string | null
   extraActionsSlot?: React.ReactNode
 }
 
 export default function ProjectTopBar({
   projectId,
   projectName,
+  jobNumber,
   extraActionsSlot,
 }: ProjectTopBarProps) {
   const pathname = usePathname()
@@ -103,6 +105,9 @@ export default function ProjectTopBar({
           <div className="flex flex-col min-w-0">
             <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)] leading-none">Project</span>
             <span className="text-xs font-extrabold text-[var(--text-primary)] group-hover:text-[var(--accent-text)] transition-colors truncate">
+              {jobNumber && (
+                <span className="font-mono text-[var(--text-tertiary)] mr-1.5">{jobNumber}</span>
+              )}
               {projectName}
             </span>
           </div>

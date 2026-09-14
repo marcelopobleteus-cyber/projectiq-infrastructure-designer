@@ -75,6 +75,7 @@ export default async function ProjectLayout({ children, params }: ProjectLayoutP
         <ProjectTopBar
           projectId={projectId}
           projectName={project.name}
+          jobNumber={project.job_number}
         />
 
         {/* Main Workspace Content */}

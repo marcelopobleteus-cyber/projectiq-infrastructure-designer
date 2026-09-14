@@ -3491,6 +3491,7 @@ export type Database = {
       }
       projects: {
         Row: {
+          job_number: string | null
           camera_canvas_mode: string
           created_at: string
           default_latitude: number
@@ -3508,6 +3509,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          job_number?: string | null
           camera_canvas_mode?: string
           created_at?: string
           default_latitude?: number
@@ -3525,6 +3527,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          job_number?: string | null
           camera_canvas_mode?: string
           created_at?: string
           default_latitude?: number

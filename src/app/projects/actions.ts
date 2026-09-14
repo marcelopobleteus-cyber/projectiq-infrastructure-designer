@@ -23,6 +23,7 @@ export async function createProject(formData: FormData) {
   }
 
   const name = formData.get('name') as string
+  const jobNumberRaw = String(formData.get('job_number') ?? '').trim()
   const description = formData.get('description') as string
   const latitudeStr = formData.get('latitude') as string
   const longitudeStr = formData.get('longitude') as string
@@ -31,6 +32,17 @@ export async function createProject(formData: FormData) {
   if (!name) {
     return { error: 'Project name is required' }
   }
+
+  // El numero de obra es opcional y deliberadamente libre: los trabajos de NGT
+  // usan ano-correlativo (26-012) pero los de un prime traen el numero del
+  // cliente (10016414). Solo se exige que sea corto y sin espacios, el mismo
+  // CHECK que tiene la base; esto es para dar un mensaje util.
+  if (jobNumberRaw && !/^[A-Za-z0-9][A-Za-z0-9_-]{0,19}$/.test(jobNumberRaw)) {
+    return {
+      error: 'El número de obra admite letras, números y guiones, sin espacios (máximo 20 caracteres).',
+    }
+  }
+  const jobNumber = jobNumberRaw || null
 
   // Resolve organization
   let orgId: string | null = null
@@ -79,10 +91,11 @@ export async function createProject(formData: FormData) {
     ? (requestedSection as ProjectSection)
     : DEFAULT_PROJECT_SECTION
 
-  const { data: project } = await supabase
+  const { data: project, error: insertError } = await supabase
     .from('projects')
     .insert({
       name,
+      job_number: jobNumber,
       description: description || null,
       disciplines,
       project_section,
@@ -94,16 +107,26 @@ export async function createProject(formData: FormData) {
     .select('id')
     .single()
 
-  const redirectId = project?.id || `proj-${disciplines[0]}-${Date.now().toString(36)}`
+  // Este error se descartaba, y cuando el insert fallaba la funcion inventaba
+  // un id (`proj-fiber-<timestamp>`) y redirigia ahi: el usuario aterrizaba en
+  // un proyecto inexistente sin ningun mensaje. Asi se veia "crear proyecto"
+  // cuando la columna project_section todavia no existia en la base.
+  if (insertError || !project) {
+    if (insertError?.code === '23505') {
+      return { error: `Ya existe un proyecto con el número ${jobNumber} en esta organización.` }
+    }
+    return { error: insertError?.message ?? 'No se pudo crear el proyecto.' }
+  }
 
   revalidatePath('/projects')
-  redirect(`/projects/${redirectId}/overview`)
+  redirect(`/projects/${project.id}/overview`)
 }
 
 export async function updateProjectMetadata(
   projectId: string,
   data: {
     name: string
+    job_number?: string | null
     description?: string
     default_latitude: number
     default_longitude: number
@@ -141,6 +164,7 @@ export async function updateProjectMetadata(
     .from('projects')
     .update({
       name: data.name,
+      ...(data.job_number !== undefined ? { job_number: data.job_number || null } : {}),
       description: data.description || null,
       default_latitude: data.default_latitude,
       default_longitude: data.default_longitude,
@@ -558,3 +582,38 @@ export async function syncProjectStatusFromTasks(projectId: string) {
   }
 }
 
+
+/**
+ * Siguiente número de obra libre, como sugerencia para el formulario.
+ *
+ * Los dos primeros dígitos son el año: en Construction Foreman, el proyecto
+ * 26-012 fue creado en agosto de 2026. Así que la sugerencia es
+ * <año en curso>-<siguiente correlativo de ese año>.
+ *
+ * Es sugerencia y no imposición porque el número no siempre lo pone NGT: un
+ * trabajo para un prime lleva el número del cliente (MT. OLIVE = 10016414), que
+ * no sigue ningún correlativo nuestro. Por eso el campo se puede escribir y
+ * esos números se ignoran al calcular el siguiente.
+ */
+export async function suggestNextJobNumber(): Promise<{ suggestion: string }> {
+  const supabase = await createClient()
+
+  const { data: rows } = await supabase
+    .from('projects')
+    .select('job_number')
+    .not('job_number', 'is', null)
+
+  const yearPrefix = String(new Date().getFullYear()).slice(-2)
+
+  // Solo cuentan los números de este año con nuestro formato; los del cliente
+  // (10016414) no entran en el correlativo de NGT.
+  const highest = (rows ?? [])
+    .map(r => r.job_number)
+    .filter((n): n is string => typeof n === 'string' && new RegExp(`^${yearPrefix}-\\d{3}$`).test(n))
+    .map(n => parseInt(n.slice(3), 10))
+    .reduce((a, b) => Math.max(a, b), 0)
+
+  if (highest >= 999) return { suggestion: '' }
+
+  return { suggestion: `${yearPrefix}-${String(highest + 1).padStart(3, '0')}` }
+}
