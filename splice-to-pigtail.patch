@@ -1,0 +1,178 @@
+From 42c4c20166f69c2755da35e70cbf805d6fd43b47 Mon Sep 17 00:00:00 2001
+From: "Marcelo Poblete (via Claude)" <marcelopoblete.us@gmail.com>
+Date: Mon, 14 Sep 2026 01:29:44 +0000
+Subject: [PATCH] feat: splice inside the new fiber objects, through to the
+ pigtail
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Two gaps stopped a splice from being built end to end.
+
+The Splice tab was gated on a hardcoded list of node types — 'Splice
+Enclosure', 'Cabinet', 'Handhole' — written before the CE/CTO/Splitter/
+ODF types existed. So you could place a Splice Closure and then not
+splice in it. The gate now comes from the fiber catalog (does this type
+carry an enclosure?) plus whether an enclosure row actually exists at
+that node, which also keeps the legacy Handhole rows working and can't
+drift the next time a type is added.
+
+The splice matrix patches cable A to cable B core by core, so anything
+that is not a cable can never be one side of a splice — and a pigtail
+was only a marker. A pigtail IS a short cable in the field: a stub of
+fibre, connector on one end, fusion-spliced to the feeder on the other.
+Placing one now creates that cable too (12F, 10 ft, matching the
+PIGTAIL-CAM-001 rows already in this project), so it shows up in the
+matrix and the splice can run through to it. The existing fiber_cables
+trigger generates its strands with the TIA-598 colours.
+
+The pigtail cable's failure is reported rather than only logged, same
+as the Ductería mirror.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01ScqTACWd5u51GDZPenDDdM
+---
+ .../[projectId]/fiber/FiberMapCanvas.tsx      | 23 ++++++++++++--
+ src/app/projects/actions-fiber.ts             | 31 +++++++++++++++++--
+ src/lib/fiberNodeTypes.ts                     | 20 +++++++++++-
+ 3 files changed, 67 insertions(+), 7 deletions(-)
+
+diff --git a/src/app/projects/[projectId]/fiber/FiberMapCanvas.tsx b/src/app/projects/[projectId]/fiber/FiberMapCanvas.tsx
+index 6f2ac0f..11a87b0 100644
+--- a/src/app/projects/[projectId]/fiber/FiberMapCanvas.tsx
++++ b/src/app/projects/[projectId]/fiber/FiberMapCanvas.tsx
+@@ -1,6 +1,6 @@
+ 'use client'
+ 
+-import React, { useEffect, useRef, useState } from 'react'
++import React, { useEffect, useMemo, useRef, useState } from 'react'
+ import { useRouter } from 'next/navigation'
+ import * as maplibregl from 'maplibre-gl'
+ import 'maplibre-gl/dist/maplibre-gl.css'
+@@ -152,6 +152,23 @@ export default function FiberMapCanvas({
+   // Sidebar States
+   const [activeTab, setActiveTab] = useState<'catalog' | 'properties' | 'splice' | 'cameras' | 'lists'>('properties')
+   const [selectedNode, setSelectedNode] = useState<any | null>(null)
++  /**
++   * Splicing happens wherever an enclosure lives. Driven by the fiber catalog
++   * (src/lib/fiberNodeTypes.ts) plus whether the node actually has an
++   * enclosure row, rather than a hardcoded list of type names — the old list
++   * predated the CE/CTO/Splitter/ODF types and silently locked them out of
++   * the splice matrix. 'Cabinet' stays because it hosts the ODF/OLT.
++   */
++  const canSpliceAtSelectedNode = useMemo(() => {
++    if (!selectedNode) return false
++    if (fiberNodeTypeDef(selectedNode.node_type)?.enclosure) return true
++    if (selectedNode.node_type === 'Cabinet') return true
++    // Anything else only if an enclosure was actually placed there — covers
++    // the legacy Handhole/Splice Enclosure rows already in the data.
++    return (initialData.enclosures ?? []).some(
++      (e: { node_id: string | null }) => e.node_id === selectedNode.id
++    )
++  }, [selectedNode, initialData.enclosures])
+   const [selectedRoute, setSelectedRoute] = useState<any | null>(null)
+ 
+   // Form States for Node creation/editing
+@@ -2053,8 +2070,8 @@ export default function FiberMapCanvas({
+               className={`flex-1 py-3 text-center text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
+                 activeTab === 'splice' ? 'border-[var(--accent)] text-[var(--text-primary)] bg-[var(--surface-2)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+               }`}
+-              disabled={!selectedNode || (selectedNode.node_type !== 'Splice Enclosure' && selectedNode.node_type !== 'Cabinet' && selectedNode.node_type !== 'Handhole')}
+-              title={(!selectedNode || (selectedNode.node_type !== 'Splice Enclosure' && selectedNode.node_type !== 'Cabinet' && selectedNode.node_type !== 'Handhole')) ? 'Select a Splice Enclosure on the map first' : ''}
++              disabled={!canSpliceAtSelectedNode}
++              title={canSpliceAtSelectedNode ? '' : 'Select a node that holds an enclosure — a Splice Closure (CE), Terminal Box (CTO), Splitter or ODF'}
+             >
+               Splice
+             </button>
+diff --git a/src/app/projects/actions-fiber.ts b/src/app/projects/actions-fiber.ts
+index 2d46db3..3f4b30c 100644
+--- a/src/app/projects/actions-fiber.ts
++++ b/src/app/projects/actions-fiber.ts
+@@ -361,6 +361,9 @@ export async function createFiberNode(params: {
+   // de una vez: si no, quedan como un marcador vacio que no sirve en las
+   // vistas de empalme/fusion. Los tipos sin enclosure (pigtail, reserva,
+   // fuente existente) no crean nada extra.
++  // Auto-created side effects report their failure instead of only logging it,
++  // so a broken mirror is visible the first time it happens.
++  let nodeMirrorWarning: string | null = null
+   const fiberTypeDef = fiberNodeTypeDef(params.nodeType)
+   if (fiberTypeDef?.enclosure) {
+     const { error: encErr } = await supabase.from('fiber_enclosures').insert({
+@@ -381,11 +384,33 @@ export async function createFiberNode(params: {
+     if (encErr) console.error('Failed to auto-create fiber enclosure:', encErr.message)
+   }
+ 
++  // Un pigtail ES un cable corto: se crea como tal para que aparezca en la
++  // matriz de empalmes del enclosure y el empalme pueda llegar hasta el.
++  // El trigger de fiber_cables genera sus hilos con los colores TIA-598.
++  if (fiberTypeDef?.cable) {
++    const { error: cableErr } = await supabase.from('fiber_cables').insert({
++      project_id: params.projectId,
++      organization_id: '00000000-0000-0000-0000-000000000000', // trigger overrides
++      cable_tag: nodeTag,
++      cable_type: fiberTypeDef.cable.cableType,
++      fiber_count: fiberTypeDef.cable.fiberCount,
++      strand_count: fiberTypeDef.cable.fiberCount,
++      length_ft: fiberTypeDef.cable.lengthFt,
++      from_node_id: newNode.id,
++      to_node_id: newNode.id,
++      install_status: 'Planned',
++      test_status: 'Not Tested',
++      asset_condition: assetCondition,
++      work_scope: workScope,
++    })
++    if (cableErr) {
++      console.error('Failed to auto-create pigtail cable:', cableErr.message)
++      nodeMirrorWarning = `Node saved, but its pigtail cable could not be created: ${cableErr.message}`
++    }
++  }
++
+   // Espejo en la capa conduit para las estructuras civiles. Los tipos nuevos
+   // de fibra no aparecen aqui a proposito: la obra civil se crea en Ducteria.
+-  // Same reasoning as the duct-run mirror below: report the failure instead of
+-  // only logging it, so a broken mirror is visible the first time it happens.
+-  let nodeMirrorWarning: string | null = null
+   const CONDUIT_STRUCTURE_TYPES: Record<string, string> = {
+     'Handhole': 'handhole', 'Manhole': 'manhole', 'Pull Box': 'pull_box', 'Vault': 'vault',
+   }
+diff --git a/src/lib/fiberNodeTypes.ts b/src/lib/fiberNodeTypes.ts
+index 572fce7..78da5c6 100644
+--- a/src/lib/fiberNodeTypes.ts
++++ b/src/lib/fiberNodeTypes.ts
+@@ -29,6 +29,19 @@ export interface FiberNodeTypeDef {
+     role: 'midspan_splice' | 'termination' | 'field_termination' | 'headend'
+     capacity: number
+   }
++  /**
++   * Set when the object IS a short cable in the field. A pigtail is exactly
++   * that — a stub of fibre with a connector on one end, fusion-spliced to the
++   * feeder at the other. Creating it as a cable is what lets it appear in the
++   * enclosure's splice matrix, so a splice can actually run through to it;
++   * a bare marker could never be one side of a splice. The database trigger
++   * on fiber_cables generates its strands with the TIA-598 colours.
++   */
++  cable?: {
++    cableType: 'Backbone' | 'Drop' | 'Existing' | 'Spare' | 'Temporary' | 'Custom'
++    fiberCount: number
++    lengthFt: number
++  }
+ }
+ 
+ export const FIBER_NODE_TYPES: FiberNodeTypeDef[] = [
+@@ -56,7 +69,12 @@ export const FIBER_NODE_TYPES: FiberNodeTypeDef[] = [
+     tagPrefix: 'ODF',
+     enclosure: { enclosureType: 'ODF', role: 'headend', capacity: 48 },
+   },
+-  { value: 'Pigtail', label: 'Pigtail', tagPrefix: 'PIG' },
++  {
++    value: 'Pigtail',
++    label: 'Pigtail',
++    tagPrefix: 'PIG',
++    cable: { cableType: 'Custom', fiberCount: 12, lengthFt: 10 },
++  },
+   { value: 'Fiber Slack', label: 'Fiber Slack / Reserve', tagPrefix: 'SLK' },
+   { value: 'Existing Fiber Source', label: 'Existing Fiber Source', tagPrefix: 'EXT' },
+ ]
+-- 
+2.43.0
+

@@ -29,6 +29,19 @@ export interface FiberNodeTypeDef {
     role: 'midspan_splice' | 'termination' | 'field_termination' | 'headend'
     capacity: number
   }
+  /**
+   * Set when the object IS a short cable in the field. A pigtail is exactly
+   * that — a stub of fibre with a connector on one end, fusion-spliced to the
+   * feeder at the other. Creating it as a cable is what lets it appear in the
+   * enclosure's splice matrix, so a splice can actually run through to it;
+   * a bare marker could never be one side of a splice. The database trigger
+   * on fiber_cables generates its strands with the TIA-598 colours.
+   */
+  cable?: {
+    cableType: 'Backbone' | 'Drop' | 'Existing' | 'Spare' | 'Temporary' | 'Custom'
+    fiberCount: number
+    lengthFt: number
+  }
 }
 
 export const FIBER_NODE_TYPES: FiberNodeTypeDef[] = [
@@ -56,7 +69,12 @@ export const FIBER_NODE_TYPES: FiberNodeTypeDef[] = [
     tagPrefix: 'ODF',
     enclosure: { enclosureType: 'ODF', role: 'headend', capacity: 48 },
   },
-  { value: 'Pigtail', label: 'Pigtail', tagPrefix: 'PIG' },
+  {
+    value: 'Pigtail',
+    label: 'Pigtail',
+    tagPrefix: 'PIG',
+    cable: { cableType: 'Custom', fiberCount: 12, lengthFt: 10 },
+  },
   { value: 'Fiber Slack', label: 'Fiber Slack / Reserve', tagPrefix: 'SLK' },
   { value: 'Existing Fiber Source', label: 'Existing Fiber Source', tagPrefix: 'EXT' },
 ]

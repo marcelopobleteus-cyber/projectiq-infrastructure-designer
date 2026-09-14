@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
@@ -152,6 +152,23 @@ export default function FiberMapCanvas({
   // Sidebar States
   const [activeTab, setActiveTab] = useState<'catalog' | 'properties' | 'splice' | 'cameras' | 'lists'>('properties')
   const [selectedNode, setSelectedNode] = useState<any | null>(null)
+  /**
+   * Splicing happens wherever an enclosure lives. Driven by the fiber catalog
+   * (src/lib/fiberNodeTypes.ts) plus whether the node actually has an
+   * enclosure row, rather than a hardcoded list of type names — the old list
+   * predated the CE/CTO/Splitter/ODF types and silently locked them out of
+   * the splice matrix. 'Cabinet' stays because it hosts the ODF/OLT.
+   */
+  const canSpliceAtSelectedNode = useMemo(() => {
+    if (!selectedNode) return false
+    if (fiberNodeTypeDef(selectedNode.node_type)?.enclosure) return true
+    if (selectedNode.node_type === 'Cabinet') return true
+    // Anything else only if an enclosure was actually placed there — covers
+    // the legacy Handhole/Splice Enclosure rows already in the data.
+    return (initialData.enclosures ?? []).some(
+      (e: { node_id: string | null }) => e.node_id === selectedNode.id
+    )
+  }, [selectedNode, initialData.enclosures])
   const [selectedRoute, setSelectedRoute] = useState<any | null>(null)
 
   // Form States for Node creation/editing
@@ -2053,8 +2070,8 @@ export default function FiberMapCanvas({
               className={`flex-1 py-3 text-center text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
                 activeTab === 'splice' ? 'border-[var(--accent)] text-[var(--text-primary)] bg-[var(--surface-2)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
-              disabled={!selectedNode || (selectedNode.node_type !== 'Splice Enclosure' && selectedNode.node_type !== 'Cabinet' && selectedNode.node_type !== 'Handhole')}
-              title={(!selectedNode || (selectedNode.node_type !== 'Splice Enclosure' && selectedNode.node_type !== 'Cabinet' && selectedNode.node_type !== 'Handhole')) ? 'Select a Splice Enclosure on the map first' : ''}
+              disabled={!canSpliceAtSelectedNode}
+              title={canSpliceAtSelectedNode ? '' : 'Select a node that holds an enclosure — a Splice Closure (CE), Terminal Box (CTO), Splitter or ODF'}
             >
               Splice
             </button>

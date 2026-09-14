@@ -361,6 +361,9 @@ export async function createFiberNode(params: {
   // de una vez: si no, quedan como un marcador vacio que no sirve en las
   // vistas de empalme/fusion. Los tipos sin enclosure (pigtail, reserva,
   // fuente existente) no crean nada extra.
+  // Auto-created side effects report their failure instead of only logging it,
+  // so a broken mirror is visible the first time it happens.
+  let nodeMirrorWarning: string | null = null
   const fiberTypeDef = fiberNodeTypeDef(params.nodeType)
   if (fiberTypeDef?.enclosure) {
     const { error: encErr } = await supabase.from('fiber_enclosures').insert({
@@ -381,11 +384,33 @@ export async function createFiberNode(params: {
     if (encErr) console.error('Failed to auto-create fiber enclosure:', encErr.message)
   }
 
+  // Un pigtail ES un cable corto: se crea como tal para que aparezca en la
+  // matriz de empalmes del enclosure y el empalme pueda llegar hasta el.
+  // El trigger de fiber_cables genera sus hilos con los colores TIA-598.
+  if (fiberTypeDef?.cable) {
+    const { error: cableErr } = await supabase.from('fiber_cables').insert({
+      project_id: params.projectId,
+      organization_id: '00000000-0000-0000-0000-000000000000', // trigger overrides
+      cable_tag: nodeTag,
+      cable_type: fiberTypeDef.cable.cableType,
+      fiber_count: fiberTypeDef.cable.fiberCount,
+      strand_count: fiberTypeDef.cable.fiberCount,
+      length_ft: fiberTypeDef.cable.lengthFt,
+      from_node_id: newNode.id,
+      to_node_id: newNode.id,
+      install_status: 'Planned',
+      test_status: 'Not Tested',
+      asset_condition: assetCondition,
+      work_scope: workScope,
+    })
+    if (cableErr) {
+      console.error('Failed to auto-create pigtail cable:', cableErr.message)
+      nodeMirrorWarning = `Node saved, but its pigtail cable could not be created: ${cableErr.message}`
+    }
+  }
+
   // Espejo en la capa conduit para las estructuras civiles. Los tipos nuevos
   // de fibra no aparecen aqui a proposito: la obra civil se crea en Ducteria.
-  // Same reasoning as the duct-run mirror below: report the failure instead of
-  // only logging it, so a broken mirror is visible the first time it happens.
-  let nodeMirrorWarning: string | null = null
   const CONDUIT_STRUCTURE_TYPES: Record<string, string> = {
     'Handhole': 'handhole', 'Manhole': 'manhole', 'Pull Box': 'pull_box', 'Vault': 'vault',
   }
