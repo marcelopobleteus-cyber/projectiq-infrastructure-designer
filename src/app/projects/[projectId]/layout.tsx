@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
+import { getCachedProject, getCachedUser } from '@/utils/supabase/cached'
 import { BYPASS_AUTH } from '@/config/auth'
 import { DEMO_PROJECT } from '@/lib/demoData'
 import ProjectTopBar from '@/components/layout/ProjectTopBar'
@@ -17,9 +18,7 @@ export default async function ProjectLayout({ children, params }: ProjectLayoutP
   const { projectId } = await params
   const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCachedUser()
 
   if (!user && !BYPASS_AUTH) {
     redirect('/login')
@@ -31,11 +30,7 @@ export default async function ProjectLayout({ children, params }: ProjectLayoutP
   if (projectId === 'demo-metro-cctv') {
     project = DEMO_PROJECT as any
   } else {
-    const { data } = await supabase
-      .from('projects')
-      .select('*')
-      .eq('id', projectId)
-      .single()
+    const data = await getCachedProject(projectId)
 
     if (!data) {
       notFound()

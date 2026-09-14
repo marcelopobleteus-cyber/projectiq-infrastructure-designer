@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/utils/supabase/server'
+import { getCachedProject, getCachedUser } from '@/utils/supabase/cached'
 import { BYPASS_AUTH } from '@/config/auth'
 import { DEMO_PROJECT } from '@/lib/demoData'
 import { getCameraLocations, getCameraModels } from '../../actions-sprint2'
@@ -20,22 +20,15 @@ interface PageProps {
 
 export default async function ProjectMapsPage({ params }: PageProps) {
   const { projectId } = await params
-  const supabase = await createClient()
   
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCachedUser()
 
   if (!user && !BYPASS_AUTH) {
     redirect('/login')
   }
 
   // Load project details
-  const { data: projectData } = await supabase
-    .from('projects')
-    .select('*')
-    .eq('id', projectId)
-    .single()
+  const projectData = await getCachedProject(projectId)
 
   // Reasignar sobre la variable destructurada dejaba el tipo en "posiblemente
   // null" para TS; con una const aparte el fallback queda garantizado.

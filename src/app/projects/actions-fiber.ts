@@ -95,7 +95,15 @@ async function fetchAllFiberRouteSegments(
   while (true) {
     const { data, error }: { data: any[] | null; error: any } = await (supabase
       .from('fiber_route_segments') as any)
-      .select('*')
+      // Explicit columns, not '*'. This is the biggest table the Fiber page
+      // ships (1,800+ rows on a real project) and every row is serialised into
+      // the HTML twice — once to render, once to hydrate. organization_id,
+      // project_id, created_at and updated_at are never read by the map or any
+      // other client component. The map only ever reads route_id, segment_index
+      // and the four coordinates (route lengths come from fiber_routes, not from
+      // here) — the same six columns the Conduit loader already selects. Keep
+      // this list in sync with what the UI actually uses.
+      .select('route_id, segment_index, start_latitude, start_longitude, end_latitude, end_longitude')
       .eq('project_id', projectId)
       .order('segment_index')
       .range(from, from + pageSize - 1)

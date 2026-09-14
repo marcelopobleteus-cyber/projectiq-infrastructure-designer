@@ -1,5 +1,5 @@
 import { notFound, redirect } from 'next/navigation'
-import { createClient } from '@/utils/supabase/server'
+import { getCachedProject, getCachedUser } from '@/utils/supabase/cached'
 import { BYPASS_AUTH } from '@/config/auth'
 import { DEMO_PROJECT } from '@/lib/demoData'
 
@@ -11,21 +11,14 @@ interface PageProps {
 
 export default async function ProjectPowerPage({ params }: PageProps) {
   const { projectId } = await params
-  const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCachedUser()
 
   if (!user && !BYPASS_AUTH) {
     redirect('/login')
   }
 
-  let { data: project } = await supabase
-    .from('projects')
-    .select('*')
-    .eq('id', projectId)
-    .single()
+  let project = await getCachedProject(projectId)
 
   if (!project) {
     project = { ...DEMO_PROJECT, id: projectId } as any

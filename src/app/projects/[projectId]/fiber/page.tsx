@@ -1,8 +1,8 @@
 import { notFound, redirect } from 'next/navigation'
-import { createClient } from '@/utils/supabase/server'
+import { getCachedProject, getCachedUser } from '@/utils/supabase/cached'
 import { BYPASS_AUTH } from '@/config/auth'
 import { DEMO_PROJECT } from '@/lib/demoData'
-import { getFiberCatalog, getFiberDesignData } from '../../actions-fiber'
+import { getFiberDesignData } from '../../actions-fiber'
 import FiberPageClient from './FiberPageClient'
 
 interface PageProps {
@@ -13,22 +13,15 @@ interface PageProps {
 
 export default async function ProjectFiberPage({ params }: PageProps) {
   const { projectId } = await params
-  const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCachedUser()
 
   if (!user && !BYPASS_AUTH) {
     redirect('/login')
   }
 
   // Load project details
-  let { data: project } = await supabase
-    .from('projects')
-    .select('*')
-    .eq('id', projectId)
-    .single()
+  let project = await getCachedProject(projectId)
 
   if (!project) {
     project = { ...DEMO_PROJECT, id: projectId } as any
@@ -48,8 +41,11 @@ export default async function ProjectFiberPage({ params }: PageProps) {
   }
 
   try {
-    catalog = await getFiberCatalog()
+    // getFiberDesignData already fetches fiber_catalog as part of its parallel
+    // batch, so calling getFiberCatalog() first was a second, identical query —
+    // and a sequential one, blocking the batch behind it. Take it from the batch.
     initialData = await getFiberDesignData(projectId)
+    catalog = initialData.catalog ?? []
   } catch (err) {
     console.error('Failed to load fiber design data:', err)
   }

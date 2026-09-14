@@ -47,3 +47,7 @@ next-env.d.ts
 mcp_config.json
 supabase/.temp/
 Claude outputs/
+
+# Parches generados por Claude y el archivo reservado de Windows que rompe git add
+*.patch
+nul
