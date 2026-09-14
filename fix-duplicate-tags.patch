@@ -1,0 +1,234 @@
+From 048c469acc61f1db5c31b0496cf1d023d12ffb96 Mon Sep 17 00:00:00 2001
+From: "Marcelo Poblete (via Claude)" <marcelopoblete.us@gmail.com>
+Date: Mon, 14 Sep 2026 00:50:03 +0000
+Subject: [PATCH] fix: auto-numbered tags no longer collide and lose the drawn
+ route
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Drawing a route failed with "duplicate key value violates unique
+constraint fiber_routes_project_id_route_id_tag_key" and the route was
+lost. R-014 had just been created; the next draw asked for R-014 again.
+
+The tag was auto-numbered in the browser from the copy of the project
+it last loaded, while (project_id, tag) is UNIQUE in the database.
+Anything that makes the browser's copy stale — a second tab, a refresh
+that hadn't landed, another user on the same project — produces a tag
+that already exists, and the insert is rejected outright.
+
+The tag is now resolved server-side against live data, with the
+browser's tag treated only as a preference, and the insert retries on a
+unique violation (up to 5 times) in case the tag is taken in the gap
+between reading and writing. Applied to both fiber routes and fiber
+nodes; the mirrored conduit run, conduit structure, cabinet, cable and
+enclosure tags all derive from the resolved tag rather than the one the
+browser suggested, so they stay consistent.
+
+Renaming a route keeps reporting a duplicate as an error — there the
+user picked the name on purpose and should see the clash.
+
+Verified the numbering against this project's real tags, including the
+"R-004 existing " style names with trailing text.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01ScqTACWd5u51GDZPenDDdM
+---
+ src/app/projects/actions-fiber.ts | 109 ++++++++++++++++++++++++++----
+ 1 file changed, 97 insertions(+), 12 deletions(-)
+
+diff --git a/src/app/projects/actions-fiber.ts b/src/app/projects/actions-fiber.ts
+index d8c1bc2..bafa72e 100644
+--- a/src/app/projects/actions-fiber.ts
++++ b/src/app/projects/actions-fiber.ts
+@@ -282,13 +282,20 @@ export async function createFiberNode(params: {
+     : params.nodeType === 'Building' ? 10.0
+     : 0.0
+ 
+-  const { data: newNode, error: nodeErr } = await supabase
++  // Same story as routes: the browser's tag is a preference, the database has
++  // the last word (project_id, node_tag is UNIQUE). See nextFreeTag.
++  let nodeTag = await nextFreeTag(supabase, 'fiber_nodes', 'node_tag', params.projectId, params.nodeTag)
++
++  let newNode: { id: string } | null = null
++  let nodeErr: { code?: string; message: string } | null = null
++  for (let attempt = 0; attempt < 5; attempt++) {
++    const res = await supabase
+     .from('fiber_nodes')
+     .insert({
+       project_id: params.projectId,
+       // organization_id filled by trigger
+       organization_id: '00000000-0000-0000-0000-000000000000', // placeholder — trigger will override via set_fiber_organization_id_from_project
+-      node_tag: params.nodeTag,
++      node_tag: nodeTag,
+       node_type: params.nodeType,
+       latitude: params.latitude,
+       longitude: params.longitude,
+@@ -306,7 +313,19 @@ export async function createFiberNode(params: {
+     .select()
+     .single()
+ 
+-  if (nodeErr) return { error: `Failed to create fiber node: ${nodeErr.message}` }
++    if (!res.error) {
++      newNode = res.data
++      nodeErr = null
++      break
++    }
++    nodeErr = res.error
++    if (!isDuplicateTagError(res.error)) break
++    nodeTag = await nextFreeTag(supabase, 'fiber_nodes', 'node_tag', params.projectId, nodeTag)
++  }
++
++  if (nodeErr || !newNode) {
++    return { error: `Failed to create fiber node: ${nodeErr?.message ?? 'unknown error'}` }
++  }
+ 
+   // If the node type is Cabinet, auto-create a cabinet record
+   if (params.nodeType === 'Cabinet') {
+@@ -315,7 +334,7 @@ export async function createFiberNode(params: {
+       .insert({
+         project_id: params.projectId,
+         organization_id: '00000000-0000-0000-0000-000000000000', // trigger overrides
+-        cabinet_tag: params.nodeTag,
++        cabinet_tag: nodeTag,
+         cabinet_type: 'Fiber Cabinet',
+         latitude: params.latitude,
+         longitude: params.longitude,
+@@ -348,7 +367,7 @@ export async function createFiberNode(params: {
+       project_id: params.projectId,
+       organization_id: '00000000-0000-0000-0000-000000000000', // trigger overrides
+       node_id: newNode.id,
+-      enclosure_tag: `ENC-${params.nodeTag}`,
++      enclosure_tag: `ENC-${nodeTag}`,
+       enclosure_type: fiberTypeDef.enclosure.enclosureType,
+       role: fiberTypeDef.enclosure.role,
+       capacity: fiberTypeDef.enclosure.capacity,
+@@ -373,7 +392,7 @@ export async function createFiberNode(params: {
+       project_id: params.projectId,
+       organization_id: '00000000-0000-0000-0000-000000000000', // trigger overrides
+       node_id: newNode.id,
+-      structure_tag: params.nodeTag,
++      structure_tag: nodeTag,
+       structure_type: structureType,
+       latitude: params.latitude,
+       longitude: params.longitude,
+@@ -515,6 +534,53 @@ export async function createFiberEnclosure(params: {
+   return { success: true, data }
+ }
+ 
++/**
++ * Tags like R-014 / HH-007 are auto-numbered in the browser from the data it
++ * last loaded, but (project_id, tag) is UNIQUE in the database. Anything that
++ * makes the browser's copy stale — a second tab, a refresh that hadn't landed
++ * yet, another user on the same project — produces a tag that already exists
++ * and the insert is rejected outright ("duplicate key value violates unique
++ * constraint"), losing the route the user just drew.
++ *
++ * So the tag is resolved here, against live data, and the caller's tag is only
++ * a preference. Returns the first free `PREFIX-NNN`.
++ */
++async function nextFreeTag(
++  supabase: Awaited<ReturnType<typeof createClient>>,
++  table: 'fiber_routes' | 'fiber_nodes',
++  column: 'route_id_tag' | 'node_tag',
++  projectId: string,
++  preferredTag: string
++): Promise<string> {
++  const { data } = await supabase.from(table).select(column).eq('project_id', projectId)
++  // table/column are dynamic, so the generated row union can't resolve here —
++  // read the rows as plain records.
++  const rows = (data ?? []) as unknown as Record<string, unknown>[]
++  const taken = new Set(rows.map(row => String(row[column])))
++  if (!taken.has(preferredTag)) return preferredTag
++
++  // Keep the caller's prefix (R-, HH-, CE-…) and find the next free number.
++  const dash = preferredTag.lastIndexOf('-')
++  const prefix = dash > 0 ? preferredTag.slice(0, dash) : preferredTag
++  let max = 0
++  for (const tag of taken) {
++    if (!tag.startsWith(`${prefix}-`)) continue
++    const num = parseInt(tag.slice(prefix.length + 1), 10)
++    if (!isNaN(num) && num > max) max = num
++  }
++  let candidate = ''
++  for (let n = max + 1; n < max + 500; n++) {
++    candidate = `${prefix}-${String(n).padStart(3, '0')}`
++    if (!taken.has(candidate)) break
++  }
++  return candidate
++}
++
++/** Postgres unique-violation. */
++function isDuplicateTagError(err: { code?: string } | null): boolean {
++  return err?.code === '23505'
++}
++
+ // ─── 7. Create fiber route ───────────────────────────────────────────────────
+ 
+ export async function createFiberRoute(params: {
+@@ -589,13 +655,19 @@ export async function createFiberRoute(params: {
+   const segmentSlack = params.segments.reduce((s, seg) => s + (seg.slackFeet ?? 0), 0)
+   const installedLength = measuredLength * (1 + slackPct / 100) + segmentSlack + technicalReserveFt * 2
+ 
+-  // Insert route
+-  const { data: newRoute, error: routeErr } = await supabase
++  // The browser's suggested tag is only a preference — resolve it against
++  // live data, and retry if someone takes it in the gap between the two.
++  let routeTag = await nextFreeTag(supabase, 'fiber_routes', 'route_id_tag', params.projectId, params.routeIdTag)
++
++  let newRoute: { id: string } | null = null
++  let routeErr: { code?: string; message: string } | null = null
++  for (let attempt = 0; attempt < 5; attempt++) {
++    const res = await supabase
+     .from('fiber_routes')
+     .insert({
+       project_id: params.projectId,
+       organization_id: '00000000-0000-0000-0000-000000000000', // trigger fills
+-      route_id_tag: params.routeIdTag,
++      route_id_tag: routeTag,
+       measured_length_feet: Number(measuredLength.toFixed(2)),
+       slack_percentage: slackPct,
+       technical_reserve_ft: technicalReserveFt,
+@@ -612,7 +684,20 @@ export async function createFiberRoute(params: {
+     .select()
+     .single()
+ 
+-  if (routeErr) return { error: `Failed to create route: ${routeErr.message}` }
++    if (!res.error) {
++      newRoute = res.data
++      routeErr = null
++      break
++    }
++    routeErr = res.error
++    if (!isDuplicateTagError(res.error)) break
++    // Someone took the tag in between — pick the next free one and try again.
++    routeTag = await nextFreeTag(supabase, 'fiber_routes', 'route_id_tag', params.projectId, routeTag)
++  }
++
++  if (routeErr || !newRoute) {
++    return { error: `Failed to create route: ${routeErr?.message ?? 'unknown error'}` }
++  }
+ 
+   // Espejo en la capa conduit: la obra civil como elemento propio, con su
+   // condicion. Comparte la geometria de la ruta, no la duplica.
+@@ -620,7 +705,7 @@ export async function createFiberRoute(params: {
+     project_id: params.projectId,
+     organization_id: '00000000-0000-0000-0000-000000000000', // trigger overrides
+     route_id: newRoute.id,
+-    run_tag: params.routeIdTag,
++    run_tag: routeTag,
+     install_method: params.installMethod ?? (params.installationType === 'underground' ? 'bore' : 'aerial'),
+     surface_type: params.surfaceType ?? 'unknown',
+     diameter_inches: params.conduitDiameterInches ?? 2.0,
+@@ -663,7 +748,7 @@ export async function createFiberRoute(params: {
+ 
+     if (catalogItem) {
+       const fCount = params.fiberCount ?? catalogItem.fiber_count
+-      const cableTag = `BB-${params.routeIdTag}`
++      const cableTag = `BB-${routeTag}`
+ 
+       const { error: cableErr } = await supabase
+         .from('fiber_cables')
+-- 
+2.43.0
+
