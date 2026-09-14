@@ -1,0 +1,137 @@
+From 408a126d506ed7921132b91aeccc1baedbb759cb Mon Sep 17 00:00:00 2001
+From: "Marcelo Poblete (via Claude)" <marcelopoblete.us@gmail.com>
+Date: Mon, 14 Sep 2026 00:56:49 +0000
+Subject: [PATCH] =?UTF-8?q?fix:=20Ducter=C3=ADa=20mirror=20was=20silently?=
+ =?UTF-8?q?=20failing=20on=20every=20new=20route=20and=20node?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+While verifying the duplicate-tag fix I drew two routes and found
+neither had produced its duct run. Every fiber route in the Beltside
+project from R-012 onward (2026-09-13) has no conduit run — R-001 to
+R-011 do.
+
+Cause: conduit_runs and conduit_structures are inserted with a
+placeholder organization_id, exactly as fiber_routes and fiber_nodes
+are, relying on a BEFORE INSERT trigger to resolve it from the project.
+fiber_routes and fiber_nodes have that trigger; the two conduit tables
+never got it. So the placeholder hit the organization_id foreign key
+and the insert was rejected every time.
+
+- migration: adds set_fiber_organization_id_from_project as a BEFORE
+  INSERT trigger on conduit_runs and conduit_structures, the same one
+  the fiber tables use. Verified by inserting with the placeholder and
+  watching the real organization_id come back.
+- The mirror failure was console.error only, which is exactly why this
+  went unnoticed for a day of work. createFiberRoute and createFiberNode
+  now return a warning, and the map surfaces it instead of reporting a
+  clean success over a half-finished write. The route/node itself still
+  saves — losing the drawing would be the worse outcome.
+
+Not included: backfilling the duct runs missing for R-012, R-013 and
+R-014. That changes what the Ductería module shows on a live project,
+so it is Marcelo's call.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01ScqTACWd5u51GDZPenDDdM
+---
+ .../[projectId]/fiber/FiberMapCanvas.tsx      | 13 +++++++++++
+ src/app/projects/actions-fiber.ts             | 22 +++++++++++++++----
+ 2 files changed, 31 insertions(+), 4 deletions(-)
+
+diff --git a/src/app/projects/[projectId]/fiber/FiberMapCanvas.tsx b/src/app/projects/[projectId]/fiber/FiberMapCanvas.tsx
+index 7aa70a7..6f2ac0f 100644
+--- a/src/app/projects/[projectId]/fiber/FiberMapCanvas.tsx
++++ b/src/app/projects/[projectId]/fiber/FiberMapCanvas.tsx
+@@ -1226,6 +1226,12 @@ export default function FiberMapCanvas({
+ 
+     if (res.error) {
+       showNotification('error', res.error)
++    } else if (res.warning) {
++      // The node saved but its Ductería mirror didn't — surface it instead of
++      // reporting a clean success over a half-finished write.
++      showNotification('error', res.warning)
++      setToolMode('select')
++      await loadDesignData()
+     } else {
+       showNotification(
+         'success',
+@@ -1290,6 +1296,13 @@ export default function FiberMapCanvas({
+ 
+     if (res.error) {
+       showNotification('error', res.error)
++    } else if (res.warning) {
++      // Route saved but its duct run didn't mirror — say so rather than
++      // reporting success over a half-finished write.
++      showNotification('error', res.warning)
++      setTempRoutePoints([])
++      setToolMode('select')
++      await loadDesignData()
+     } else {
+       showNotification(
+         'success',
+diff --git a/src/app/projects/actions-fiber.ts b/src/app/projects/actions-fiber.ts
+index bafa72e..2d46db3 100644
+--- a/src/app/projects/actions-fiber.ts
++++ b/src/app/projects/actions-fiber.ts
+@@ -383,6 +383,9 @@ export async function createFiberNode(params: {
+ 
+   // Espejo en la capa conduit para las estructuras civiles. Los tipos nuevos
+   // de fibra no aparecen aqui a proposito: la obra civil se crea en Ducteria.
++  // Same reasoning as the duct-run mirror below: report the failure instead of
++  // only logging it, so a broken mirror is visible the first time it happens.
++  let nodeMirrorWarning: string | null = null
+   const CONDUIT_STRUCTURE_TYPES: Record<string, string> = {
+     'Handhole': 'handhole', 'Manhole': 'manhole', 'Pull Box': 'pull_box', 'Vault': 'vault',
+   }
+@@ -403,7 +406,10 @@ export async function createFiberNode(params: {
+       work_scope: workScope,
+       owner_of_record: params.ownerOfRecord,
+     })
+-    if (structErr) console.error('Failed to mirror conduit structure:', structErr.message)
++    if (structErr) {
++      console.error('Failed to mirror conduit structure:', structErr.message)
++      nodeMirrorWarning = `Node saved, but its Ductería structure could not be created: ${structErr.message}`
++    }
+   }
+ 
+   // Auto BOM por tipo de nodo.
+@@ -443,7 +449,7 @@ export async function createFiberNode(params: {
+ 
+   revalidatePath(`/projects/${params.projectId}/fiber`)
+   revalidatePath(`/projects/${params.projectId}/bom`)
+-  return { success: true, data: newNode }
++  return { success: true, data: newNode, warning: nodeMirrorWarning ?? undefined }
+ }
+ 
+ // ─── 5. Delete fiber node ────────────────────────────────────────────────────
+@@ -714,7 +720,15 @@ export async function createFiberRoute(params: {
+     work_scope: conduitWorkScope,
+     owner_of_record: params.ownerOfRecord,
+   })
+-  if (runErr) console.error('Failed to mirror conduit run:', runErr.message)
++  // A failed mirror used to be console.error only, which is how it went
++  // unnoticed that every route from R-012 on had no duct run in Ductería.
++  // The route itself still succeeds — losing the drawing would be worse — but
++  // the caller now gets told so it can surface it.
++  let mirrorWarning: string | null = null
++  if (runErr) {
++    console.error('Failed to mirror conduit run:', runErr.message)
++    mirrorWarning = `Route saved, but its Ductería duct run could not be created: ${runErr.message}`
++  }
+ 
+   // Insert segments
+   const finalSegments = segmentInserts.map(s => ({
+@@ -873,7 +887,7 @@ export async function createFiberRoute(params: {
+ 
+   revalidatePath(`/projects/${params.projectId}/fiber`)
+   revalidatePath(`/projects/${params.projectId}/bom`)
+-  return { success: true, data: newRoute }
++  return { success: true, data: newRoute, warning: mirrorWarning ?? undefined }
+ }
+ 
+ // ─── 8. Delete fiber route ───────────────────────────────────────────────────
+-- 
+2.43.0
+

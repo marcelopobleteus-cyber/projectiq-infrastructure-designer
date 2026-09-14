@@ -1226,6 +1226,12 @@ export default function FiberMapCanvas({
 
     if (res.error) {
       showNotification('error', res.error)
+    } else if (res.warning) {
+      // The node saved but its Ductería mirror didn't — surface it instead of
+      // reporting a clean success over a half-finished write.
+      showNotification('error', res.warning)
+      setToolMode('select')
+      await loadDesignData()
     } else {
       showNotification(
         'success',
@@ -1290,6 +1296,13 @@ export default function FiberMapCanvas({
 
     if (res.error) {
       showNotification('error', res.error)
+    } else if (res.warning) {
+      // Route saved but its duct run didn't mirror — say so rather than
+      // reporting success over a half-finished write.
+      showNotification('error', res.warning)
+      setTempRoutePoints([])
+      setToolMode('select')
+      await loadDesignData()
     } else {
       showNotification(
         'success',

@@ -383,6 +383,9 @@ export async function createFiberNode(params: {
 
   // Espejo en la capa conduit para las estructuras civiles. Los tipos nuevos
   // de fibra no aparecen aqui a proposito: la obra civil se crea en Ducteria.
+  // Same reasoning as the duct-run mirror below: report the failure instead of
+  // only logging it, so a broken mirror is visible the first time it happens.
+  let nodeMirrorWarning: string | null = null
   const CONDUIT_STRUCTURE_TYPES: Record<string, string> = {
     'Handhole': 'handhole', 'Manhole': 'manhole', 'Pull Box': 'pull_box', 'Vault': 'vault',
   }
@@ -403,7 +406,10 @@ export async function createFiberNode(params: {
       work_scope: workScope,
       owner_of_record: params.ownerOfRecord,
     })
-    if (structErr) console.error('Failed to mirror conduit structure:', structErr.message)
+    if (structErr) {
+      console.error('Failed to mirror conduit structure:', structErr.message)
+      nodeMirrorWarning = `Node saved, but its Ductería structure could not be created: ${structErr.message}`
+    }
   }
 
   // Auto BOM por tipo de nodo.
@@ -443,7 +449,7 @@ export async function createFiberNode(params: {
 
   revalidatePath(`/projects/${params.projectId}/fiber`)
   revalidatePath(`/projects/${params.projectId}/bom`)
-  return { success: true, data: newNode }
+  return { success: true, data: newNode, warning: nodeMirrorWarning ?? undefined }
 }
 
 // ─── 5. Delete fiber node ────────────────────────────────────────────────────
@@ -714,7 +720,15 @@ export async function createFiberRoute(params: {
     work_scope: conduitWorkScope,
     owner_of_record: params.ownerOfRecord,
   })
-  if (runErr) console.error('Failed to mirror conduit run:', runErr.message)
+  // A failed mirror used to be console.error only, which is how it went
+  // unnoticed that every route from R-012 on had no duct run in Ductería.
+  // The route itself still succeeds — losing the drawing would be worse — but
+  // the caller now gets told so it can surface it.
+  let mirrorWarning: string | null = null
+  if (runErr) {
+    console.error('Failed to mirror conduit run:', runErr.message)
+    mirrorWarning = `Route saved, but its Ductería duct run could not be created: ${runErr.message}`
+  }
 
   // Insert segments
   const finalSegments = segmentInserts.map(s => ({
@@ -873,7 +887,7 @@ export async function createFiberRoute(params: {
 
   revalidatePath(`/projects/${params.projectId}/fiber`)
   revalidatePath(`/projects/${params.projectId}/bom`)
-  return { success: true, data: newRoute }
+  return { success: true, data: newRoute, warning: mirrorWarning ?? undefined }
 }
 
 // ─── 8. Delete fiber route ───────────────────────────────────────────────────
