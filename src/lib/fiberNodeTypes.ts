@@ -91,15 +91,44 @@ export function fiberNodeTypeDef(value: string): FiberNodeTypeDef | undefined {
  */
 export const CIVIL_NODE_TYPES = new Set(['Manhole', 'Handhole', 'Pull Box', 'Vault'])
 export const CCTV_NODE_TYPES = new Set(['Camera Location'])
+/**
+ * Outside-plant structures. Fiber gets attached TO them, but they are not fiber
+ * equipment and are not designed from this module: a pole is surveyed once and
+ * shared by everything strung on it, and a cabinet is a housing whose contents
+ * (ODF, patch panels, switches) are the real fiber objects. Both belong on the
+ * reference layer so the Fiber map shows only fiber.
+ */
+export const STRUCTURE_NODE_TYPES = new Set(['Pole', 'Cabinet'])
 
 export function isForeignNodeType(nodeType: string | null | undefined): boolean {
   if (!nodeType) return false
-  return CIVIL_NODE_TYPES.has(nodeType) || CCTV_NODE_TYPES.has(nodeType)
+  return (
+    CIVIL_NODE_TYPES.has(nodeType) ||
+    CCTV_NODE_TYPES.has(nodeType) ||
+    STRUCTURE_NODE_TYPES.has(nodeType)
+  )
 }
 
 /** Which module owns a node type — used for the reference-layer labelling. */
-export function owningModule(nodeType: string | null | undefined): 'conduit' | 'cctv' | 'fiber' {
+export function owningModule(
+  nodeType: string | null | undefined
+): 'conduit' | 'cctv' | 'structure' | 'fiber' {
   if (nodeType && CIVIL_NODE_TYPES.has(nodeType)) return 'conduit'
   if (nodeType && CCTV_NODE_TYPES.has(nodeType)) return 'cctv'
+  if (nodeType && STRUCTURE_NODE_TYPES.has(nodeType)) return 'structure'
   return 'fiber'
+}
+
+/** Label shown on a reference marker's tooltip. */
+export function owningModuleLabel(nodeType: string | null | undefined): string {
+  switch (owningModule(nodeType)) {
+    case 'cctv':
+      return 'CCTV'
+    case 'conduit':
+      return 'Ductería'
+    case 'structure':
+      return 'Estructura'
+    default:
+      return 'Fibra'
+  }
 }

@@ -27,7 +27,7 @@ import {
 import type { FiberNodeType } from '../../actions-fiber'
 import type { AssetCondition } from '@/lib/assetCondition'
 import { getFiberColor } from '@/lib/fiberColors'
-import { FIBER_NODE_TYPES, fiberNodeTypeDef, isForeignNodeType, owningModule } from '@/lib/fiberNodeTypes'
+import { FIBER_NODE_TYPES, fiberNodeTypeDef, isForeignNodeType, owningModuleLabel } from '@/lib/fiberNodeTypes'
 
 const haversineDistanceMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const R = 6371000 // Earth radius in meters
@@ -188,6 +188,24 @@ export default function FiberMapCanvas({
   // the fiber map unless you turn on the reference layer — see
   // claude/plan-separacion-modulos.md.
   const [showContextLayer, setShowContextLayer] = useState(false)
+
+  /**
+   * Nodes that carry actual fiber equipment: an enclosure mounted in them, or a
+   * cable landing on them. These stay visible and clickable in Fiber even when
+   * the node itself is a Ductería or CCTV object, because the fiber work really
+   * does happen there — a closure inside a handhole is still a closure.
+   */
+  const nodesHostingFiberGear = useMemo(() => {
+    const ids = new Set<string>()
+    ;(initialData.enclosures ?? []).forEach((e: { node_id: string | null }) => {
+      if (e.node_id) ids.add(e.node_id)
+    })
+    ;(initialData.cables ?? []).forEach((c: { from_node_id: string | null; to_node_id: string | null }) => {
+      if (c.from_node_id) ids.add(c.from_node_id)
+      if (c.to_node_id) ids.add(c.to_node_id)
+    })
+    return ids
+  }, [initialData.enclosures, initialData.cables])
   // Technical reserve (OZmap calls it "reserva técnica"): extra cable left
   // coiled at each end of the route for splicing/rework room. Counted at
   // BOTH ends per the industry convention OZmap documents — a 15ft reserve
@@ -773,7 +791,13 @@ export default function FiberMapCanvas({
       // default and, when the reference layer is on, drawn dimmed and
       // read-only so you can see which handhole a closure sits in without
       // being able to edit Ductería's data from here.
-      const isForeign = isForeignNodeType(node.node_type)
+      // A node's TYPE says which module designs it, but what actually sits on it
+      // decides whether Fiber may hide it. Most of this project's closures are
+      // mounted inside a handhole or a manhole — civil structures — and treating
+      // those as pure reference hid the closure along with them, so a splice
+      // enclosure only appeared with the context layer switched on. A node that
+      // hosts fiber equipment is fiber's to show and to click, whatever its type.
+      const isForeign = isForeignNodeType(node.node_type) && !nodesHostingFiberGear.has(node.id)
       if (isForeign && !showContextLayer) return
 
       const customNodeColor = getNodeCustomColor(node)
@@ -900,7 +924,7 @@ export default function FiberMapCanvas({
         nodeEl.style.cursor = 'default'
         nodeEl.style.opacity = '0.35'
         nodeEl.style.pointerEvents = 'none'
-        nodeEl.title = `${node.node_tag} — ${owningModule(node.node_type) === 'cctv' ? 'CCTV' : 'Ductería'} reference (read-only here)`
+        nodeEl.title = `${node.node_tag} — referencia de ${owningModuleLabel(node.node_type)} (solo lectura en Fibra)`
       } else {
         nodeEl.style.cursor = 'pointer'
         nodeEl.title = `${node.node_tag} (${node.node_type.toUpperCase()})`
@@ -1144,7 +1168,7 @@ export default function FiberMapCanvas({
     }
     // showContextLayer is a dependency so toggling the Ductería/CCTV reference
     // layer redraws the markers.
-  }, [map, initialData, selectedRoute, showContextLayer])
+  }, [map, initialData, selectedRoute, showContextLayer, nodesHostingFiberGear])
 
   // 4. Temporary Polyline drawing synchronization
   const TEMP_ROUTE_LAYER_ID = 'fiber-temp-route-preview'
