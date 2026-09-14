@@ -26,9 +26,10 @@ interface AdminDashboardClientProps {
 export default function AdminDashboardClient({ initialData }: AdminDashboardClientProps) {
   const supabase = createClient()
   const [data, setData] = useState<PlatformOverviewData>(initialData)
-  const [activeTab, setActiveTab] = useState<'overview' | 'organizations' | 'modules' | 'users' | 'activity' | 'settings'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'organizations' | 'modules' | 'users' | 'access' | 'activity' | 'settings'>('overview')
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [expandedSignInUserId, setExpandedSignInUserId] = useState<string | null>(null)
 
   // Create Organization Modal State
   const [isCreateOrgOpen, setIsCreateOrgOpen] = useState(false)
@@ -517,6 +518,7 @@ export default function AdminDashboardClient({ initialData }: AdminDashboardClie
             { id: 'organizations', label: `Client Companies (${data.organizations.length})` },
             { id: 'modules', label: `Modules & Pricing (${data.modules.length})` },
             { id: 'users', label: `Global Users (${data.users.length})` },
+            { id: 'access', label: `Sign-In Log (${data.signIns.length})` },
             { id: 'activity', label: 'Cross-Tenant Audit' },
             { id: 'settings', label: 'Platform Controls' },
           ].map(tab => (
@@ -961,7 +963,108 @@ export default function AdminDashboardClient({ initialData }: AdminDashboardClie
           </div>
         )}
 
-        {/* TAB 5: AUDIT LOG */}
+        {/* TAB 5: SIGN-IN LOG */}
+        {activeTab === 'access' && (
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-base font-black text-[var(--text-primary)]">User Sign-In Log</h2>
+              <p className="text-xs text-[var(--text-secondary)]">
+                Who has logged in, when, and whether they still have a session open. Every login is recorded from
+                this point on; entries before the log was enabled show only the most recent sign-in Supabase had kept.
+              </p>
+            </div>
+
+            <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-[var(--text-secondary)]">
+                  <thead className="bg-[var(--surface-2)] text-[var(--text-tertiary)] uppercase text-[10px] tracking-wider border-b border-[var(--border)] font-bold">
+                    <tr>
+                      <th className="text-left px-5 py-3.5">User</th>
+                      <th className="text-left px-4 py-3.5">Tenant</th>
+                      <th className="text-left px-4 py-3.5">Registered</th>
+                      <th className="text-left px-4 py-3.5">Last Sign-In</th>
+                      <th className="text-right px-4 py-3.5">Logins</th>
+                      <th className="text-left px-4 py-3.5">Session</th>
+                      <th className="text-right px-5 py-3.5">History</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border)] font-medium">
+                    {data.signIns.map(s => (
+                      <React.Fragment key={s.userId}>
+                        <tr className="hover:bg-[var(--surface-hover)] transition-colors">
+                          <td className="px-5 py-4">
+                            <div className="font-bold text-sm text-[var(--text-primary)]">{s.fullName}</div>
+                            <div className="font-mono text-[11px] text-[var(--text-tertiary)]">{s.email}</div>
+                          </td>
+                          <td className="px-4 py-4">
+                            {s.organizations.length > 0 ? (
+                              <div className="flex flex-wrap gap-1.5">
+                                {s.organizations.map((name, i) => (
+                                  <span key={i} className="px-2 py-0.5 rounded bg-[var(--surface-2)] border border-[var(--border)] text-[11px] font-bold text-[var(--text-primary)]">
+                                    {name}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-[var(--text-tertiary)]">No tenant</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-4 font-mono text-[11px] text-[var(--text-tertiary)] whitespace-nowrap">
+                            {s.registeredAt ? new Date(s.registeredAt).toLocaleString() : '—'}
+                          </td>
+                          <td className="px-4 py-4 font-mono text-[11px] whitespace-nowrap">
+                            {s.lastSignInAt ? (
+                              <span className="text-[var(--text-primary)] font-bold">{new Date(s.lastSignInAt).toLocaleString()}</span>
+                            ) : (
+                              <span className="text-[var(--text-tertiary)]">Never signed in</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-4 text-right font-mono font-bold text-[var(--text-primary)] tabular-nums">
+                            {s.signInCount}
+                          </td>
+                          <td className="px-4 py-4">
+                            {s.activeSessions > 0 ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                Online ({s.activeSessions})
+                              </span>
+                            ) : (
+                              <span className="text-[var(--text-tertiary)]">Signed out</span>
+                            )}
+                          </td>
+                          <td className="px-5 py-4 text-right">
+                            <button
+                              type="button"
+                              disabled={s.history.length === 0}
+                              onClick={() => setExpandedSignInUserId(expandedSignInUserId === s.userId ? null : s.userId)}
+                              className="px-3 py-1.5 text-xs font-bold rounded-xl border border-[var(--border)] bg-[var(--surface-2)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              {expandedSignInUserId === s.userId ? 'Hide' : `View (${s.history.length})`}
+                            </button>
+                          </td>
+                        </tr>
+                        {expandedSignInUserId === s.userId && s.history.length > 0 && (
+                          <tr className="bg-[var(--surface-2)]/50">
+                            <td colSpan={7} className="px-5 py-3">
+                              <ul className="space-y-1">
+                                {s.history.map((ts, i) => (
+                                  <li key={i} className="font-mono text-[11px] text-[var(--text-secondary)]">
+                                    {new Date(ts).toLocaleString()}
+                                  </li>
+                                ))}
+                              </ul>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 6: AUDIT LOG */}
         {activeTab === 'activity' && (
           <div className="space-y-4">
             <div>

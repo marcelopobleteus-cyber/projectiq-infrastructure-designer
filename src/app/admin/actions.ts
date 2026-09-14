@@ -73,6 +73,19 @@ export interface PlatformActivityItem {
   createdAt: string
 }
 
+export interface PlatformSignInItem {
+  userId: string
+  email: string
+  fullName: string
+  organizations: string[]
+  registeredAt: string
+  lastSignInAt: string | null
+  activeSessions: number
+  signInCount: number
+  /** Timestamps of every recorded sign-in, newest first. */
+  history: string[]
+}
+
 export interface PlatformSettingsState {
   maintenanceMode: {
     enabled: boolean
@@ -115,6 +128,7 @@ export interface PlatformOverviewData {
   organizations: PlatformOrganizationItem[]
   users: PlatformUserItem[]
   recentActivity: PlatformActivityItem[]
+  signIns: PlatformSignInItem[]
   platformSettings: PlatformSettingsState
 }
 
@@ -399,6 +413,54 @@ export async function getPlatformOverviewData(): Promise<PlatformOverviewData | 
 
   const pastDueOrganizations = orgItems.filter(o => o.billingStatus === 'past_due' || o.status === 'suspended')
 
+  // 7b. Sign-in log.
+  // `auth.users.last_sign_in_at` only keeps the most recent login and this
+  // project's `auth.audit_log_entries` is empty, so the history comes from the
+  // `user.signed_in` rows written by the `on_auth_user_sign_in` trigger.
+  const { data: rawSignInStats, error: signInStatsError } = await supabase.rpc('admin_user_sign_in_stats')
+
+  if (signInStatsError) {
+    console.error('Failed to load sign-in stats for admin console:', signInStatsError)
+  }
+
+  const { data: rawSignInEvents } = await supabase
+    .from('activity_log')
+    .select('actor_id, created_at')
+    .eq('action', 'user.signed_in')
+    .order('created_at', { ascending: false })
+    .limit(500)
+
+  const signInHistoryMap = new Map<string, string[]>()
+  ;(rawSignInEvents || []).forEach((e: { actor_id: string | null; created_at: string }) => {
+    if (!e.actor_id) return
+    const list = signInHistoryMap.get(e.actor_id) || []
+    list.push(e.created_at)
+    signInHistoryMap.set(e.actor_id, list)
+  })
+
+  type SignInStatRow = {
+    user_id: string
+    email: string | null
+    full_name: string | null
+    created_at: string
+    last_sign_in_at: string | null
+    active_sessions: number
+    sign_in_count: number
+    organization_names: string[] | null
+  }
+
+  const signInItems: PlatformSignInItem[] = ((rawSignInStats || []) as SignInStatRow[]).map(r => ({
+    userId: r.user_id,
+    email: r.email || '',
+    fullName: r.full_name || 'Anonymous User',
+    organizations: r.organization_names || [],
+    registeredAt: r.created_at,
+    lastSignInAt: r.last_sign_in_at,
+    activeSessions: Number(r.active_sessions || 0),
+    signInCount: Number(r.sign_in_count || 0),
+    history: signInHistoryMap.get(r.user_id) || [],
+  }))
+
   // Build User Items
   const userItems: PlatformUserItem[] = profilesList.map(p => ({
     id: p.id,
@@ -440,6 +502,7 @@ export async function getPlatformOverviewData(): Promise<PlatformOverviewData | 
     organizations: orgItems,
     users: userItems,
     recentActivity: activityList,
+    signIns: signInItems,
     platformSettings: currentSettings,
   }
 }

@@ -3800,6 +3800,19 @@ export type Database = {
       }
     }
     Functions: {
+      admin_user_sign_in_stats: {
+        Args: never
+        Returns: {
+          user_id: string
+          email: string
+          full_name: string | null
+          created_at: string
+          last_sign_in_at: string | null
+          active_sessions: number
+          sign_in_count: number
+          organization_names: string[]
+        }[]
+      }
       assign_camera_to_switch_port: {
         Args: { camera_id: string; switch_port_id: string }
         Returns: undefined
