@@ -46,17 +46,6 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse
   }
 
-  // Fetch platform-admin status once, reused by every check below.
-  let isPlatformAdmin = false
-  if (user) {
-    const { data: prof } = await supabase
-      .from('profiles')
-      .select('is_platform_admin')
-      .eq('id', user.id)
-      .single()
-    isPlatformAdmin = Boolean(prof?.is_platform_admin)
-  }
-
   // The employee mobile app has its own entry point (/mobile, which decides
   // where to send the visitor) and its own login page (/mobile/login) — both
   // must stay reachable while signed out. Every OTHER /mobile/* route (the
@@ -73,6 +62,25 @@ export async function updateSession(request: NextRequest) {
   // which should apply across the whole mobile app too (not just its gated part).
   const isTenantAppRoute = isDesktopTenantRoute || isMobileRoute
   const isAdminRoute = path.startsWith('/admin')
+
+  // This runs on EVERY request, so it pays for itself to ask only when an
+  // answer is actually used. Previously the middleware always read `profiles`
+  // and then, separately, `organization_members` joined to `organizations` —
+  // two sequential round-trips on top of getUser(). Both answers depend only on
+  // auth.uid(), so they now come back from one `auth_route_context()` call, and
+  // only on the paths whose decisions need them: a request that is neither the
+  // tenant app, nor /admin, nor the two landing paths that redirect by role,
+  // makes no database call at all.
+  const needsRouteContext =
+    Boolean(user) && (isTenantAppRoute || isAdminRoute || path === '/' || path === '/login')
+
+  let isPlatformAdmin = false
+  let workspaceBlocked = false
+  if (needsRouteContext) {
+    const { data: ctx } = await supabase.rpc('auth_route_context').single()
+    isPlatformAdmin = Boolean(ctx?.is_platform_admin)
+    workspaceBlocked = Boolean(ctx?.workspace_blocked)
+  }
 
   if (isProtectedMobileRoute && !user) {
     const url = request.nextUrl.clone()
@@ -112,25 +120,13 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Workspace suspension / cancellation check — only runs for non-admins on tenant app routes
-  if (isTenantAppRoute && user && !isPlatformAdmin && path !== '/inactive-workspace') {
-    try {
-      const { data: member } = await supabase
-        .from('organization_members')
-        .select('organization_id, organizations!inner(status, billing_status)')
-        .eq('profile_id', user.id)
-        .limit(1)
-        .single()
-
-      const org = (member as any)?.organizations
-      if (org && (org.status === 'suspended' || org.billing_status === 'canceled')) {
-        const url = request.nextUrl.clone()
-        url.pathname = '/inactive-workspace'
-        return NextResponse.redirect(url)
-      }
-    } catch (e) {
-      // Continue if query fails
-    }
+  // Workspace suspension / cancellation check — only for non-admins on tenant
+  // app routes, exactly as before; the answer just arrived with the call above
+  // instead of costing its own query.
+  if (isTenantAppRoute && user && !isPlatformAdmin && workspaceBlocked && path !== '/inactive-workspace') {
+    const url = request.nextUrl.clone()
+    url.pathname = '/inactive-workspace'
+    return NextResponse.redirect(url)
   }
 
   return supabaseResponse

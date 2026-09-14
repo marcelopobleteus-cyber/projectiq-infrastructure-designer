@@ -3800,6 +3800,13 @@ export type Database = {
       }
     }
     Functions: {
+      auth_route_context: {
+        Args: never
+        Returns: {
+          is_platform_admin: boolean
+          workspace_blocked: boolean
+        }[]
+      }
       admin_user_sign_in_stats: {
         Args: never
         Returns: {
