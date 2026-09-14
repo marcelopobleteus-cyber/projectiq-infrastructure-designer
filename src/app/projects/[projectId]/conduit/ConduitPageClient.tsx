@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from 'react'
 import { Database } from '@/types/supabase'
 import { ASSET_CONDITION_LABELS, WORK_SCOPE_LABELS, type AssetCondition, type WorkScope } from '@/lib/assetCondition'
+import ConduitMapCanvas from './ConduitMapCanvas'
 
 type ConduitStructure = Database['public']['Tables']['conduit_structures']['Row'] & {
   fiber_nodes?: { node_tag: string; node_type: string } | { node_tag: string; node_type: string }[] | null
@@ -18,10 +19,24 @@ type ConduitRun = Database['public']['Tables']['conduit_runs']['Row'] & {
   fiber_routes?: ConduitRunRoute | ConduitRunRoute[] | null
 }
 
+interface ConduitRouteSegment {
+  route_id: string
+  segment_index: number
+  start_latitude: number
+  start_longitude: number
+  end_latitude: number
+  end_longitude: number
+}
+
 interface ConduitPageClientProps {
   projectId: string
   structures: ConduitStructure[]
   runs: ConduitRun[]
+  /** Geometry for the map — a run borrows the trace of the route it mirrors. */
+  segments: ConduitRouteSegment[]
+  defaultLatitude: number
+  defaultLongitude: number
+  defaultZoom: number
 }
 
 // Supabase returns a joined one-to-one relation as either an object or a
@@ -204,7 +219,15 @@ function ScopePill({ scope }: { scope: WorkScope }) {
   )
 }
 
-export default function ConduitPageClient({ structures, runs }: ConduitPageClientProps) {
+export default function ConduitPageClient({
+  structures,
+  runs,
+  segments,
+  defaultLatitude,
+  defaultLongitude,
+  defaultZoom,
+}: ConduitPageClientProps) {
+  const [view, setView] = useState<'overview' | 'map' | 'equipment'>('overview')
   const [tab, setTab] = useState<'runs' | 'structures'>('runs')
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
   const [selectedStructureId, setSelectedStructureId] = useState<string | null>(null)
@@ -258,6 +281,72 @@ export default function ConduitPageClient({ structures, runs }: ConduitPageClien
   ]
 
   return (
+    <div className="flex-1 flex flex-col overflow-hidden h-full w-full font-sans bg-[var(--bg)]">
+      {/* Module tabs — the shape every module follows: summary, then the
+          module's own map, then the equipment you click through to inspect. */}
+      <div className="bg-[var(--surface-1)] border-b border-[var(--border)] px-6 py-2 flex items-center justify-between no-print shadow-xs shrink-0">
+        <div className="flex items-center gap-1">
+          {([
+            { id: 'overview', label: 'Overview' },
+            { id: 'map', label: 'Map' },
+            { id: 'equipment', label: 'Equipment' },
+          ] as const).map(t => (
+            <button
+              key={t.id}
+              onClick={() => setView(t.id)}
+              className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer border ${
+                view === t.id
+                  ? 'bg-[var(--surface-2)] text-[var(--text-primary)] border-[var(--accent-border)]'
+                  : 'bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] border-transparent'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div className="text-[10px] text-[var(--text-tertiary)] font-mono">Conduit Workspace Mode</div>
+      </div>
+
+      {view === 'map' ? (
+        <div className="flex-1 min-h-0 flex">
+          <div className="flex-1 min-w-0">
+            <ConduitMapCanvas
+              structures={structures}
+              runs={runs}
+              segments={segments}
+              defaultLatitude={defaultLatitude}
+              defaultLongitude={defaultLongitude}
+              defaultZoom={defaultZoom}
+              selectedStructureId={selectedStructureId}
+              selectedRunId={selectedRunId}
+              onSelectStructure={id => { setSelectedStructureId(id); setSelectedRunId(null) }}
+              onSelectRun={id => { setSelectedRunId(id); setSelectedStructureId(null) }}
+            />
+          </div>
+          {(selectedRun || selectedStructure) && (
+            <div className="w-72 shrink-0 overflow-y-auto border-l border-[var(--border)] bg-[var(--surface-1)] p-3.5 space-y-3">
+              <div className="flex items-start justify-between">
+                <div>
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">
+                    Cross-Section
+                  </span>
+                  <span className="text-sm font-black text-[var(--text-primary)]">
+                    {selectedRun?.run_tag ?? selectedStructure?.structure_tag}
+                  </span>
+                </div>
+                <button
+                  onClick={() => { setSelectedRunId(null); setSelectedStructureId(null) }}
+                  className="w-6 h-6 rounded-lg flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors cursor-pointer"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+              {selectedRun && <DuctCrossSection run={selectedRun} route={one(selectedRun.fiber_routes)} />}
+              {selectedStructure && <StructureCrossSection structure={selectedStructure} />}
+            </div>
+          )}
+        </div>
+      ) : (
     <div className="space-y-4 relative z-10 w-full h-full px-6 py-4 flex-1 flex flex-col overflow-hidden bg-[var(--bg)] font-sans">
       <div>
         <h1 className="text-sm font-black text-[var(--text-primary)] tracking-tight">Conduit & Duct Bank</h1>
@@ -288,7 +377,10 @@ export default function ConduitPageClient({ structures, runs }: ConduitPageClien
         ))}
       </div>
 
-      {/* Tabs */}
+      {/* Runs / Structures sub-tabs — the equipment view. Overview stops at
+          the metrics above. */}
+      {view === 'equipment' && (
+      <>
       <div className="flex items-center gap-1 border-b border-[var(--border)] shrink-0">
         <button
           onClick={() => switchTab('runs')}
@@ -452,6 +544,10 @@ export default function ConduitPageClient({ structures, runs }: ConduitPageClien
         </div>
       )}
       </div>
+      </>
+      )}
+    </div>
+      )}
     </div>
   )
 }

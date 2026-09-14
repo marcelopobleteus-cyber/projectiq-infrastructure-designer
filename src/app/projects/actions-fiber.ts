@@ -229,9 +229,25 @@ export async function getConduitData(projectId: string) {
   if (structuresRes.error) console.error('Failed to load conduit_structures:', structuresRes.error.message)
   if (runsRes.error) console.error('Failed to load conduit_runs:', runsRes.error.message)
 
+  // Geometry for the Conduit map. A run shares its trace with the fiber route
+  // it mirrors (see plan-seccion-ducteria.md), so the drawn line comes from
+  // that route's segments rather than being duplicated on the conduit side.
+  const routeIds = (runsRes.data ?? []).map(r => r.route_id).filter(Boolean) as string[]
+  let segments: { route_id: string; segment_index: number; start_latitude: number; start_longitude: number; end_latitude: number; end_longitude: number }[] = []
+  if (routeIds.length > 0) {
+    const segRes = await supabase
+      .from('fiber_route_segments')
+      .select('route_id, segment_index, start_latitude, start_longitude, end_latitude, end_longitude')
+      .in('route_id', routeIds)
+      .order('segment_index')
+    if (segRes.error) console.error('Failed to load conduit run geometry:', segRes.error.message)
+    segments = segRes.data ?? []
+  }
+
   return {
     structures: structuresRes.data ?? [],
     runs: runsRes.data ?? [],
+    segments,
   }
 }
 
