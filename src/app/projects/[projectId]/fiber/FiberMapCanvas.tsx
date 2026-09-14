@@ -121,6 +121,7 @@ export default function FiberMapCanvas({
   const mapRef = useRef<HTMLDivElement>(null)
   const [map, setMap] = useState<maplibregl.Map | null>(null)
   const [activeLayer, setActiveLayer] = useState<'hybrid' | 'roadmap' | 'satellite'>('roadmap')
+  const [basemapPanelOpen, setBasemapPanelOpen] = useState(false)
 
   // 'roadmap' shows the OSM street basemap; 'hybrid' & 'satellite' both show Esri
   // satellite imagery (kept as three values for compat with the layer-toggle UI).
@@ -1950,21 +1951,68 @@ export default function FiberMapCanvas({
 
           {/* Map canvas container */}
           <div className="w-full h-full min-h-0 bg-[var(--surface-2)] flex-1 relative">
-            {/* Basemap toggle: Street (OpenStreetMap) / Satellite (Esri World Imagery) */}
-            <div className="absolute top-3 right-3 z-10 flex bg-[var(--surface-2)]/70 border border-slate-805 rounded-xl p-1 gap-1 backdrop-blur-md">
-              {(['roadmap', 'satellite'] as const).map(layer => (
+            {/* Map controls: the same right-edge icon toolbar as the general
+                project map and the Conduit map, so the controls don't change
+                shape from one module to the next. */}
+            <div className="absolute top-4 right-4 bottom-4 z-20 flex items-start">
+              {basemapPanelOpen && (
+                <div className="mr-2 w-56 bg-[var(--surface-1)]/95 backdrop-blur-md border border-[var(--border)] rounded-xl shadow-xl p-2.5 flex flex-col gap-1.5 text-[10px] font-bold text-[var(--text-primary)] font-sans pointer-events-auto">
+                  <div className="text-[9px] text-[var(--accent-text)] uppercase tracking-wider border-b border-[var(--border)] pb-1 mb-0.5">
+                    Basemap
+                  </div>
+                  <div className="flex items-center gap-1 p-1 bg-[var(--surface-2)] rounded-lg">
+                    {([
+                      { key: 'roadmap', label: 'Road' },
+                      { key: 'satellite', label: 'Sat' },
+                      { key: 'hybrid', label: 'Hybrid' },
+                    ] as const).map(opt => (
+                      <button
+                        key={opt.key}
+                        onClick={() => handleLayerChange(opt.key)}
+                        className={`flex-1 px-2 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                          activeLayer === opt.key
+                            ? 'bg-[var(--accent)] text-white shadow-xs'
+                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                        }`}
+                        title={`${opt.label} basemap`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-col items-center gap-1 p-1.5 bg-[var(--surface-1)]/95 backdrop-blur-md border border-[var(--border)] rounded-xl shadow-xl pointer-events-auto">
                 <button
-                  key={layer}
-                  onClick={() => handleLayerChange(layer)}
-                  className={`px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider rounded-lg transition-all ${
-                    activeLayer === layer || (layer === 'satellite' && activeLayer === 'hybrid')
-                      ? 'bg-[var(--accent)] text-white text-[var(--text-primary)] font-bold'
-                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                  onClick={() => setBasemapPanelOpen(v => !v)}
+                  title="Basemap & layers"
+                  className={`p-2 rounded-lg transition-colors ${
+                    basemapPanelOpen
+                      ? 'bg-[var(--accent)] text-white'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)]'
                   }`}
                 >
-                  {layer === 'roadmap' ? 'Street' : 'Satellite'}
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5Z" /><path d="M2 12l10 5 10-5" /><path d="M2 17l10 5 10-5" /></svg>
                 </button>
-              ))}
+
+                <div className="w-full h-px bg-[var(--border)]" />
+
+                <button
+                  onClick={() => map?.zoomIn()}
+                  title="Zoom in"
+                  className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)] transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                </button>
+                <button
+                  onClick={() => map?.zoomOut()}
+                  title="Zoom out"
+                  className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)] transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                </button>
+              </div>
             </div>
 
             <div
