@@ -8,6 +8,7 @@ import {
   type PayrollWeekRow,
   type PayrollDetailRow,
 } from './actions'
+import { generatePayStatementPdf } from './pdf'
 
 /** Lunes de la semana que contiene `d`. La semana laboral va lunes a domingo. */
 function mondayOf(d: Date): Date {
@@ -53,6 +54,7 @@ export default function PayrollClient() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const [pdfFor, setPdfFor] = useState<string | null>(null)
   const [openEmployee, setOpenEmployee] = useState<string | null>(null)
   const [detail, setDetail] = useState<PayrollDetailRow[]>([])
   const [detailLoading, setDetailLoading] = useState(false)
@@ -77,6 +79,26 @@ export default function PayrollClient() {
     const id = window.setTimeout(() => { load() }, 0)
     return () => window.clearTimeout(id)
   }, [load])
+
+  const downloadStatement = async (profileId: string) => {
+    setPdfFor(profileId)
+    const res = await generatePayStatementPdf(profileId, from, to)
+    setPdfFor(null)
+    if (res.error || !res.base64 || !res.fileName) {
+      setError(res.error || 'Could not build the statement.')
+      return
+    }
+    // El servidor devuelve el PDF en base64; aqui solo se reconstituye y baja.
+    const bin = atob(res.base64)
+    const buf = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i)
+    const url = URL.createObjectURL(new Blob([buf], { type: 'application/pdf' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = res.fileName
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   const openDetail = async (profileId: string) => {
     if (openEmployee === profileId) {
@@ -286,13 +308,24 @@ export default function PayrollClient() {
                       <tr key={w.weekStart} className="hover:bg-[var(--surface-hover)]">
                         <td className="px-4 py-2.5">
                           {i === 0 && (
-                            <button
-                              type="button"
-                              onClick={() => openDetail(emp.profileId)}
-                              className="font-bold text-[var(--text-primary)] hover:text-[var(--accent-text)] cursor-pointer text-left"
-                            >
-                              {emp.name}
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openDetail(emp.profileId)}
+                                className="font-bold text-[var(--text-primary)] hover:text-[var(--accent-text)] cursor-pointer text-left"
+                              >
+                                {emp.name}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={pdfFor === emp.profileId}
+                                onClick={() => downloadStatement(emp.profileId)}
+                                title="Download this employee's payment statement as PDF"
+                                className="px-2 py-0.5 text-[10px] font-bold rounded border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] cursor-pointer disabled:opacity-40"
+                              >
+                                {pdfFor === emp.profileId ? '…' : 'PDF'}
+                              </button>
+                            </div>
                           )}
                         </td>
                         <td className="px-4 py-2.5">
