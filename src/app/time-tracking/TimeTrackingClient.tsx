@@ -50,6 +50,9 @@ export default function TimeTrackingClient({
   entries,
 }: TimeTrackingData) {
   const canEdit = currentUserRole === 'owner' || currentUserRole === 'admin' || currentUserRole === 'editor'
+  // La nomina es de administracion: un editor puede corregir horas pero no ve
+  // tarifas ni totales a pagar.
+  const isPayrollManager = currentUserRole === 'owner' || currentUserRole === 'admin'
 
   const [projectFilter, setProjectFilter] = useState('all')
   const [employeeFilter, setEmployeeFilter] = useState('all')
@@ -142,6 +145,14 @@ export default function TimeTrackingClient({
             Field time entries · {organizationName}
           </p>
         </div>
+        {isPayrollManager && (
+          <a
+            href="/time-tracking/payroll"
+            className="h-9 px-4 rounded-lg border border-[var(--border)] text-xs font-bold text-[var(--text-primary)] hover:bg-[var(--surface-hover)] flex items-center mr-2"
+          >
+            Payroll &amp; Labor
+          </a>
+        )}
         {canEdit && (
           <button
             onClick={() => setShowCostCodes(true)}

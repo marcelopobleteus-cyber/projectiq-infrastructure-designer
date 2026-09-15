@@ -1,0 +1,123 @@
+'use server'
+
+/**
+ * Reportes de nomina para administracion.
+ *
+ * Las reglas de negocio (semana lunes-domingo en la zona del empleado,
+ * sobretiempo solo W2 sobre 40 h, tarifas visibles solo para owner/admin) viven
+ * en las funciones payroll_summary y payroll_employee_detail de la base, no
+ * aqui: asi un reporte no puede mostrar un numero distinto al del timecard.
+ */
+
+import { createClient } from '@/utils/supabase/server'
+
+export interface PayrollWeekRow {
+  profileId: string
+  employeeName: string
+  weekStart: string
+  employmentType: 'w2' | '1099'
+  regularHours: number
+  overtimeHours: number
+  totalHours: number
+  hourlyRate: number | null
+  regularCost: number | null
+  overtimeCost: number | null
+  totalCost: number | null
+}
+
+export interface PayrollDetailRow {
+  entryId: string
+  workDay: string
+  weekStart: string
+  projectName: string
+  clockIn: string
+  clockOut: string
+  pausedMinutes: number
+  hours: number
+  workDescription: string | null
+}
+
+async function callerOrg(): Promise<{ orgId: string | null; isManager: boolean }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { orgId: null, isManager: false }
+
+  const { data } = await supabase
+    .from('organization_members')
+    .select('organization_id, role')
+    .eq('profile_id', user.id)
+    .limit(1)
+
+  const m = data?.[0]
+  return {
+    orgId: m?.organization_id ?? null,
+    isManager: m?.role === 'owner' || m?.role === 'admin',
+  }
+}
+
+export async function getPayrollSummary(
+  from: string,
+  to: string
+): Promise<{ rows?: PayrollWeekRow[]; error?: string }> {
+  const { orgId, isManager } = await callerOrg()
+  if (!orgId) return { error: 'No organization for the current user.' }
+  if (!isManager) return { error: 'Payroll reports are limited to owners and admins.' }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc('payroll_summary', {
+    p_organization_id: orgId,
+    p_from: from,
+    p_to: to,
+  })
+
+  if (error) return { error: error.message }
+
+  const rows: PayrollWeekRow[] = (data ?? []).map(r => ({
+    profileId: r.profile_id,
+    employeeName: r.employee_name,
+    weekStart: r.week_start,
+    employmentType: r.employment_type === '1099' ? '1099' : 'w2',
+    regularHours: Number(r.regular_hours),
+    overtimeHours: Number(r.overtime_hours),
+    totalHours: Number(r.total_hours),
+    hourlyRate: r.hourly_rate === null ? null : Number(r.hourly_rate),
+    regularCost: r.regular_cost === null ? null : Number(r.regular_cost),
+    overtimeCost: r.overtime_cost === null ? null : Number(r.overtime_cost),
+    totalCost: r.total_cost === null ? null : Number(r.total_cost),
+  }))
+
+  return { rows }
+}
+
+export async function getPayrollEmployeeDetail(
+  profileId: string,
+  from: string,
+  to: string
+): Promise<{ rows?: PayrollDetailRow[]; error?: string }> {
+  const { orgId } = await callerOrg()
+  if (!orgId) return { error: 'No organization for the current user.' }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc('payroll_employee_detail', {
+    p_organization_id: orgId,
+    p_profile_id: profileId,
+    p_from: from,
+    p_to: to,
+  })
+
+  if (error) return { error: error.message }
+
+  const rows: PayrollDetailRow[] = (data ?? []).map(r => ({
+    entryId: r.entry_id,
+    workDay: r.work_day,
+    weekStart: r.week_start,
+    projectName: r.project_name,
+    clockIn: r.clock_in,
+    clockOut: r.clock_out,
+    pausedMinutes: Number(r.paused_minutes),
+    hours: Number(r.hours),
+    workDescription: r.work_description,
+  }))
+
+  return { rows }
+}

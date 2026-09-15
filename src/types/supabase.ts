@@ -3860,6 +3860,36 @@ export type Database = {
       }
     }
     Functions: {
+      payroll_summary: {
+        Args: { p_organization_id: string; p_from: string; p_to: string }
+        Returns: {
+          profile_id: string
+          employee_name: string
+          week_start: string
+          employment_type: string
+          regular_hours: number
+          overtime_hours: number
+          total_hours: number
+          hourly_rate: number | null
+          regular_cost: number | null
+          overtime_cost: number | null
+          total_cost: number | null
+        }[]
+      }
+      payroll_employee_detail: {
+        Args: { p_organization_id: string; p_profile_id: string; p_from: string; p_to: string }
+        Returns: {
+          entry_id: string
+          work_day: string
+          week_start: string
+          project_name: string
+          clock_in: string
+          clock_out: string
+          paused_minutes: number
+          hours: number
+          work_description: string | null
+        }[]
+      }
       auth_route_context: {
         Args: never
         Returns: {

@@ -1,0 +1,17 @@
+-- Reportes de nomina. Aplicado en vivo 2026-09-15.
+--
+--  payroll_summary(org, from, to)
+--    Una fila por empleado y por SEMANA, aunque el periodo sea quincenal: el
+--    sobretiempo es regla semanal (sobre 40 h), no se puede calcular sobre el
+--    total de dos semanas sin inflarlo. Solo responde a owner/admin.
+--
+--  payroll_employee_detail(org, profile, from, to)
+--    Detalle dia a dia. Un empleado puede ver el suyo; el de otro, solo
+--    owner/admin.
+--
+-- La semana laboral va de LUNES a DOMINGO, en la zona horaria del empleado.
+-- Cada turno se redondea a 2 decimales y despues se suma, para que cuadre con
+-- el timecard sumado a mano.
+--
+-- El cuerpo se aplico con el MCP de Supabase; ver migraciones
+-- 'payroll_summary_and_detail' y 'week_starts_monday'.
