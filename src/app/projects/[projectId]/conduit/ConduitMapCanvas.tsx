@@ -343,9 +343,14 @@ export default function ConduitMapCanvas({
 
   return (
     <div className="relative w-full h-full overflow-hidden">
-      {/* Absolutely positioned so the canvas can never push the pane wider
-          than it is — the other half of the sizing fix above. */}
-      <div ref={mapContainerRef} className="absolute inset-0" />
+      {/* w-full h-full, NO 'absolute inset-0'. MapLibre trae
+          `.maplibregl-map { position: relative }` en su propia hoja de estilos y
+          esa regla gana sobre la clase `absolute` de Tailwind (misma
+          especificidad, se carga despues). Sin position:absolute el inset-0 se
+          ignora y el contenedor colapsa a altura 0: el mapa quedaba invisible y
+          sin recibir clics. Fibra siempre uso w-full h-full y por eso nunca
+          tuvo el problema. */}
+      <div ref={mapContainerRef} className="w-full h-full" />
 
       {/* Same right-edge icon toolbar as the general project map, so the map
           controls are identical everywhere instead of one style per module. */}
