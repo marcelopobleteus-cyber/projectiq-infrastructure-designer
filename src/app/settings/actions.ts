@@ -188,9 +188,13 @@ export async function getOrganizationTeamData(): Promise<OrganizationTeamData> {
 
 export async function inviteTeamMember(
   email: string,
-  role: 'admin' | 'editor' | 'viewer'
+  role: 'admin' | 'editor' | 'viewer' | 'employee'
 ): Promise<{ success?: boolean; error?: string; warning?: string }> {
-  const validRoles = ['admin', 'editor', 'viewer']
+  // 'employee' es el rol de quien ficha horas en terreno: entra al timecard y
+  // ve sus propias horas, pero no edita el diseno ni ve tarifas. Faltaba aqui,
+  // asi que el rol existia en la base pero no habia forma de invitar a nadie
+  // con el desde la aplicacion.
+  const validRoles = ['admin', 'editor', 'viewer', 'employee']
   if (!validRoles.includes(role)) {
     return { error: 'Invalid role selected.' }
   }
@@ -259,7 +263,7 @@ export async function inviteTeamMember(
 
 export async function updateMemberRole(
   memberId: string,
-  newRole: 'owner' | 'admin' | 'editor' | 'viewer'
+  newRole: 'owner' | 'admin' | 'editor' | 'viewer' | 'employee'
 ): Promise<{ success?: boolean; error?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

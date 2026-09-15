@@ -39,7 +39,7 @@ export default function SettingsClient({ initialTeamData }: { initialTeamData: O
   // Invite modal state
   const [isInviteOpen, setIsInviteOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteRole, setInviteRole] = useState<'admin' | 'editor' | 'viewer'>('editor')
+  const [inviteRole, setInviteRole] = useState<'admin' | 'editor' | 'viewer' | 'employee'>('editor')
   const [isInviting, setIsInviting] = useState(false)
 
   // Member deletion state
@@ -553,6 +553,7 @@ export default function SettingsClient({ initialTeamData }: { initialTeamData: O
                                 <option value="admin">Admin</option>
                                 <option value="editor">Editor</option>
                                 <option value="viewer">Viewer</option>
+                                <option value="employee">Employee</option>
                               </select>
                             ) : (
                               <span className="capitalize font-bold text-[var(--text-primary)]">{member.role}</span>
@@ -655,6 +656,7 @@ export default function SettingsClient({ initialTeamData }: { initialTeamData: O
                 >
                   <option value="editor">Editor (Can create and edit projects)</option>
                   <option value="viewer">Viewer (Read-only access)</option>
+                  <option value="employee">Employee (Time card only — clocks hours in the field)</option>
                   {isOwner && <option value="admin">Admin (Can manage users & settings)</option>}
                 </select>
               </div>
