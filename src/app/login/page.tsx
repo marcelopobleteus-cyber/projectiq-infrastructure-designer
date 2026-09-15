@@ -8,6 +8,9 @@ import { login } from '../auth/actions'
 function LoginForm() {
   const searchParams = useSearchParams()
   const resetSuccess = searchParams.get('reset') === 'success'
+  // El callback de correo redirige aqui con ?error= cuando el enlace falla. Antes
+  // se ignoraba, asi que el usuario aterrizaba en un login mudo sin saber por que.
+  const linkError = searchParams.get('error')
   const [error, setError] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -43,9 +46,9 @@ function LoginForm() {
           </div>
         )}
 
-        {error && (
+        {(error || linkError) && (
           <div className="bg-red-50 border border-red-200 text-[var(--danger)] text-xs font-semibold p-3 rounded-lg mb-6">
-            {error}
+            {error || linkError}
           </div>
         )}
 

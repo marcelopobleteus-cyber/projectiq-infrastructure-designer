@@ -1,10 +1,15 @@
 'use client'
 
-import React, { useState, useTransition } from 'react'
+import React, { Suspense, useState, useTransition } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { forgotPassword } from '../auth/actions'
 
-export default function ForgotPasswordPage() {
+function ForgotPasswordForm() {
+  const searchParams = useSearchParams()
+  // Un enlace de recuperacion vencido o ya usado vuelve aqui con el motivo; sin
+  // esto el usuario solo veia el formulario otra vez, sin saber que paso.
+  const linkError = searchParams.get('error')
   const [error, setError] = useState<string | null>(null)
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -38,9 +43,9 @@ export default function ForgotPasswordPage() {
           </p>
         </div>
 
-        {error && (
+        {(error || linkError) && (
           <div className="bg-red-50 border border-red-200 text-[var(--danger)] text-xs font-semibold p-3 rounded-lg mb-6">
-            {error}
+            {error || `That reset link did not work: ${linkError}. Request a new one below — open it in this same browser, and note it expires after a while.`}
           </div>
         )}
 
@@ -94,5 +99,13 @@ export default function ForgotPasswordPage() {
         )}
       </div>
     </main>
+  )
+}
+
+export default function ForgotPasswordPage() {
+  return (
+    <Suspense fallback={null}>
+      <ForgotPasswordForm />
+    </Suspense>
   )
 }

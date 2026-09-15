@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/client'
@@ -13,6 +13,31 @@ export default function ResetPasswordPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isPending, setIsPending] = useState(false)
+  // La pantalla solo sirve con la sesion que crea el enlace del correo. Se
+  // comprueba al entrar para poder decirlo claro, en vez de dejar que el usuario
+  // escriba una clave nueva y recien ahi falle el guardado.
+  const [sessionState, setSessionState] = useState<'checking' | 'ready' | 'missing'>('checking')
+
+  useEffect(() => {
+    let cancelled = false
+
+    const check = async () => {
+      const { data } = await supabase.auth.getSession()
+      if (!cancelled) setSessionState(data.session ? 'ready' : 'missing')
+    }
+
+    // El SDK puede estar todavia leyendo el enlace de la URL, asi que se escucha
+    // el cambio de estado ademas de preguntar una vez.
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!cancelled && session) setSessionState('ready')
+    })
+
+    check()
+    return () => {
+      cancelled = true
+      sub.subscription.unsubscribe()
+    }
+  }, [supabase])
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -66,6 +91,24 @@ export default function ResetPasswordPage() {
           </div>
         )}
 
+        {sessionState === 'missing' ? (
+          <div className="space-y-4">
+            <div className="bg-red-50 border border-red-200 text-[var(--danger)] text-xs font-semibold p-3 rounded-lg leading-relaxed">
+              This page needs the link from your reset email. Open that link in this same browser — the link expires, and it only works once.
+            </div>
+            <Link
+              href="/forgot-password"
+              className="w-full block text-center py-2.5 px-4 bg-[var(--accent)] text-white font-bold rounded-lg text-xs"
+            >
+              Request a new link
+            </Link>
+            <div className="pt-2 text-center">
+              <Link href="/login" className="text-xs font-bold text-[var(--accent-text)] hover:underline">
+                &larr; Back to Sign In
+              </Link>
+            </div>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="password" className="block text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider mb-1.5">
@@ -115,7 +158,7 @@ export default function ResetPasswordPage() {
 
           <button
             type="submit"
-            disabled={isPending}
+            disabled={isPending || sessionState !== 'ready'}
             className="w-full py-2.5 px-4 bg-[var(--accent)] text-white font-bold rounded-lg transition-all shadow-xs text-xs cursor-pointer disabled:opacity-50"
           >
             {isPending ? 'Saving Password...' : 'Set Password'}
@@ -127,6 +170,7 @@ export default function ResetPasswordPage() {
             </Link>
           </div>
         </form>
+        )}
       </div>
     </main>
   )
