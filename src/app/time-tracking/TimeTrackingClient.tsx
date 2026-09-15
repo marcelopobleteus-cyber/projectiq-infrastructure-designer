@@ -114,9 +114,23 @@ export default function TimeTrackingClient({
     if (!editingEntry) return
     setError(null)
     startTransition(async () => {
+      // <input type="datetime-local"> solo maneja minutos, asi que reconstruir la
+      // fecha desde el input trunca los segundos — y lo hacia incluso en los
+      // campos que nadie toco: abrir y guardar una entrada le restaba hasta un
+      // minuto, siempre hacia abajo. Un dia de 8.07 h (8:04:12) volvia como
+      // 8:04:00 = 8.07 -> 8.0667, y el total semanal bajaba sin motivo visible.
+      // Si el valor mostrado coincide con el original, se manda el original
+      // intacto; solo lo que el usuario realmente edito pierde los segundos,
+      // que es correcto porque los escribio al minuto.
+      const keepIfUnchanged = (typed: string, original: string | null): string | null => {
+        if (!original) return typed ? new Date(typed).toISOString() : null
+        if (typed && toLocalInputValue(original) === typed) return original
+        return typed ? new Date(typed).toISOString() : null
+      }
+
       const res = await updateTimeEntry(editingEntry.id, {
-        clock_in: new Date(clockIn).toISOString(),
-        clock_out: clockOut ? new Date(clockOut).toISOString() : null,
+        clock_in: keepIfUnchanged(clockIn, editingEntry.clock_in) as string,
+        clock_out: keepIfUnchanged(clockOut, editingEntry.clock_out),
         project_id: projectId,
         cost_code_id: costCodeId,
         work_description: description.trim() || null,
