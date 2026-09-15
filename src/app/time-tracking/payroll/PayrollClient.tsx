@@ -8,7 +8,7 @@ import {
   type PayrollWeekRow,
   type PayrollDetailRow,
 } from './actions'
-import { generatePayStatementPdf } from './pdf'
+import { generatePayStatementPdf, generatePayrollReportPdf } from './pdf'
 
 /** Lunes de la semana que contiene `d`. La semana laboral va lunes a domingo. */
 function mondayOf(d: Date): Date {
@@ -55,6 +55,7 @@ export default function PayrollClient() {
   const [error, setError] = useState<string | null>(null)
 
   const [pdfFor, setPdfFor] = useState<string | null>(null)
+  const [reportPdfBusy, setReportPdfBusy] = useState(false)
   const [openEmployee, setOpenEmployee] = useState<string | null>(null)
   const [detail, setDetail] = useState<PayrollDetailRow[]>([])
   const [detailLoading, setDetailLoading] = useState(false)
@@ -80,6 +81,19 @@ export default function PayrollClient() {
     return () => window.clearTimeout(id)
   }, [load])
 
+  /** El servidor devuelve el PDF en base64; aqui solo se reconstituye y baja. */
+  const savePdf = (base64: string, fileName: string) => {
+    const bin = atob(base64)
+    const buf = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i)
+    const url = URL.createObjectURL(new Blob([buf], { type: 'application/pdf' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fileName
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const downloadStatement = async (profileId: string) => {
     setPdfFor(profileId)
     const res = await generatePayStatementPdf(profileId, from, to)
@@ -88,16 +102,18 @@ export default function PayrollClient() {
       setError(res.error || 'Could not build the statement.')
       return
     }
-    // El servidor devuelve el PDF en base64; aqui solo se reconstituye y baja.
-    const bin = atob(res.base64)
-    const buf = new Uint8Array(bin.length)
-    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i)
-    const url = URL.createObjectURL(new Blob([buf], { type: 'application/pdf' }))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = res.fileName
-    a.click()
-    URL.revokeObjectURL(url)
+    savePdf(res.base64, res.fileName)
+  }
+
+  const downloadReport = async () => {
+    setReportPdfBusy(true)
+    const res = await generatePayrollReportPdf(from, to)
+    setReportPdfBusy(false)
+    if (res.error || !res.base64 || !res.fileName) {
+      setError(res.error || 'Could not build the report.')
+      return
+    }
+    savePdf(res.base64, res.fileName)
   }
 
   const openDetail = async (profileId: string) => {
@@ -240,14 +256,23 @@ export default function PayrollClient() {
             </button>
           ))}
         </div>
-        <div className="ml-auto">
+        <div className="ml-auto flex gap-1.5">
           <button
             type="button"
             onClick={exportCsv}
             disabled={rows.length === 0}
-            className="px-3 py-1.5 text-[11px] font-bold rounded-lg bg-[var(--accent)] text-white cursor-pointer disabled:opacity-40"
+            className="px-3 py-1.5 text-[11px] font-bold rounded-lg border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] cursor-pointer disabled:opacity-40"
           >
             Export CSV
+          </button>
+          <button
+            type="button"
+            onClick={downloadReport}
+            disabled={rows.length === 0 || reportPdfBusy}
+            title="Payroll report for every employee in this period, as PDF"
+            className="px-3 py-1.5 text-[11px] font-bold rounded-lg bg-[var(--accent)] text-white cursor-pointer disabled:opacity-40"
+          >
+            {reportPdfBusy ? 'Building…' : 'Report PDF'}
           </button>
         </div>
       </div>
