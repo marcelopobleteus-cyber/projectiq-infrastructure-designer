@@ -21,6 +21,10 @@ export interface CustomerItem {
   notes: string | null
   status: 'active' | 'inactive'
   projectCount: number
+  /** Suma de la capa financiera de todos sus proyectos. */
+  invoiced: number
+  paid: number
+  receivable: number
 }
 
 async function callerOrg(): Promise<{ orgId: string | null; canWrite: boolean }> {
@@ -55,7 +59,25 @@ export async function getCustomers(): Promise<{ customers: CustomerItem[]; canWr
     supabase.from('projects').select('customer_id').eq('organization_id', orgId),
   ])
 
+  // El resumen financiero se lee de la vista: sumarlo aqui en JS obligaria a
+  // traer todas las facturas y pagos de la organizacion.
+  const { data: finRows } = await supabase
+    .from('project_financial_summary')
+    .select('customer_id, invoiced, paid, receivable')
+    .eq('organization_id', orgId)
+
   if (error) return { customers: [], canWrite, error: error.message }
+
+  const round2 = (v: unknown) => Math.round(Number(v || 0) * 100) / 100
+  const fin = new Map<string, { invoiced: number; paid: number; receivable: number }>()
+  ;(finRows ?? []).forEach(r => {
+    if (!r.customer_id) return
+    const cur = fin.get(r.customer_id) ?? { invoiced: 0, paid: 0, receivable: 0 }
+    cur.invoiced = round2(cur.invoiced + round2(r.invoiced))
+    cur.paid = round2(cur.paid + round2(r.paid))
+    cur.receivable = round2(cur.receivable + round2(r.receivable))
+    fin.set(r.customer_id, cur)
+  })
 
   const counts = new Map<string, number>()
   ;(projectRows ?? []).forEach(p => {
@@ -74,6 +96,9 @@ export async function getCustomers(): Promise<{ customers: CustomerItem[]; canWr
       notes: c.notes,
       status: c.status === 'inactive' ? 'inactive' : 'active',
       projectCount: counts.get(c.id) ?? 0,
+      invoiced: fin.get(c.id)?.invoiced ?? 0,
+      paid: fin.get(c.id)?.paid ?? 0,
+      receivable: fin.get(c.id)?.receivable ?? 0,
     })),
   }
 }

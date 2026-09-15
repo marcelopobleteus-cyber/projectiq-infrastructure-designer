@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { saveCustomer, deleteCustomer, type CustomerItem, type CustomerInput } from './actions'
 
+const money = (n: number) =>
+  n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 })
+
 const EMPTY: CustomerInput = {
   name: '', contactName: '', contactEmail: '', contactPhone: '', address: '', notes: '', status: 'active',
 }
@@ -37,6 +40,7 @@ export default function CustomersClient({
   const totals = useMemo(() => ({
     active: customers.filter(c => c.status === 'active').length,
     withProjects: customers.filter(c => c.projectCount > 0).length,
+    receivable: Math.round(customers.reduce((s, c) => s + c.receivable, 0) * 100) / 100,
   }), [customers])
 
   const save = async () => {
@@ -100,15 +104,16 @@ export default function CustomersClient({
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: 'Customers', value: String(customers.length) },
-          { label: 'Active', value: String(totals.active) },
-          { label: 'With projects', value: String(totals.withProjects) },
+          { label: 'Customers', value: String(customers.length), tone: '' },
+          { label: 'Active', value: String(totals.active), tone: '' },
+          { label: 'With projects', value: String(totals.withProjects), tone: '' },
+          { label: 'Receivable', value: money(totals.receivable), tone: totals.receivable > 0 ? 'text-amber-400' : '' },
         ].map(m => (
           <div key={m.label} className={`${card} p-3 h-20 flex flex-col justify-between`}>
             <span className="text-[9.5px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">{m.label}</span>
-            <span className="text-xl font-black tracking-tight font-mono text-[var(--text-primary)]">{m.value}</span>
+            <span className={`text-lg font-black tracking-tight font-mono ${m.tone || 'text-[var(--text-primary)]'}`}>{m.value}</span>
           </div>
         ))}
       </div>
@@ -129,6 +134,7 @@ export default function CustomersClient({
                 <th className={th}>Contact</th>
                 <th className={th}>Phone</th>
                 <th className={`${th} text-right`}>Projects</th>
+                <th className={`${th} text-right`}>Receivable</th>
                 <th className={th}>Status</th>
                 <th className={`${th} text-right`}>Actions</th>
               </tr>
@@ -136,7 +142,7 @@ export default function CustomersClient({
             <tbody className="divide-y divide-[var(--border)] font-medium">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-[var(--text-tertiary)]">
+                  <td colSpan={7} className="px-4 py-8 text-center text-[var(--text-tertiary)]">
                     {customers.length === 0 ? 'No customers yet.' : 'Nothing matches that search.'}
                   </td>
                 </tr>
@@ -161,6 +167,18 @@ export default function CustomersClient({
                           {c.projectCount}
                         </Link>
                       ) : '0'}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono tabular-nums">
+                      {c.invoiced > 0 ? (
+                        <>
+                          <div className={`font-bold ${c.receivable > 0 ? 'text-amber-400' : 'text-[var(--text-primary)]'}`}>
+                            {money(c.receivable)}
+                          </div>
+                          <div className="text-[10px] text-[var(--text-tertiary)]">
+                            {money(c.paid)} of {money(c.invoiced)}
+                          </div>
+                        </>
+                      ) : <span className="text-[var(--text-tertiary)]">—</span>}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase border ${
