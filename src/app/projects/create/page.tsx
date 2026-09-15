@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useTransition, useMemo } from 'react'
 import Link from 'next/link'
 import { createProject, suggestNextJobNumber } from '../actions'
+import { getCustomers, type CustomerItem } from '@/app/customers/actions'
 import { createClient } from '@/utils/supabase/client'
 import { PROJECT_SECTIONS, disciplinesForSection, type ProjectSection } from '@/lib/disciplines'
 
@@ -13,12 +14,17 @@ export default function CreateProjectPage() {
   const [section, setSection] = useState<ProjectSection>('its')
   const [jobNumber, setJobNumber] = useState('')
   const [suggestedJobNumber, setSuggestedJobNumber] = useState('')
+  const [customers, setCustomers] = useState<CustomerItem[]>([])
+  const [customerId, setCustomerId] = useState('')
 
   // Sugerencia, no imposicion: un proyecto migrado conserva su numero real.
   useEffect(() => {
     let alive = true
     suggestNextJobNumber()
       .then(res => { if (alive) setSuggestedJobNumber(res.suggestion) })
+      .catch(() => {})
+    getCustomers()
+      .then(res => { if (alive) setCustomers(res.customers.filter(c => c.status === 'active')) })
       .catch(() => {})
     return () => { alive = false }
   }, [])
@@ -265,6 +271,28 @@ export default function CreateProjectPage() {
                 Modules marked &ldquo;Under construction&rdquo; are saved to the project so its full scope is visible, but their work module is not built in the app yet.
               </p>
             )}
+          </div>
+
+          <div>
+            <label htmlFor="customer_id" className="block text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider mb-2">
+              Customer
+            </label>
+            <select
+              id="customer_id"
+              name="customer_id"
+              value={customerId}
+              onChange={e => setCustomerId(e.target.value)}
+              className="w-full px-4 py-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-indigo-500 transition-all text-sm"
+            >
+              <option value="">— No customer —</option>
+              {customers.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <p className="text-[11px] text-[var(--text-tertiary)] mt-1.5 leading-snug">
+              Who the job is for — Mastec, GDOT, City of Milton. Manage the list in{' '}
+              <a href="/customers" className="underline">Customers</a>. Optional.
+            </p>
           </div>
 
           <div>

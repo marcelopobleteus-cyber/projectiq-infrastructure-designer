@@ -1306,6 +1306,48 @@ export type Database = {
         }
         Relationships: []
       }
+      customers: {
+        Row: {
+          address: string | null
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+          organization_id: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+          organization_id: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          organization_id?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       enclosure_kit_items: {
         Row: {
           created_at: string
@@ -3548,6 +3590,7 @@ export type Database = {
       }
       projects: {
         Row: {
+          customer_id: string | null
           job_number: string | null
           camera_canvas_mode: string
           created_at: string
@@ -3566,6 +3609,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          customer_id?: string | null
           job_number?: string | null
           camera_canvas_mode?: string
           created_at?: string
@@ -3584,6 +3628,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          customer_id?: string | null
           job_number?: string | null
           camera_canvas_mode?: string
           created_at?: string

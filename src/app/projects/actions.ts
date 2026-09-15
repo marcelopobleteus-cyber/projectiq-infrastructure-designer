@@ -24,6 +24,7 @@ export async function createProject(formData: FormData) {
 
   const name = formData.get('name') as string
   const jobNumberRaw = String(formData.get('job_number') ?? '').trim()
+  const customerIdRaw = String(formData.get('customer_id') ?? '').trim()
   const description = formData.get('description') as string
   const latitudeStr = formData.get('latitude') as string
   const longitudeStr = formData.get('longitude') as string
@@ -96,6 +97,7 @@ export async function createProject(formData: FormData) {
     .insert({
       name,
       job_number: jobNumber,
+      customer_id: customerIdRaw || null,
       description: description || null,
       disciplines,
       project_section,
