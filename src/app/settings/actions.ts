@@ -853,3 +853,189 @@ export async function saveOrganizationBranding(
   revalidatePath('/settings')
   return { success: true }
 }
+
+// ─── Ficha de empleado ───────────────────────────────────────────────────────
+
+export interface EmployeeProfileDetail {
+  profileId: string
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+  cell: string
+  title: string
+  weatherZip: string
+  emailSignature: string
+  timeZone: string
+  status: 'active' | 'inactive' | 'archived'
+  /** Solo llega con valor si quien pregunta es owner o admin. */
+  hourlyRate: number | null
+  employmentType: 'w2' | '1099'
+  canSeeRate: boolean
+}
+
+/** Owner/admin de la organizacion del usuario actual, y el id de esa org. */
+async function callerOrgAndRole() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { supabase, userId: null, orgId: null, isManager: false }
+
+  const { data: rows } = await supabase
+    .from('organization_members')
+    .select('organization_id, role')
+    .eq('profile_id', user.id)
+    .limit(1)
+
+  const m = rows?.[0]
+  return {
+    supabase,
+    userId: user.id,
+    orgId: m?.organization_id ?? null,
+    isManager: m?.role === 'owner' || m?.role === 'admin',
+  }
+}
+
+export async function getEmployeeProfile(
+  profileId: string
+): Promise<{ data?: EmployeeProfileDetail; error?: string }> {
+  const { supabase, orgId, isManager } = await callerOrgAndRole()
+  if (!orgId) return { error: 'No organization for the current user.' }
+
+  const { data: p, error } = await supabase
+    .from('profiles')
+    .select('id, first_name, last_name, email, phone, cell, title, weather_zip, email_signature, time_zone, status')
+    .eq('id', profileId)
+    .single()
+
+  if (error || !p) return { error: error?.message ?? 'Profile not found.' }
+
+  // La tarifa la filtra ademas la politica RLS de employee_rates; esto solo
+  // evita pedirla cuando ya sabemos que no corresponde.
+  let hourlyRate: number | null = null
+  let employmentType: 'w2' | '1099' = 'w2'
+  if (isManager) {
+    const { data: rate } = await supabase
+      .from('employee_rates')
+      .select('hourly_rate, employment_type')
+      .eq('organization_id', orgId)
+      .eq('profile_id', profileId)
+      .maybeSingle()
+    if (rate) {
+      hourlyRate = Number(rate.hourly_rate)
+      employmentType = rate.employment_type === '1099' ? '1099' : 'w2'
+    }
+  }
+
+  return {
+    data: {
+      profileId: p.id,
+      firstName: p.first_name ?? '',
+      lastName: p.last_name ?? '',
+      email: p.email ?? '',
+      phone: p.phone ?? '',
+      cell: p.cell ?? '',
+      title: p.title ?? '',
+      weatherZip: p.weather_zip ?? '',
+      emailSignature: p.email_signature ?? '',
+      timeZone: p.time_zone ?? 'America/New_York',
+      status: (p.status as 'active' | 'inactive' | 'archived') ?? 'active',
+      hourlyRate,
+      employmentType,
+      canSeeRate: isManager,
+    },
+  }
+}
+
+export async function updateEmployeeProfile(
+  profileId: string,
+  fields: {
+    firstName: string
+    lastName: string
+    phone: string
+    cell: string
+    title: string
+    weatherZip: string
+    emailSignature: string
+    timeZone: string
+    status: 'active' | 'inactive' | 'archived'
+  }
+): Promise<{ success?: boolean; error?: string }> {
+  const { supabase, userId, isManager } = await callerOrgAndRole()
+  if (!userId) return { error: 'Not authenticated' }
+  // Cada quien puede editar su propia ficha; la de otro, solo owner/admin.
+  if (profileId !== userId && !isManager) {
+    return { error: 'Only owners and admins can edit another user.' }
+  }
+
+  const first = fields.firstName.trim()
+  const last = fields.lastName.trim()
+  if (!first) return { error: 'First name is required.' }
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      first_name: first,
+      last_name: last || null,
+      // full_name sigue siendo lo que muestran las listas y el timecard, asi que
+      // se mantiene en sincronia en vez de quedar con el valor viejo.
+      full_name: [first, last].filter(Boolean).join(' '),
+      phone: fields.phone.trim() || null,
+      cell: fields.cell.trim() || null,
+      title: fields.title.trim() || null,
+      weather_zip: fields.weatherZip.trim() || null,
+      email_signature: fields.emailSignature.trim() || null,
+      time_zone: fields.timeZone,
+      status: fields.status,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', profileId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/settings')
+  revalidatePath('/time-tracking')
+  return { success: true }
+}
+
+export async function setEmployeeRate(
+  profileId: string,
+  hourlyRate: number | null,
+  employmentType: 'w2' | '1099'
+): Promise<{ success?: boolean; error?: string }> {
+  const { supabase, orgId, isManager } = await callerOrgAndRole()
+  if (!orgId) return { error: 'No organization for the current user.' }
+  if (!isManager) return { error: 'Only owners and admins can set pay rates.' }
+
+  if (hourlyRate === null) {
+    const { error } = await supabase
+      .from('employee_rates')
+      .delete()
+      .eq('organization_id', orgId)
+      .eq('profile_id', profileId)
+    if (error) return { error: error.message }
+    revalidatePath('/settings')
+    return { success: true }
+  }
+
+  if (!Number.isFinite(hourlyRate) || hourlyRate < 0) {
+    return { error: 'The hourly rate must be a positive number.' }
+  }
+
+  const { error } = await supabase
+    .from('employee_rates')
+    .upsert(
+      {
+        organization_id: orgId,
+        profile_id: profileId,
+        hourly_rate: hourlyRate,
+        employment_type: employmentType,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'organization_id,profile_id' }
+    )
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/settings')
+  return { success: true }
+}

@@ -4,6 +4,10 @@ import React, { useState, useEffect, useRef } from 'react'
 import {
   getOrganizationTeamData,
   inviteTeamMember,
+  getEmployeeProfile,
+  updateEmployeeProfile,
+  setEmployeeRate,
+  type EmployeeProfileDetail,
   updateMemberRole,
   removeMember,
   revokeInvite,
@@ -18,6 +22,174 @@ import {
 import ConfirmModal from '@/components/ui/ConfirmModal'
 import ChecklistTemplatesPanel from '@/components/settings/ChecklistTemplatesPanel'
 import BrandingPanel from '@/components/settings/BrandingPanel'
+
+
+/**
+ * Ficha de usuario, equivalente a la de Construction Foreman.
+ *
+ * La tarifa y el tipo de contrato solo se muestran a owner/admin — y no por
+ * cortesia de esta pantalla: `employee_rates` tiene una politica RLS que no
+ * devuelve la fila a nadie mas, asi que aunque alguien abriera esto por otro
+ * camino, no veria un numero.
+ */
+function EmployeeEditorModal({
+  detail,
+  saving,
+  onSave,
+  onClose,
+}: {
+  detail: EmployeeProfileDetail
+  saving: boolean
+  onSave: (form: EmployeeProfileDetail) => void
+  onClose: () => void
+}) {
+  const [form, setForm] = useState<EmployeeProfileDetail>(detail)
+  const set = <K extends keyof EmployeeProfileDetail>(k: K, v: EmployeeProfileDetail[K]) =>
+    setForm(f => ({ ...f, [k]: v }))
+
+  const field =
+    'w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--text-primary)]'
+  const label =
+    'block text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)] mb-1'
+
+  return (
+    <div className="fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center p-4">
+      <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] sticky top-0 bg-[var(--surface-1)]">
+          <div>
+            <h3 className="text-sm font-black text-[var(--text-primary)]">User Settings</h3>
+            <p className="font-mono text-[11px] text-[var(--text-tertiary)]">{form.email}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+          >
+            Cancel
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={label}>First Name</label>
+              <input className={field} value={form.firstName} onChange={e => set('firstName', e.target.value)} />
+            </div>
+            <div>
+              <label className={label}>Last Name</label>
+              <input className={field} value={form.lastName} onChange={e => set('lastName', e.target.value)} />
+            </div>
+            <div>
+              <label className={label}>Phone</label>
+              <input className={field} value={form.phone} onChange={e => set('phone', e.target.value)} />
+            </div>
+            <div>
+              <label className={label}>Cell</label>
+              <input className={field} value={form.cell} onChange={e => set('cell', e.target.value)} />
+            </div>
+            <div>
+              <label className={label}>Title</label>
+              <input className={field} value={form.title} onChange={e => set('title', e.target.value)} placeholder="Crew" />
+            </div>
+            <div>
+              <label className={label}>Weather: Zip Code</label>
+              <input className={field} value={form.weatherZip} onChange={e => set('weatherZip', e.target.value)} placeholder="30004" />
+            </div>
+            <div>
+              <label className={label}>Time Zone</label>
+              <select className={field} value={form.timeZone} onChange={e => set('timeZone', e.target.value)}>
+                <option value="America/New_York">(UTC-05:00) Eastern Time (US &amp; Canada)</option>
+                <option value="America/Chicago">(UTC-06:00) Central Time (US &amp; Canada)</option>
+                <option value="America/Denver">(UTC-07:00) Mountain Time (US &amp; Canada)</option>
+                <option value="America/Phoenix">(UTC-07:00) Arizona</option>
+                <option value="America/Los_Angeles">(UTC-08:00) Pacific Time (US &amp; Canada)</option>
+                <option value="America/Santiago">(UTC-04:00) Santiago</option>
+              </select>
+              <p className="text-[10px] text-[var(--text-tertiary)] mt-1 leading-snug">
+                Decides which day and week a shift belongs to on the time card.
+              </p>
+            </div>
+            <div>
+              <label className={label}>Status</label>
+              <select
+                className={field}
+                value={form.status}
+                onChange={e => set('status', e.target.value as EmployeeProfileDetail['status'])}
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="archived">Archived</option>
+              </select>
+              <p className="text-[10px] text-[var(--text-tertiary)] mt-1 leading-snug">
+                Inactivate instead of deleting, so past time cards keep their records.
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <label className={label}>Email Signature</label>
+            <textarea className={field} rows={3} value={form.emailSignature} onChange={e => set('emailSignature', e.target.value)} />
+          </div>
+
+          {form.canSeeRate && (
+            <div className="border-t border-[var(--border)] pt-4">
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)] mb-2">
+                Pay — visible to owners and admins only
+              </span>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={label}>Hourly Rate (USD)</label>
+                  <input
+                    className={field}
+                    inputMode="decimal"
+                    value={form.hourlyRate === null ? '' : String(form.hourlyRate)}
+                    onChange={e =>
+                      set('hourlyRate', e.target.value.trim() === '' ? null : Number(e.target.value))
+                    }
+                    placeholder="27.00"
+                  />
+                </div>
+                <div>
+                  <label className={label}>Employment Type</label>
+                  <select
+                    className={field}
+                    value={form.employmentType}
+                    onChange={e => set('employmentType', e.target.value as 'w2' | '1099')}
+                  >
+                    <option value="w2">W2 — overtime over 40 h/week at 1.5×</option>
+                    <option value="1099">1099 — all hours at straight time</option>
+                  </select>
+                </div>
+              </div>
+              <p className="text-[10px] text-[var(--text-tertiary)] mt-1.5 leading-snug">
+                A 1099 contractor isn&apos;t covered by FLSA overtime, so every hour is paid at the same rate.
+                Leave the rate empty to remove it.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="px-5 py-4 border-t border-[var(--border)] flex justify-end gap-2 sticky bottom-0 bg-[var(--surface-1)]">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-xs font-bold rounded-xl border border-[var(--border)] text-[var(--text-secondary)] cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => onSave(form)}
+            className="px-4 py-2 text-xs font-bold rounded-xl bg-[var(--accent)] text-white cursor-pointer disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function SettingsClient({ initialTeamData }: { initialTeamData: OrganizationTeamData }) {
   const [activeTab, setActiveTab] = useState<'general' | 'profile' | 'company' | 'branding' | 'team' | 'rates' | 'checklists' | 'preferences' | 'integrations' | 'security'>('general')
@@ -55,6 +227,11 @@ export default function SettingsClient({ initialTeamData }: { initialTeamData: O
   const ratesRequested = useRef(false)
 
   const [memberToRemove, setMemberToRemove] = useState<TeamMemberItem | null>(null)
+  // Ficha de empleado: se carga bajo demanda al abrir, no con la tabla, para no
+  // pedir las tarifas de todo el equipo en cada visita a Settings.
+  const [editingEmployee, setEditingEmployee] = useState<EmployeeProfileDetail | null>(null)
+  const [employeeLoading, setEmployeeLoading] = useState(false)
+  const [employeeSaving, setEmployeeSaving] = useState(false)
   const [isRemoving, setIsRemoving] = useState(false)
 
   const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
@@ -116,6 +293,53 @@ export default function SettingsClient({ initialTeamData }: { initialTeamData: O
 
     showToast('Workspace name updated.')
     setTeamData(prev => (prev ? { ...prev, organizationName: next } : prev))
+  }
+
+  const openEmployeeEditor = async (profileId: string) => {
+    setEmployeeLoading(true)
+    const res = await getEmployeeProfile(profileId)
+    setEmployeeLoading(false)
+    if (res.error || !res.data) {
+      showToast(res.error || 'Could not load the user.', 'error')
+      return
+    }
+    setEditingEmployee(res.data)
+  }
+
+  const saveEmployee = async (form: EmployeeProfileDetail) => {
+    setEmployeeSaving(true)
+    const res = await updateEmployeeProfile(form.profileId, {
+      firstName: form.firstName,
+      lastName: form.lastName,
+      phone: form.phone,
+      cell: form.cell,
+      title: form.title,
+      weatherZip: form.weatherZip,
+      emailSignature: form.emailSignature,
+      timeZone: form.timeZone,
+      status: form.status,
+    })
+
+    // La tarifa se guarda aparte porque vive en otra tabla y con otra regla de
+    // acceso: si el usuario no puede verla, no se toca.
+    let rateError: string | undefined
+    if (form.canSeeRate) {
+      const rateRes = await setEmployeeRate(
+        form.profileId,
+        form.hourlyRate === null || Number.isNaN(form.hourlyRate) ? null : Number(form.hourlyRate),
+        form.employmentType
+      )
+      rateError = rateRes.error
+    }
+    setEmployeeSaving(false)
+
+    if (res.error || rateError) {
+      showToast(res.error || rateError || 'Could not save.', 'error')
+      return
+    }
+    showToast('User updated.')
+    setEditingEmployee(null)
+    loadTeamData()
   }
 
   const handleRoleChange = async (memberId: string, newRole: any) => {
@@ -559,7 +783,14 @@ export default function SettingsClient({ initialTeamData }: { initialTeamData: O
                               <span className="capitalize font-bold text-[var(--text-primary)]">{member.role}</span>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-4 py-3 text-right whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => openEmployeeEditor(member.profileId)}
+                              className="text-xs text-[var(--accent-text)] hover:underline font-bold cursor-pointer mr-3"
+                            >
+                              Edit
+                            </button>
                             {isOrgAdmin && (
                               <button
                                 type="button"
@@ -673,6 +904,21 @@ export default function SettingsClient({ initialTeamData }: { initialTeamData: O
       )}
 
       {/* Member Deletion Confirmation Modal */}
+      {employeeLoading && (
+        <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center">
+          <span className="text-xs font-bold text-white">Loading user…</span>
+        </div>
+      )}
+
+      {editingEmployee && (
+        <EmployeeEditorModal
+          detail={editingEmployee}
+          saving={employeeSaving}
+          onSave={saveEmployee}
+          onClose={() => setEditingEmployee(null)}
+        />
+      )}
+
       <ConfirmModal
         isOpen={Boolean(memberToRemove)}
         title={`Remove ${memberToRemove?.fullName}?`}

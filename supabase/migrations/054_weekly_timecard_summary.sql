@@ -1,0 +1,14 @@
+-- Resumen semanal de horas y costo por empleado. Aplicado en vivo 2026-09-15.
+--
+-- Reglas:
+--  * Semana de domingo a sabado, en la zona horaria del empleado. Un turno que
+--    termina tarde el sabado en Atlanta pertenece a esa semana, no a la siguiente.
+--  * Cada turno se redondea a 2 decimales y DESPUES se suma, que es como cuadra
+--    el timecard sumado a mano y como paga la nomina.
+--  * Sobretiempo solo para W2: sobre 40 h semanales, 1.5x. Un 1099 es
+--    contratista y cobra todas sus horas a tarifa simple.
+--  * Tarifa y costo solo para owner/admin de esa organizacion; a cualquier otro
+--    le llegan las horas y el costo en null.
+--
+-- El cuerpo real de la funcion se aplico con el MCP de Supabase; este archivo
+-- documenta el contrato. Ver migracion 'round_hours_per_entry_then_sum'.

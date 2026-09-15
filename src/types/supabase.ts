@@ -1276,6 +1276,36 @@ export type Database = {
           },
         ]
       }
+      employee_rates: {
+        Row: {
+          created_at: string
+          employment_type: string
+          hourly_rate: number
+          id: string
+          organization_id: string
+          profile_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          employment_type?: string
+          hourly_rate: number
+          id?: string
+          organization_id: string
+          profile_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          employment_type?: string
+          hourly_rate?: number
+          id?: string
+          organization_id?: string
+          profile_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       enclosure_kit_items: {
         Row: {
           created_at: string
@@ -3305,6 +3335,15 @@ export type Database = {
       }
       profiles: {
         Row: {
+          cell: string | null
+          email_signature: string | null
+          first_name: string | null
+          last_name: string | null
+          phone: string | null
+          status: string
+          time_zone: string
+          title: string | null
+          weather_zip: string | null
           avatar_url: string | null
           email: string | null
           full_name: string | null
@@ -3314,6 +3353,15 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          cell?: string | null
+          email_signature?: string | null
+          first_name?: string | null
+          last_name?: string | null
+          phone?: string | null
+          status?: string
+          time_zone?: string
+          title?: string | null
+          weather_zip?: string | null
           avatar_url?: string | null
           email?: string | null
           full_name?: string | null
@@ -3323,6 +3371,15 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          cell?: string | null
+          email_signature?: string | null
+          first_name?: string | null
+          last_name?: string | null
+          phone?: string | null
+          status?: string
+          time_zone?: string
+          title?: string | null
+          weather_zip?: string | null
           avatar_url?: string | null
           email?: string | null
           full_name?: string | null
