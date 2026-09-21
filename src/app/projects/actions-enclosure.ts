@@ -4,6 +4,9 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
 import type { AssetCondition, WorkScope } from '@/lib/assetCondition'
 import { defaultScopeFor, scopeBuysMaterial } from '@/lib/assetCondition'
+// Un archivo 'use server' solo puede exportar funciones async, asi que estas
+// constantes viven en su propio modulo y se importan desde aqui.
+import { MAX_ETHERNET_DROP_FT, strandColor } from '@/lib/fiberStrands'
 
 /**
  * Caja de campo de camara.
@@ -21,9 +24,6 @@ import { defaultScopeFor, scopeBuysMaterial } from '@/lib/assetCondition'
  * la bandeja de empalme, y las lineas de BOM del kit. A mano son cinco pasos
  * y por eso en los proyectos reales la cadena quedo sin armar.
  */
-
-/** Limite fisico de Ethernet sobre cobre: 100 m. */
-export const MAX_ETHERNET_DROP_FT = 328
 
 export interface EnclosureKitSummary {
   id: string
@@ -490,21 +490,6 @@ function haversineFeet(lat1: number, lon1: number, lat2: number, lon2: number): 
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
-
-/**
- * Norma de colores TIA-598-C para los 12 hilos de un buffer tube.
- * El orden no es decorativo: es como la cuadrilla identifica cada hilo en
- * terreno, y es el orden en que se ocupan.
- */
-export const STRAND_COLORS = [
-  'Blue', 'Orange', 'Green', 'Brown', 'Slate', 'White',
-  'Red', 'Black', 'Yellow', 'Violet', 'Rose', 'Aqua',
-] as const
-
-export function strandColor(n: number): string {
-  // Mas alla de 12 los colores se repiten por tubo; el numero manda.
-  return STRAND_COLORS[(n - 1) % 12] ?? `Strand ${n}`
-}
 
 export interface StrandUse {
   strandNumber: number

@@ -12,13 +12,13 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
+// Las categorias viven en su propio modulo: un archivo 'use server' solo puede
+// exportar funciones async, y una constante exportada desde aqui compila pero
+// revienta en produccion al invocar el action.
+import type { ExpenseCategory } from './categories'
 
 const BUCKET = 'expense-receipts'
 
-export const EXPENSE_CATEGORIES = [
-  'fuel', 'material', 'equipment', 'tools', 'permit', 'travel', 'meals', 'other',
-] as const
-export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number]
 
 export interface ExpenseItem {
   id: string

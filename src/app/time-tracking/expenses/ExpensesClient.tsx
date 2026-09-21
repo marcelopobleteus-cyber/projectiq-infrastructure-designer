@@ -4,13 +4,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
   getExpenses, saveExpense, deleteExpense, uploadReceipt,
-  EXPENSE_CATEGORIES, type ExpenseItem, type ExpenseCategory, type ExpenseInput,
+  type ExpenseItem, type ExpenseInput,
 } from './actions'
-
-const CATEGORY_LABEL: Record<ExpenseCategory, string> = {
-  fuel: 'Fuel', material: 'Material', equipment: 'Equipment', tools: 'Tools',
-  permit: 'Permit', travel: 'Travel', meals: 'Meals', other: 'Other',
-}
+import { EXPENSE_CATEGORIES, CATEGORY_LABEL, type ExpenseCategory } from './categories'
 
 const money = (n: number) =>
   n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 })
