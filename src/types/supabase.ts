@@ -3830,6 +3830,86 @@ export type Database = {
         }
         Relationships: []
       }
+      project_expenses: {
+        Row: {
+          amount: number
+          billable: boolean
+          category: string
+          created_at: string
+          description: string
+          id: string
+          notes: string | null
+          organization_id: string
+          profile_id: string
+          project_id: string | null
+          receipt_path: string | null
+          spent_on: string
+          updated_at: string | null
+          vendor: string | null
+        }
+        Insert: {
+          amount: number
+          billable?: boolean
+          category?: string
+          created_at?: string
+          description: string
+          id?: string
+          notes?: string | null
+          organization_id: string
+          profile_id: string
+          project_id?: string | null
+          receipt_path?: string | null
+          spent_on?: string
+          updated_at?: string | null
+          vendor?: string | null
+        }
+        Update: {
+          amount?: number
+          billable?: boolean
+          category?: string
+          created_at?: string
+          description?: string
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          profile_id?: string
+          project_id?: string | null
+          receipt_path?: string | null
+          spent_on?: string
+          updated_at?: string | null
+          vendor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_expenses_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_expenses_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_expenses_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_financial_summary"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_expenses_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_floor_plans: {
         Row: {
           created_at: string

@@ -9,6 +9,9 @@ import {
   type PayrollDetailRow,
 } from './actions'
 import { generatePayStatementPdf, generatePayrollReportPdf } from './pdf'
+import { generateLaborInvoicePdf, suggestInvoiceNumber } from './invoicePdf'
+import { getCustomers, type CustomerItem } from '@/app/customers/actions'
+import { getBillableTotal } from '../expenses/actions'
 
 /** Lunes de la semana que contiene `d`. La semana laboral va lunes a domingo. */
 function mondayOf(d: Date): Date {
@@ -56,6 +59,21 @@ export default function PayrollClient() {
 
   const [pdfFor, setPdfFor] = useState<string | null>(null)
   const [reportPdfBusy, setReportPdfBusy] = useState(false)
+  // Factura de labor: se arma con las mismas horas del periodo.
+  const [invoiceOpen, setInvoiceOpen] = useState(false)
+  const [invoiceBusy, setInvoiceBusy] = useState(false)
+  const [customers, setCustomers] = useState<CustomerItem[]>([])
+  const [invoice, setInvoice] = useState({
+    customerId: '',
+    invoiceNumber: '',
+    invoiceDate: iso(today),
+    paymentTerms: 'Net 14',
+    projectOrPo: 'Crew Labor',
+    reimbursementLabel: '',
+    reimbursementAmount: '',
+    otherOrTax: '',
+    notes: 'Please remit payment according to the agreed payment terms. Thank you for your business.',
+  })
   const [openEmployee, setOpenEmployee] = useState<string | null>(null)
   const [detail, setDetail] = useState<PayrollDetailRow[]>([])
   const [detailLoading, setDetailLoading] = useState(false)
@@ -114,6 +132,47 @@ export default function PayrollClient() {
       return
     }
     savePdf(res.base64, res.fileName)
+  }
+
+  const openInvoice = async () => {
+    setInvoiceOpen(true)
+    // Los gastos marcados facturables del mismo periodo se proponen como
+    // reembolso: es exactamente la linea de combustible que se factura a mano hoy.
+    const [list, suggested, billable] = await Promise.all([
+      getCustomers(),
+      suggestInvoiceNumber(iso(today)),
+      getBillableTotal(from, to),
+    ])
+    setCustomers(list.customers)
+    setInvoice(v => ({
+      ...v,
+      invoiceNumber: v.invoiceNumber || suggested,
+      customerId: v.customerId || (list.customers[0]?.id ?? ''),
+      reimbursementLabel: v.reimbursementLabel || (billable > 0 ? 'Reimbursable expenses' : ''),
+      reimbursementAmount: v.reimbursementAmount || (billable > 0 ? billable.toFixed(2) : ''),
+    }))
+  }
+
+  const downloadInvoice = async () => {
+    setInvoiceBusy(true)
+    const res = await generateLaborInvoicePdf(from, to, {
+      customerId: invoice.customerId || null,
+      invoiceNumber: invoice.invoiceNumber,
+      invoiceDate: invoice.invoiceDate,
+      paymentTerms: invoice.paymentTerms,
+      projectOrPo: invoice.projectOrPo,
+      reimbursementLabel: invoice.reimbursementLabel,
+      reimbursementAmount: Number(invoice.reimbursementAmount || 0),
+      otherOrTax: Number(invoice.otherOrTax || 0),
+      notes: invoice.notes,
+    })
+    setInvoiceBusy(false)
+    if (res.error || !res.base64 || !res.fileName) {
+      setError(res.error || 'Could not build the invoice.')
+      return
+    }
+    savePdf(res.base64, res.fileName)
+    setInvoiceOpen(false)
   }
 
   const openDetail = async (profileId: string) => {
@@ -198,6 +257,8 @@ export default function PayrollClient() {
   }
 
   const card = 'bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl'
+  const invField = 'w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--text-primary)]'
+  const invLabel = 'block text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)] mb-1'
   const th = 'text-left px-4 py-2.5 font-bold text-[10px] uppercase tracking-wider text-[var(--text-tertiary)]'
 
   return (
@@ -273,6 +334,15 @@ export default function PayrollClient() {
             className="px-3 py-1.5 text-[11px] font-bold rounded-lg bg-[var(--accent)] text-white cursor-pointer disabled:opacity-40"
           >
             {reportPdfBusy ? 'Building…' : 'Report PDF'}
+          </button>
+          <button
+            type="button"
+            onClick={openInvoice}
+            disabled={rows.length === 0}
+            title="Bill these hours to a customer as an invoice"
+            className="px-3 py-1.5 text-[11px] font-bold rounded-lg bg-[var(--accent)] text-white cursor-pointer disabled:opacity-40"
+          >
+            Invoice PDF
           </button>
         </div>
       </div>
@@ -447,6 +517,84 @@ export default function PayrollClient() {
         Sunday: a period that cuts a week in half counts only the days inside it, so that week&apos;s overtime is
         figured on partial hours.
       </p>
+
+      {invoiceOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setInvoiceOpen(false)}>
+          <div
+            className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl w-full max-w-lg p-5 max-h-[90vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 className="text-sm font-black text-[var(--text-primary)]">Labor invoice</h2>
+            <p className="text-[11px] text-[var(--text-tertiary)] mt-1 mb-4">
+              One line per week from {from} to {to}, using the hours already in this table.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <label className={invLabel}>Bill to</label>
+                <select
+                  className={invField}
+                  value={invoice.customerId}
+                  onChange={e => setInvoice({ ...invoice, customerId: e.target.value })}
+                >
+                  <option value="">— Select a customer —</option>
+                  {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={invLabel}>Invoice #</label>
+                <input className={invField} value={invoice.invoiceNumber} onChange={e => setInvoice({ ...invoice, invoiceNumber: e.target.value })} />
+              </div>
+              <div>
+                <label className={invLabel}>Invoice date</label>
+                <input type="date" className={invField} value={invoice.invoiceDate} onChange={e => setInvoice({ ...invoice, invoiceDate: e.target.value })} />
+              </div>
+              <div>
+                <label className={invLabel}>Payment terms</label>
+                <select className={invField} value={invoice.paymentTerms} onChange={e => setInvoice({ ...invoice, paymentTerms: e.target.value })}>
+                  {['Due on receipt', 'Net 14', 'Net 15', 'Net 30', 'Net 45', 'Net 60'].map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={invLabel}>Project / PO</label>
+                <input className={invField} value={invoice.projectOrPo} onChange={e => setInvoice({ ...invoice, projectOrPo: e.target.value })} />
+              </div>
+              <div>
+                <label className={invLabel}>Reimbursement label</label>
+                <input className={invField} placeholder="Fuel Reimbursement" value={invoice.reimbursementLabel} onChange={e => setInvoice({ ...invoice, reimbursementLabel: e.target.value })} />
+              </div>
+              <div>
+                <label className={invLabel}>Reimbursement amount</label>
+                <input type="number" step="0.01" className={invField} placeholder="0.00" value={invoice.reimbursementAmount} onChange={e => setInvoice({ ...invoice, reimbursementAmount: e.target.value })} />
+              </div>
+              <div>
+                <label className={invLabel}>Other / Tax</label>
+                <input type="number" step="0.01" className={invField} placeholder="0.00" value={invoice.otherOrTax} onChange={e => setInvoice({ ...invoice, otherOrTax: e.target.value })} />
+              </div>
+              <div className="col-span-2">
+                <label className={invLabel}>Notes / payment instructions</label>
+                <textarea rows={3} className={invField} value={invoice.notes} onChange={e => setInvoice({ ...invoice, notes: e.target.value })} />
+              </div>
+            </div>
+
+            <p className="text-[10px] text-[var(--text-tertiary)] mt-3 leading-snug">
+              The reimbursement is pre-filled with the expenses marked billable in this period. Clear the
+              amount to leave it off. A reimbursement line only appears when it has both a label and an amount.
+            </p>
+
+            <div className="flex justify-end gap-2 mt-5">
+              <button type="button" onClick={() => setInvoiceOpen(false)} disabled={invoiceBusy}
+                className="px-3 py-1.5 text-[11px] font-bold rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-primary)] cursor-pointer disabled:opacity-50">
+                Cancel
+              </button>
+              <button type="button" onClick={downloadInvoice} disabled={invoiceBusy}
+                className="px-3 py-1.5 text-[11px] font-bold rounded-lg bg-[var(--accent)] text-white cursor-pointer disabled:opacity-50">
+                {invoiceBusy ? 'Building…' : 'Download invoice'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

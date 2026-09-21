@@ -159,6 +159,12 @@ export default function TimeTrackingClient({
             Field time entries · {organizationName}
           </p>
         </div>
+        <a
+          href="/time-tracking/expenses"
+          className="h-9 px-4 rounded-lg border border-[var(--border)] text-xs font-bold text-[var(--text-primary)] hover:bg-[var(--surface-hover)] flex items-center mr-2"
+        >
+          Expenses
+        </a>
         {isPayrollManager && (
           <a
             href="/time-tracking/payroll"
