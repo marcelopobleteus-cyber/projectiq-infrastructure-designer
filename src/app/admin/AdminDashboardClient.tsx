@@ -14,6 +14,7 @@ import {
   updatePlatformModule,
   toggleOrganizationSuspension,
   updatePlatformOrganization,
+  inviteOrganizationOwner,
 } from './actions'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 import { logout } from '@/app/auth/actions'
@@ -72,6 +73,10 @@ export default function AdminDashboardClient({ initialData }: AdminDashboardClie
 
   // Organization Action Modals
   const [orgToDelete, setOrgToDelete] = useState<PlatformOrganizationItem | null>(null)
+  // Invitar / reenviar la invitacion de owner a una organizacion existente.
+  const [invitingOrg, setInvitingOrg] = useState<PlatformOrganizationItem | null>(null)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState<'owner' | 'admin' | 'editor' | 'viewer' | 'employee'>('owner')
   const [userToToggleAdmin, setUserToToggleAdmin] = useState<PlatformUserItem | null>(null)
 
   // Platform Settings State
@@ -347,6 +352,23 @@ export default function AdminDashboardClient({ initialData }: AdminDashboardClie
           ),
         }))
       }
+    })
+  }
+
+  const handleSendInvite = () => {
+    if (!invitingOrg) return
+    const org = invitingOrg
+    startTransition(async () => {
+      const res = await inviteOrganizationOwner(org.id, inviteEmail, inviteRole)
+      if (res.error) {
+        showToast(res.error, 'error')
+        return
+      }
+      // Una cuenta que ya existe no es un fallo: la invitacion queda escrita y
+      // se aplica al siguiente inicio de sesion. Por eso el aviso es warning.
+      showToast(res.warning || `Invitation sent to ${inviteEmail.trim()} for ${org.name}.`, res.warning ? 'error' : 'success')
+      setInvitingOrg(null)
+      setInviteEmail('')
     })
   }
 
@@ -731,6 +753,19 @@ export default function AdminDashboardClient({ initialData }: AdminDashboardClie
                         }`}
                       >
                         {org.status === 'suspended' ? 'Reactivate Access' : 'Suspend Workspace'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setInvitingOrg(org)
+                          setInviteEmail(org.contactEmail || '')
+                          setInviteRole('owner')
+                        }}
+                        title="Invite or re-send the owner invitation for this company"
+                        className="px-3 py-1.5 text-xs font-bold text-[var(--text-primary)] bg-[var(--surface-2)] hover:bg-[var(--surface-hover)] border border-[var(--border)] rounded-xl transition cursor-pointer flex items-center gap-1.5"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                        <span>Invite owner</span>
                       </button>
                       <button
                         type="button"
@@ -1622,6 +1657,72 @@ export default function AdminDashboardClient({ initialData }: AdminDashboardClie
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* INVITAR / REENVIAR INVITACION DE OWNER */}
+      {invitingOrg && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={() => setInvitingOrg(null)}>
+          <div
+            className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl w-full max-w-md p-6"
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 className="text-base font-black text-[var(--text-primary)]">Invite owner</h2>
+            <p className="text-xs text-[var(--text-secondary)] mt-1 mb-5">
+              Sends the invitation for <strong className="text-[var(--text-primary)]">{invitingOrg.name}</strong>. Re-sending is safe:
+              the previous pending invitation for the same address is replaced, never duplicated.
+            </p>
+
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)] mb-1.5">
+              Email
+            </label>
+            <input
+              type="email"
+              value={inviteEmail}
+              onChange={e => setInviteEmail(e.target.value)}
+              placeholder="owner@company.com"
+              className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3.5 py-2.5 text-sm text-[var(--text-primary)] mb-4"
+            />
+
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)] mb-1.5">
+              Role
+            </label>
+            <select
+              value={inviteRole}
+              onChange={e => setInviteRole(e.target.value as typeof inviteRole)}
+              className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-xl px-3.5 py-2.5 text-sm text-[var(--text-primary)]"
+            >
+              <option value="owner">Owner</option>
+              <option value="admin">Admin</option>
+              <option value="editor">Editor</option>
+              <option value="viewer">Viewer</option>
+              <option value="employee">Employee</option>
+            </select>
+
+            <p className="text-[10px] text-[var(--text-tertiary)] mt-3 leading-snug">
+              The invitation is written first and the email second. That order is what ties the person to this
+              company — an account created before the invitation exists lands in a separate workspace.
+            </p>
+
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                type="button"
+                onClick={() => setInvitingOrg(null)}
+                disabled={isPending}
+                className="px-4 py-2 text-xs font-bold rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-primary)] cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSendInvite}
+                disabled={isPending || !inviteEmail.trim()}
+                className="px-4 py-2 text-xs font-bold rounded-xl bg-[var(--accent)] text-white cursor-pointer disabled:opacity-50"
+              >
+                {isPending ? 'Sending…' : 'Send invitation'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -1038,3 +1038,91 @@ export async function deletePlatformOrganization(
     return { error: err.message || 'Failed to delete organization' }
   }
 }
+
+/**
+ * Invita (o reenvia la invitacion a) un owner de una organizacion existente.
+ *
+ * El flujo de crear organizacion ya escribia la invitacion y mandaba el correo,
+ * pero no habia forma de repetirlo: si el correo no llegaba, o la empresa se
+ * creo sin owner, no quedaba camino desde la interfaz. Invitar desde
+ * Settings -> Team no sirve, porque eso invita a la organizacion del que invita,
+ * no a la que se elige aqui.
+ *
+ * Dos pasos, en este orden y no al reves:
+ *   1. la fila de invitacion, que es la que amarra la persona a ESTA organizacion
+ *   2. el correo, que es lo que crea la cuenta
+ * Si la cuenta naciera antes de existir la invitacion, el usuario terminaria en
+ * una organizacion nueva creada automaticamente, no en la que se eligio.
+ */
+export async function inviteOrganizationOwner(
+  organizationId: string,
+  email: string,
+  role: 'owner' | 'admin' | 'editor' | 'viewer' | 'employee' = 'owner',
+): Promise<{ success?: boolean; error?: string; warning?: string }> {
+  const { isAuthorized, user } = await verifyPlatformAdmin()
+  if (!isAuthorized) {
+    return { error: 'Unauthorized. Platform Administrator privileges required.' }
+  }
+
+  const clean = email.trim().toLowerCase()
+  if (!clean || !clean.includes('@')) {
+    return { error: 'Enter a valid email address.' }
+  }
+
+  let admin
+  try {
+    admin = createAdminClient()
+  } catch (err) {
+    console.error('Admin client unavailable while inviting owner:', err)
+    return { error: 'Admin client unavailable. Check SUPABASE_SERVICE_ROLE_KEY.' }
+  }
+
+  const { data: org } = await admin
+    .from('organizations')
+    .select('id, name')
+    .eq('id', organizationId)
+    .maybeSingle()
+
+  if (!org) return { error: 'Organization not found.' }
+
+  // Se limpian las pendientes previas del mismo correo para ESTA organizacion.
+  // Sin esto, reenviar dos veces deja dos filas y la persona entra dos veces.
+  await admin
+    .from('organization_invites')
+    .delete()
+    .eq('organization_id', organizationId)
+    .eq('email', clean)
+    .eq('status', 'pending')
+
+  const { error: inviteError } = await admin
+    .from('organization_invites')
+    .insert({
+      organization_id: organizationId,
+      email: clean,
+      role,
+      invited_by: user?.id ?? null,
+      status: 'pending',
+    })
+
+  if (inviteError) {
+    console.error('Failed to record organization invite:', inviteError)
+    return { error: `Invitation not recorded: ${inviteError.message}` }
+  }
+
+  const invite = await sendInviteEmail(clean)
+
+  revalidatePath('/admin')
+
+  if (!invite.sent) {
+    // La cuenta ya existente NO es un fallo: la invitacion quedo escrita y
+    // reconcile_pending_invites() la aplica en el proximo inicio de sesion.
+    return {
+      success: true,
+      warning:
+        `The invitation is recorded for ${org.name}, but the email was not sent: ${invite.error || 'unknown error'}. ` +
+        `If the account already exists, signing in once is enough to join.`,
+    }
+  }
+
+  return { success: true }
+}
