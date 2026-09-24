@@ -3,6 +3,7 @@
 import React from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import NextQMark from '@/components/brand/NextQMark'
 
 interface FieldDrawerProps {
   isOpen: boolean
@@ -78,8 +79,8 @@ export default function FieldDrawer({
       <div className="relative w-4/5 max-w-xs bg-[var(--surface-1)] border-r border-[var(--border)] flex flex-col h-full z-10 shadow-2xl overflow-hidden">
         <div className="p-4 border-b-2 border-blue-600 bg-[var(--surface-2)] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
-              NQ
+            <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <NextQMark size={18} variant="mono" />
             </div>
             <div>
               <span className="text-xs font-extrabold text-blue-700 tracking-wider block">NextQ Field App</span>

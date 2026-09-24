@@ -4,7 +4,7 @@
   /* Surfaces */
   --bg: #F7F7F5;
   --surface-1: #FFFFFF;
-  --surface-2: #F4F4F1;
+  --surface-2: #F5F4F1;
   --surface-3: #EDEDE9;
   --surface-hover: #EDEDEA;
 
@@ -13,16 +13,19 @@
   --border-strong: #D6D6CF;
 
   /* Text */
-  --text-primary: #171714;
-  --text-secondary: #6B6B63;
-  --text-tertiary: #9C9C93;
+  --text-primary: #1C1B19;
+  --text-secondary: #6B675F;
+  --text-tertiary: #A8A399;
 
   /* Brand — Orange is the ONLY accent/brand color */
-  --accent: #FF6600;
-  --accent-hover: #E65C00;
-  --accent-text: #C2480A;
+  /* Valores tomados del paquete de marca NextQ (nextq-logo-E).
+     No inventar variantes: el naranja del logo y el de la interfaz son
+     el mismo color, y si se separan la app deja de verse de la empresa. */
+  --accent: #FF6A13;
+  --accent-hover: #E55A0A;
+  --accent-text: #C24E0E;
   --accent-soft: #FFF0E4;
-  --accent-border: #FFC299;
+  --accent-border: #FFC49E;
 
   /* Semantic States */
   --success: #16A34A;
@@ -30,7 +33,7 @@
   --warn: #B7791F;
   --warn-soft: #FBF1DD;
   --danger: #DC2626;
-  --pending: #9C9C93;
+  --pending: #A8A399;
 
   /* Legacy aliases mapped to new tokens for backwards safety */
   --background: var(--bg);

@@ -3,6 +3,7 @@
 import React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import NextQMark from '@/components/brand/NextQMark'
 
 interface MainSidebarProps {
   userEmail?: string | null
@@ -121,9 +122,9 @@ export default function MainSidebar({ userEmail, userName, isPlatformAdmin, onSi
         <Link
           href="/dashboard"
           title="NextQ Designer Suite"
-          className="w-10 h-10 rounded-xl bg-[var(--accent)] text-white flex items-center justify-center font-black text-sm tracking-wider shadow-sm transition-all"
+          className="w-10 h-10 rounded-xl bg-[#1C1B19] flex items-center justify-center shadow-sm transition-all"
         >
-          NQ
+          <NextQMark size={22} variant="reverse" />
         </Link>
 
         {/* Navigation Items */}

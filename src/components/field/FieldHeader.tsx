@@ -2,6 +2,7 @@
 
 import React from 'react'
 import Link from 'next/link'
+import NextQMark from '@/components/brand/NextQMark'
 
 interface FieldHeaderProps {
   title?: string
@@ -19,8 +20,8 @@ export default function FieldHeader({
   return (
     <header className="h-14 bg-[var(--surface-1)] border-b-2 border-blue-600 px-4 flex items-center justify-between sticky top-0 z-40 shrink-0 font-sans shadow-xs">
       <div className="flex items-center gap-2.5 min-w-0">
-        <Link href="/field/projects" className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
-          NQ
+        <Link href="/field/projects" className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+          <NextQMark size={18} variant="mono" />
         </Link>
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">

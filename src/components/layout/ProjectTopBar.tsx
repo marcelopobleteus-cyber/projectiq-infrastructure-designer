@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { deleteProject } from '@/app/projects/actions'
 import ConfirmModal from '@/components/ui/ConfirmModal'
+import NextQMark from '@/components/brand/NextQMark'
 
 interface ProjectTopBarProps {
   projectId: string
@@ -99,8 +100,8 @@ export default function ProjectTopBar({
       {/* Project Switcher & Name */}
       <div className="flex items-center gap-4 min-w-0">
         <Link href="/projects" className="flex items-center gap-2 group min-w-0">
-          <div className="w-7 h-7 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent-border)] flex items-center justify-center text-[var(--accent)] font-bold text-xs shrink-0">
-            NQ
+          <div className="w-7 h-7 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] flex items-center justify-center shrink-0">
+            <NextQMark size={16} />
           </div>
           <div className="flex flex-col min-w-0">
             <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)] leading-none">Project</span>

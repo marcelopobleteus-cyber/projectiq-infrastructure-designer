@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { updateProjectDisciplines } from '@/app/projects/actions'
 import { DISCIPLINES, getSectionMeta, type ProjectSection } from '@/lib/disciplines'
+import NextQMark from '@/components/brand/NextQMark'
 
 interface ProjectSidebarProps {
   projectId: string
@@ -277,7 +278,7 @@ export default function ProjectSidebar({ projectId, projectName, disciplines, pr
                 pinned ? 'text-[var(--accent-text)] bg-[var(--accent-soft)]' : 'text-[var(--text-primary)] bg-[var(--surface-2)] hover:bg-[var(--surface-hover)]'
               }`}
             >
-              NQ
+              <NextQMark size={18} />
             </button>
           )}
         </div>
