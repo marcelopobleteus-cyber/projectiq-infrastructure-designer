@@ -68,7 +68,7 @@ export async function forgotPassword(formData: FormData) {
     return { error: 'Email is required' }
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://designer.nextqtechs.com'
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://designer.nextqtechnology.com'
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${siteUrl}/auth/callback?next=/reset-password`,
   })

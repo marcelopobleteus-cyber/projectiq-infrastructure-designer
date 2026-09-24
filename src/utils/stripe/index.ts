@@ -73,7 +73,7 @@ export async function createStripeSubscriptionCheckout(params: CreateCheckoutPar
     return { error: 'No valid Stripe price IDs provided for selected modules.' }
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://designer.nextqtechs.com'
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://designer.nextqtechnology.com'
   const successUrl = params.successUrl || `${siteUrl}/admin?checkout=success&org_id=${params.organizationId}`
   const cancelUrl = params.cancelUrl || `${siteUrl}/admin?checkout=canceled&org_id=${params.organizationId}`
 

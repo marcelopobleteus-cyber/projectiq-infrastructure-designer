@@ -11,7 +11,7 @@ NextQ Infrastructure Designer is a high-performance spatial planner for enterpri
 
 ## Deployment & Reference IDs
 
-- **Primary Production URL:** https://designer.nextqtechs.com
+- **Primary Production URL:** https://designer.nextqtechnology.com
 - **Vercel Deploy Link:** https://projectiq-infrastructure-designer.vercel.app
 - **Supabase Project ID:** fkokqccxhljbuqyutkxi
 - **GitHub Repository:** https://github.com/marcelopobleteus-cyber/projectiq-infrastructure-designer

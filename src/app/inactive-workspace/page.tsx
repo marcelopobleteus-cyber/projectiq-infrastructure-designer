@@ -32,8 +32,8 @@ export default function InactiveWorkspacePage() {
           </div>
           <p className="text-xs text-[var(--text-secondary)]">
             If you believe this is in error, reach out to our team at{' '}
-            <a href="mailto:support@nextqtechs.com" className="text-[var(--accent-text)] font-semibold hover:underline">
-              support@nextqtechs.com
+            <a href="mailto:support@nextqtechnology.com" className="text-[var(--accent-text)] font-semibold hover:underline">
+              support@nextqtechnology.com
             </a>
           </p>
         </div>
