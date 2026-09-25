@@ -3265,6 +3265,90 @@ export type Database = {
           },
         ]
       }
+      labor_invoices: {
+        Row: {
+          created_at: string
+          customer_id: string | null
+          detail: Json
+          id: string
+          invoice_date: string
+          invoice_number: string
+          labor_subtotal: number
+          notes: string | null
+          organization_id: string
+          other_or_tax: number
+          paid_on: string | null
+          payment_terms: string | null
+          period_from: string
+          period_to: string
+          project_or_po: string | null
+          reimbursements: number
+          status: string
+          total: number
+          total_hours: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          customer_id?: string | null
+          detail?: Json
+          id?: string
+          invoice_date: string
+          invoice_number: string
+          labor_subtotal?: number
+          notes?: string | null
+          organization_id: string
+          other_or_tax?: number
+          paid_on?: string | null
+          payment_terms?: string | null
+          period_from: string
+          period_to: string
+          project_or_po?: string | null
+          reimbursements?: number
+          status?: string
+          total?: number
+          total_hours?: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string | null
+          detail?: Json
+          id?: string
+          invoice_date?: string
+          invoice_number?: string
+          labor_subtotal?: number
+          notes?: string | null
+          organization_id?: string
+          other_or_tax?: number
+          paid_on?: string | null
+          payment_terms?: string | null
+          period_from?: string
+          period_to?: string
+          project_or_po?: string | null
+          reimbursements?: number
+          status?: string
+          total?: number
+          total_hours?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "labor_invoices_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "labor_invoices_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       labor_rates: {
         Row: {
           applies_to_scope: Database["public"]["Enums"]["work_scope"]

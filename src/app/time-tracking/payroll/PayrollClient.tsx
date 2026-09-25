@@ -9,7 +9,8 @@ import {
   type PayrollDetailRow,
 } from './actions'
 import { generatePayStatementPdf, generatePayrollReportPdf } from './pdf'
-import { generateLaborInvoicePdf, suggestInvoiceNumber } from './invoicePdf'
+import { previewLaborInvoice, saveLaborInvoice, suggestInvoiceNumber, type InvoiceSummary } from './invoicePdf'
+import { getPeriodGaps, type PeriodGap } from './actions'
 import { getCustomers, type CustomerItem } from '@/app/customers/actions'
 import { getBillableTotal } from '../expenses/actions'
 
@@ -47,12 +48,26 @@ const money = (n: number | null) =>
 
 const hrs = (n: number) => n.toFixed(2)
 
-export default function PayrollClient() {
+/** "Mon, Sep 7" a partir de un ISO, sin que la zona del navegador corra el dia. */
+const dayLabel = (isoDay: string): string => {
+  const [y, m, d] = isoDay.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC',
+  })
+}
+
+interface PayrollClientProps {
+  /** Rango que llega desde el historial de facturas; ausente = las dos ultimas semanas. */
+  initialFrom?: string
+  initialTo?: string
+}
+
+export default function PayrollClient({ initialFrom, initialTo }: PayrollClientProps = {}) {
   const today = new Date()
   const thisMonday = mondayOf(today)
 
-  const [from, setFrom] = useState(iso(addDays(thisMonday, -7)))
-  const [to, setTo] = useState(iso(addDays(thisMonday, 6)))
+  const [from, setFrom] = useState(initialFrom ?? iso(addDays(thisMonday, -7)))
+  const [to, setTo] = useState(initialTo ?? iso(addDays(thisMonday, 6)))
   const [rows, setRows] = useState<PayrollWeekRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -74,6 +89,23 @@ export default function PayrollClient() {
     otherOrTax: '',
     notes: 'Please remit payment according to the agreed payment terms. Thank you for your business.',
   })
+  // El anexo va adjunto por defecto: una factura sin respaldo obliga a quien la
+  // recibe a pedirlo por correo, y ese ida y vuelta retrasa el pago.
+  const [includeDetail, setIncludeDetail] = useState(true)
+  // La factura se mira antes de registrarse. Mientras `preview` tenga valor el
+  // modal muestra el PDF; volver a editar lo descarta para no dejar a la vista
+  // un documento que ya no corresponde a los campos.
+  const [preview, setPreview] = useState<{
+    base64: string
+    fileName: string
+    summary: InvoiceSummary
+    alreadyUsed: boolean
+  } | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [savedId, setSavedId] = useState<string | null>(null)
+  // Dias habiles sin horas. Se separan feriados de ausencias porque son cosas
+  // distintas y el hueco se ve igual.
+  const [gaps, setGaps] = useState<PeriodGap[]>([])
   const [openEmployee, setOpenEmployee] = useState<string | null>(null)
   const [detail, setDetail] = useState<PayrollDetailRow[]>([])
   const [detailLoading, setDetailLoading] = useState(false)
@@ -98,6 +130,30 @@ export default function PayrollClient() {
     const id = window.setTimeout(() => { load() }, 0)
     return () => window.clearTimeout(id)
   }, [load])
+
+  // El iframe necesita una URL. Se crea un blob por cada vista previa y se
+  // revoca la anterior: dejarlas vivas filtra memoria en cada intento.
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      getPeriodGaps(from, to).then(res => { setGaps(res.gaps ?? []) })
+    }, 0)
+    return () => window.clearTimeout(id)
+  }, [from, to])
+
+  // El setState va diferido un tick, igual que la carga del periodo: hacerlo de
+  // forma sincrona dentro del efecto encadena renders y el linter lo marca.
+  useEffect(() => {
+    if (!preview) {
+      const clear = window.setTimeout(() => { setPreviewUrl(null) }, 0)
+      return () => window.clearTimeout(clear)
+    }
+    const bin = atob(preview.base64)
+    const bytes = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }))
+    const id = window.setTimeout(() => { setPreviewUrl(url) }, 0)
+    return () => { window.clearTimeout(id); URL.revokeObjectURL(url) }
+  }, [preview])
 
   /** El servidor devuelve el PDF en base64; aqui solo se reconstituye y baja. */
   const savePdf = (base64: string, fileName: string) => {
@@ -153,27 +209,56 @@ export default function PayrollClient() {
     }))
   }
 
-  const downloadInvoice = async () => {
+  /** Los campos que definen la factura, en un solo lugar para no repetirlos. */
+  const invoiceOptions = () => ({
+    customerId: invoice.customerId || null,
+    invoiceNumber: invoice.invoiceNumber,
+    invoiceDate: invoice.invoiceDate,
+    paymentTerms: invoice.paymentTerms,
+    projectOrPo: invoice.projectOrPo,
+    reimbursementLabel: invoice.reimbursementLabel,
+    reimbursementAmount: Number(invoice.reimbursementAmount || 0),
+    otherOrTax: Number(invoice.otherOrTax || 0),
+    notes: invoice.notes,
+    includeDetail,
+  })
+
+  const buildPreview = async () => {
     setInvoiceBusy(true)
-    const res = await generateLaborInvoicePdf(from, to, {
-      customerId: invoice.customerId || null,
-      invoiceNumber: invoice.invoiceNumber,
-      invoiceDate: invoice.invoiceDate,
-      paymentTerms: invoice.paymentTerms,
-      projectOrPo: invoice.projectOrPo,
-      reimbursementLabel: invoice.reimbursementLabel,
-      reimbursementAmount: Number(invoice.reimbursementAmount || 0),
-      otherOrTax: Number(invoice.otherOrTax || 0),
-      notes: invoice.notes,
-    })
+    setSavedId(null)
+    const res = await previewLaborInvoice(from, to, invoiceOptions())
     setInvoiceBusy(false)
-    if (res.error || !res.base64 || !res.fileName) {
+    if (res.error || !res.base64 || !res.fileName || !res.summary) {
       setError(res.error || 'Could not build the invoice.')
       return
     }
-    savePdf(res.base64, res.fileName)
-    setInvoiceOpen(false)
+    setError(null)
+    setPreview({
+      base64: res.base64,
+      fileName: res.fileName,
+      summary: res.summary,
+      alreadyUsed: Boolean(res.alreadyUsed),
+    })
   }
+
+  const saveInvoice = async () => {
+    setInvoiceBusy(true)
+    const res = await saveLaborInvoice(from, to, invoiceOptions())
+    setInvoiceBusy(false)
+    if (res.error || !res.invoiceId) {
+      setError(res.error || 'Could not record the invoice.')
+      return
+    }
+    setError(null)
+    setSavedId(res.invoiceId)
+  }
+
+  const closeInvoice = () => {
+    setInvoiceOpen(false)
+    setPreview(null)
+    setSavedId(null)
+  }
+
 
   const openDetail = async (profileId: string) => {
     if (openEmployee === profileId) {
@@ -272,12 +357,20 @@ export default function PayrollClient() {
             W2 gets 1.5× over 40 h — a 1099 contractor is paid every hour at the same rate.
           </p>
         </div>
-        <Link
-          href="/time-tracking"
-          className="text-[11px] font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] whitespace-nowrap"
-        >
-          ← Time entries
-        </Link>
+        <div className="flex items-center gap-4 whitespace-nowrap">
+          <Link
+            href="/time-tracking/invoices"
+            className="text-[11px] font-bold text-[var(--accent-text)] hover:underline"
+          >
+            Invoice history →
+          </Link>
+          <Link
+            href="/time-tracking"
+            className="text-[11px] font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+          >
+            ← Time entries
+          </Link>
+        </div>
       </div>
 
       {/* Periodo */}
@@ -353,6 +446,42 @@ export default function PayrollClient() {
         </div>
       )}
 
+      {/* Dias habiles sin horas: feriado federal o ausencia */}
+      {gaps.length > 0 && (
+        <div className={`${card} p-3`}>
+          <div className="flex items-baseline gap-2 mb-2">
+            <span className="text-[9.5px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">
+              Weekdays with no hours
+            </span>
+            <span className="text-[10px] text-[var(--text-tertiary)]">
+              {gaps.filter(g => g.holiday).length} federal holiday
+              {gaps.filter(g => g.holiday).length === 1 ? '' : 's'} ·{' '}
+              {gaps.filter(g => !g.holiday).length} unexplained
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {gaps.map(g => (
+              <span
+                key={g.day}
+                title={g.holiday ?? 'No hours recorded for this weekday'}
+                className={`px-2 py-1 rounded-lg text-[10.5px] font-bold border ${
+                  g.holiday
+                    ? 'bg-red-50 border-red-200 text-red-700'
+                    : 'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text-secondary)]'
+                }`}
+              >
+                {dayLabel(g.day)}
+                {g.holiday ? ` — ${g.holiday}` : ''}
+              </span>
+            ))}
+          </div>
+          <p className="text-[10px] text-[var(--text-tertiary)] mt-2">
+            In red, federal holidays: the prime does not work those days. The rest are weekdays with no
+            time recorded — either an absence or hours still to be entered.
+          </p>
+        </div>
+      )}
+
       {/* Totales del periodo */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
@@ -415,10 +544,13 @@ export default function PayrollClient() {
                                 type="button"
                                 disabled={pdfFor === emp.profileId}
                                 onClick={() => downloadStatement(emp.profileId)}
-                                title="Download this employee's payment statement as PDF"
-                                className="px-2 py-0.5 text-[10px] font-bold rounded border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] cursor-pointer disabled:opacity-40"
+                                title="Day-by-day statement for this employee: every shift, project and hour behind the totals"
+                                className="px-2 py-0.5 text-[10px] font-bold rounded border border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-text)] hover:brightness-95 cursor-pointer disabled:opacity-40 whitespace-nowrap"
                               >
-                                {pdfFor === emp.profileId ? '…' : 'PDF'}
+                                {/* Decia solo "PDF" y pasaba por decoracion. Es el documento
+                                    con el detalle dia por dia, que es justo lo que se pide
+                                    cuando alguien cuestiona una cifra. */}
+                                {pdfFor === emp.profileId ? 'Building…' : 'Daily detail PDF'}
                               </button>
                             </div>
                           )}
@@ -519,16 +651,98 @@ export default function PayrollClient() {
       </p>
 
       {invoiceOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setInvoiceOpen(false)}>
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={closeInvoice}>
           <div
-            className="bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl w-full max-w-lg p-5 max-h-[90vh] overflow-y-auto"
+            className={`bg-[var(--surface-1)] border border-[var(--border)] rounded-2xl w-full ${preview ? 'max-w-3xl' : 'max-w-lg'} p-5 max-h-[90vh] overflow-y-auto`}
             onClick={e => e.stopPropagation()}
           >
             <h2 className="text-sm font-black text-[var(--text-primary)]">Labor invoice</h2>
             <p className="text-[11px] text-[var(--text-tertiary)] mt-1 mb-4">
-              One line per week from {from} to {to}, using the hours already in this table.
+              {preview
+                ? 'Check it before it goes on the record. Nothing has been saved yet.'
+                : `One line per week from ${from} to ${to}, using the hours already in this table.`}
             </p>
 
+            {preview ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { label: 'Hours', value: hrs(preview.summary.totalHours) },
+                    { label: 'Labor', value: money(preview.summary.laborSubtotal) },
+                    { label: 'Reimbursements', value: money(preview.summary.reimbursements) },
+                    { label: 'Balance due', value: money(preview.summary.total) },
+                  ].map(m => (
+                    <div key={m.label} className={`${card} p-2.5`}>
+                      <span className="block text-[9px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">
+                        {m.label}
+                      </span>
+                      <span className="text-sm font-extrabold text-[var(--text-primary)]">{m.value}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-[10.5px] text-[var(--text-secondary)]">
+                  {preview.summary.weekCount} week{preview.summary.weekCount === 1 ? '' : 's'}
+                  {preview.summary.dayCount > 0
+                    ? ` · detail sheet with ${preview.summary.dayCount} days`
+                    : ' · no detail sheet'}
+                  {preview.summary.expenseCount > 0 ? ` and ${preview.summary.expenseCount} expenses` : ''}
+                </p>
+
+                {preview.alreadyUsed && !savedId && (
+                  <div className="bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-semibold p-2.5 rounded-lg">
+                    Invoice {invoice.invoiceNumber} already exists. Saving will overwrite that record — change
+                    the number if this is a different invoice.
+                  </div>
+                )}
+
+                {savedId && (
+                  <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold p-2.5 rounded-lg flex items-center justify-between gap-3">
+                    <span>Recorded as {invoice.invoiceNumber}.</span>
+                    <Link href="/time-tracking/invoices" className="underline whitespace-nowrap">
+                      Open invoice history
+                    </Link>
+                  </div>
+                )}
+
+                {previewUrl && (
+                  <iframe
+                    src={previewUrl}
+                    title="Invoice preview"
+                    className="w-full h-[52vh] rounded-lg border border-[var(--border)] bg-white"
+                  />
+                )}
+
+                <div className="flex justify-between gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setPreview(null)}
+                    disabled={invoiceBusy}
+                    className="px-3 py-1.5 text-[11px] font-bold rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-primary)] cursor-pointer disabled:opacity-50"
+                  >
+                    ← Back to edit
+                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => savePdf(preview.base64, preview.fileName)}
+                      className="px-3 py-1.5 text-[11px] font-bold rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-primary)] cursor-pointer"
+                    >
+                      Download PDF
+                    </button>
+                    <button
+                      type="button"
+                      onClick={savedId ? closeInvoice : saveInvoice}
+                      disabled={invoiceBusy}
+                      className="px-3 py-1.5 text-[11px] font-bold rounded-lg bg-[var(--accent)] text-white cursor-pointer disabled:opacity-50"
+                    >
+                      {savedId ? 'Done' : invoiceBusy ? 'Saving…' : 'Save to history'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+            <>
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
                 <label className={invLabel}>Bill to</label>
@@ -577,21 +791,37 @@ export default function PayrollClient() {
               </div>
             </div>
 
+            <label className="flex items-start gap-2 mt-4 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={includeDetail}
+                onChange={e => setIncludeDetail(e.target.checked)}
+                className="mt-0.5 accent-[var(--accent)]"
+              />
+              <span className="text-[11px] text-[var(--text-secondary)] leading-snug">
+                <span className="font-bold text-[var(--text-primary)]">Attach the detail sheet</span> — a second
+                page listing every day worked and every expense behind the totals. Uncheck it for a one-page
+                invoice.
+              </span>
+            </label>
+
             <p className="text-[10px] text-[var(--text-tertiary)] mt-3 leading-snug">
               The reimbursement is pre-filled with the expenses marked billable in this period. Clear the
               amount to leave it off. A reimbursement line only appears when it has both a label and an amount.
             </p>
 
             <div className="flex justify-end gap-2 mt-5">
-              <button type="button" onClick={() => setInvoiceOpen(false)} disabled={invoiceBusy}
+              <button type="button" onClick={closeInvoice} disabled={invoiceBusy}
                 className="px-3 py-1.5 text-[11px] font-bold rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-primary)] cursor-pointer disabled:opacity-50">
                 Cancel
               </button>
-              <button type="button" onClick={downloadInvoice} disabled={invoiceBusy}
+              <button type="button" onClick={buildPreview} disabled={invoiceBusy}
                 className="px-3 py-1.5 text-[11px] font-bold rounded-lg bg-[var(--accent)] text-white cursor-pointer disabled:opacity-50">
-                {invoiceBusy ? 'Building…' : 'Download invoice'}
+                {invoiceBusy ? 'Building…' : 'Preview invoice'}
               </button>
             </div>
+            </>
+            )}
           </div>
         </div>
       )}

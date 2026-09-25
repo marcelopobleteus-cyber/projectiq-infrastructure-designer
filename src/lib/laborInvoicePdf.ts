@@ -33,6 +33,31 @@ export interface InvoiceParty {
   website?: string | null
 }
 
+/** Un dia trabajado, tal como quedo en la tarjeta. */
+export interface DetailDay {
+  /** ISO yyyy-mm-dd */
+  date: string
+  employee: string
+  project: string
+  clockIn: string
+  clockOut: string
+  hours: number
+}
+
+/** Un gasto incluido en el reembolso. */
+export interface DetailExpense {
+  date: string
+  vendor: string
+  description: string
+  project: string
+  amount: number
+}
+
+export interface InvoiceDetail {
+  days: DetailDay[]
+  expenses: DetailExpense[]
+}
+
 export interface InvoiceInput {
   invoiceNumber: string
   /** ISO yyyy-mm-dd */
@@ -47,6 +72,12 @@ export interface InvoiceInput {
   otherOrTax: number
   balanceDue: number
   notes: string
+  /**
+   * Anexo con el respaldo dia por dia. Ausente = factura simple de una pagina.
+   * Va en hoja aparte y no mezclado con las lineas de cobro: quien aprueba el
+   * pago mira el total, y quien lo audita da vuelta la hoja.
+   */
+  detail?: InvoiceDetail
 }
 
 const NAVY = rgb(0.11, 0.20, 0.35)
@@ -240,6 +271,105 @@ export async function buildLaborInvoicePdf(input: InvoiceInput): Promise<Uint8Ar
   for (const line of wrap(reg, input.notes, 8.5, right - MARGIN)) {
     text(line, MARGIN, y, 8.5, reg, INK)
     y -= 12
+  }
+
+  // ---- Anexo: respaldo dia por dia -----------------------------------------
+  if (input.detail && (input.detail.days.length > 0 || input.detail.expenses.length > 0)) {
+    page = pdf.addPage([PAGE_W, PAGE_H])
+    y = PAGE_H - MARGIN
+
+    text('SUPPORTING DETAIL', MARGIN, y, 13, bold, NAVY)
+    y -= 14
+    text(
+      `Invoice ${input.invoiceNumber} — ${fmtDate(input.invoiceDate)}`,
+      MARGIN, y, 8.5, reg, MUTED,
+    )
+    y -= 26
+
+    // Columnas del anexo: mismo criterio que la tabla principal, borde derecho
+    // primero y de derecha a izquierda.
+    const dHours = right
+    const dOut = dHours - 52
+    const dIn = dOut - 46
+    const dProjX = MARGIN + 132
+    const dProjW = dIn - 46 - dProjX
+
+    const sectionHead = (title: string, cols: [string, number][]) => {
+      if (y < MARGIN + 60) {
+        page = pdf.addPage([PAGE_W, PAGE_H])
+        y = PAGE_H - MARGIN
+      }
+      text(title, MARGIN, y, 9.5, bold, NAVY)
+      y -= 15
+      page.drawRectangle({ x: MARGIN, y: y - 5, width: right - MARGIN, height: 16, color: BAND })
+      for (const [label, xRight] of cols) {
+        if (xRight < 0) text(label, -xRight, y, 8, bold, INK)
+        else textRight(label, xRight, y, 8, bold, INK)
+      }
+      y -= 20
+    }
+
+    const rowGuard = () => {
+      if (y < MARGIN + 30) {
+        page = pdf.addPage([PAGE_W, PAGE_H])
+        y = PAGE_H - MARGIN
+      }
+    }
+
+    if (input.detail.days.length > 0) {
+      sectionHead('Days worked', [
+        [ 'Date', -MARGIN ], [ 'Project', -dProjX ],
+        [ 'In', dIn ], [ 'Out', dOut ], [ 'Hours', dHours ],
+      ])
+      let dayTotal = 0
+      for (const d of input.detail.days) {
+        rowGuard()
+        text(fmtDate(d.date), MARGIN, y, 8.5, reg)
+        text(fit(reg, d.project, 8.5, dProjW), dProjX, y, 8.5, reg)
+        textRight(d.clockIn, dIn, y, 8.5, reg)
+        textRight(d.clockOut, dOut, y, 8.5, reg)
+        textRight(num(d.hours), dHours, y, 8.5, reg)
+        dayTotal += d.hours
+        y -= 14
+      }
+      y -= 2
+      page.drawLine({ start: { x: MARGIN, y: y + 6 }, end: { x: right, y: y + 6 }, thickness: 0.7, color: LINE })
+      text('Total hours', dProjX, y - 6, 8.5, bold, INK)
+      textRight(num(Math.round(dayTotal * 10000) / 10000), dHours, y - 6, 8.5, bold, INK)
+      y -= 34
+    }
+
+    if (input.detail.expenses.length > 0) {
+      sectionHead('Expenses included in reimbursement', [
+        [ 'Date', -MARGIN ], [ 'Vendor / Description', -dProjX ], [ 'Amount', dHours ],
+      ])
+      let expTotal = 0
+      for (const e of input.detail.expenses) {
+        rowGuard()
+        text(fmtDate(e.date), MARGIN, y, 8.5, reg)
+        const label = [e.vendor, e.description].filter(Boolean).join(' — ')
+        text(fit(reg, label, 8.5, dHours - 60 - dProjX), dProjX, y, 8.5, reg)
+        textRight(money(e.amount), dHours, y, 8.5, reg)
+        expTotal += e.amount
+        y -= 14
+        if (e.project) {
+          rowGuard()
+          text(fit(reg, e.project, 7.5, dHours - 60 - dProjX), dProjX, y + 2, 7.5, reg, MUTED)
+          y -= 11
+        }
+      }
+      y -= 2
+      page.drawLine({ start: { x: MARGIN, y: y + 6 }, end: { x: right, y: y + 6 }, thickness: 0.7, color: LINE })
+      text('Total expenses', dProjX, y - 6, 8.5, bold, INK)
+      textRight(money(Math.round(expTotal * 100) / 100), dHours, y - 6, 8.5, bold, INK)
+      y -= 30
+    }
+
+    rowGuard()
+    text(
+      'This sheet supports the amounts on the invoice. Hours come from the crew time cards; expenses from their receipts.',
+      MARGIN, y, 7.5, reg, MUTED,
+    )
   }
 
   return pdf.save()

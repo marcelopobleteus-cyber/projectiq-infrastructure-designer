@@ -121,8 +121,19 @@ export async function buildStatementPdf(input: StatementInput): Promise<Uint8Arr
   text(org?.name || 'Company', MARGIN, 16, bold)
   right('LABOR PAYMENT STATEMENT', PAGE_W - MARGIN, 10, bold, ACCENT)
   y -= 14
-  if (org?.address) { text(org.address, MARGIN, 8, font, MUTED); }
   right(`${fmtDate(from)} – ${fmtDate(to)}`, PAGE_W - MARGIN, 9, font, MUTED)
+  // La direccion de la empresa viene con saltos de linea. Dibujarla de una sola
+  // vez hacia pdf-lib pintar el segundo renglon hacia abajo SIN avanzar y, y esa
+  // linea terminaba encima de la etiqueta EMPLOYEE. Se dibuja renglon por
+  // renglon y se baja la cursor por cada uno.
+  const orgAddressLines = (org?.address ?? '')
+    .split(/\r?\n/)
+    .map(l => l.trim())
+    .filter(Boolean)
+  for (let i = 0; i < orgAddressLines.length; i++) {
+    text(orgAddressLines[i], MARGIN, 8, font, MUTED)
+    if (i < orgAddressLines.length - 1) y -= 10
+  }
   y -= 10
   rule(y)
   y -= 20

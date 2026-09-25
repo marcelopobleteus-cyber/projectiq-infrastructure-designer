@@ -10,6 +10,7 @@
  */
 
 import { createClient } from '@/utils/supabase/server'
+import { federalHolidaysBetween } from '@/lib/usFederalHolidays'
 
 export interface PayrollWeekRow {
   profileId: string
@@ -120,4 +121,67 @@ export async function getPayrollEmployeeDetail(
   }))
 
   return { rows }
+}
+
+/** Un dia habil del periodo sin horas cargadas. */
+export interface PeriodGap {
+  /** ISO yyyy-mm-dd */
+  day: string
+  /** Nombre del feriado federal, o null si fue simplemente un dia sin trabajo. */
+  holiday: string | null
+}
+
+/**
+ * Dias habiles del periodo que quedaron sin horas.
+ *
+ * Existe porque un hueco en la nomina tiene dos causas muy distintas: un feriado
+ * federal, en el que el prime no trabaja por obligacion, o una ausencia. Sin
+ * distinguirlas hay que ir a buscar el calendario cada vez que se revisa un
+ * periodo, y es justo cuando se cuela una jornada inventada.
+ *
+ * Fines de semana quedan fuera: la jornada es de lunes a viernes.
+ */
+export async function getPeriodGaps(
+  from: string,
+  to: string,
+): Promise<{ gaps?: PeriodGap[]; error?: string }> {
+  const { orgId } = await callerOrg()
+  if (!orgId) return { error: 'No organization for the current user.' }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('time_entries')
+    .select('clock_in')
+    .eq('organization_id', orgId)
+    .not('clock_out', 'is', null)
+    .gte('clock_in', `${from}T00:00:00Z`)
+    .lte('clock_in', `${to}T23:59:59Z`)
+
+  if (error) return { error: error.message }
+
+  // El dia se compara en hora local, igual que lo hace payroll_summary: un turno
+  // que empieza a las 7 AM de Georgia es 11:00 UTC, y en UTC seria otro dia.
+  const worked = new Set(
+    (data ?? []).map(e =>
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit',
+      }).format(new Date(e.clock_in as string)),
+    ),
+  )
+
+  const byDate = new Map(federalHolidaysBetween(from, to).map(h => [h.date, h.name]))
+
+  const gaps: PeriodGap[] = []
+  const cursor = new Date(`${from}T00:00:00Z`)
+  const end = new Date(`${to}T00:00:00Z`)
+  while (cursor <= end) {
+    const day = cursor.toISOString().slice(0, 10)
+    const weekday = cursor.getUTCDay()
+    if (weekday >= 1 && weekday <= 5 && !worked.has(day)) {
+      gaps.push({ day, holiday: byDate.get(day) ?? null })
+    }
+    cursor.setUTCDate(cursor.getUTCDate() + 1)
+  }
+
+  return { gaps }
 }
