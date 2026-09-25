@@ -76,9 +76,13 @@ export default function ResetPasswordPage() {
     <main className="min-h-screen flex items-center justify-center bg-[var(--bg)] p-4 relative font-sans">
       <div className="w-full max-w-md bg-[var(--surface-1)] border border-[var(--border)] rounded-xl p-8 shadow-sm relative z-10">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[var(--accent)] text-white mb-4 font-black text-xl tracking-wider shadow-xs">
-            NQ
-          </div>
+          <img
+            src="/brand/nextq-logo-horizontal.svg"
+            alt="NextQ Technology"
+            width={188}
+            height={63}
+            className="mx-auto mb-5 h-auto w-[188px]"
+          />
           <h1 className="text-2xl font-extrabold text-[var(--text-primary)] tracking-tight">Set your password</h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1.5 font-medium">
             Choose a password to access your NextQ workspace.

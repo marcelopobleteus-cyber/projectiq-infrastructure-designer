@@ -18,9 +18,14 @@ export interface OrganizationBranding {
   licenseNumber: string | null
 }
 
+/**
+ * Sin marca propia configurada, el entregable sale con el naranja de NextQ.
+ * Antes salia con un verde (#009973) que no es de nadie: era el color de la app
+ * de antes de la identidad corporativa, y quedo como default por inercia.
+ */
 export const DEFAULT_BRANDING: OrganizationBranding = {
   logoDataUrl: null,
-  primaryColor: '#009973',
+  primaryColor: '#FF6A13',
   contactName: null,
   contactEmail: null,
   contactPhone: null,
